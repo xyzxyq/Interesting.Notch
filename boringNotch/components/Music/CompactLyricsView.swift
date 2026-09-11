@@ -4,6 +4,11 @@ import SwiftUI
 enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
+    // Normalized, fixed surface features keep the moon stable while its phase changes.
+    static let moonCraters: [(CGFloat, CGFloat, CGFloat)] = [
+        (-0.32, -0.38, 0.23), (0.3, -0.13, 0.29), (-0.24, 0.24, 0.2),
+        (0.3, 0.48, 0.14), (-0.55, -0.02, 0.1), (0.15, -0.62, 0.09)
+    ]
 
     static func entranceEdge(sideWidth: CGFloat, gap: CGFloat, progress: Double) -> CGFloat {
         // Spend the two-second reveal on visible content, not the physical notch.
@@ -225,7 +230,25 @@ struct PortalLyricsFrame: View {
             shape.addLine(to: CGPoint(x: center.x + radius * (2 * progress - 1) * cos(angle), y: center.y + radius * sin(angle)))
         }
         shape.closeSubpath()
-        layer.fill(shape, with: .color(tint))
+        var surface = layer
+        surface.clip(to: shape)
+        surface.fill(shape, with: .radialGradient(
+            Gradient(colors: [Color(white: 0.98), Color(red: 0.75, green: 0.78, blue: 0.82), Color(white: 0.38)]),
+            center: CGPoint(x: center.x - radius * 0.35, y: center.y - radius * 0.4),
+            startRadius: 0, endRadius: radius * 1.8))
+        for (x, y, scale) in CompactLyricsLayout.moonCraters {
+            let r = radius * scale
+            let pit = CGRect(x: center.x + x * radius - r, y: center.y + y * radius - r,
+                             width: r * 2, height: r * 1.7)
+            surface.fill(Path(ellipseIn: pit), with: .radialGradient(
+                Gradient(colors: [Color(white: 0.22).opacity(0.55), Color(white: 0.45).opacity(0.12)]),
+                center: CGPoint(x: pit.midX - r * 0.2, y: pit.midY - r * 0.2),
+                startRadius: 0, endRadius: r))
+            var rim = Path()
+            rim.addArc(center: CGPoint(x: pit.midX, y: pit.midY), radius: r * 0.8,
+                       startAngle: .degrees(15), endAngle: .degrees(140), clockwise: false)
+            surface.stroke(rim, with: .color(.white.opacity(0.35)), lineWidth: 0.45)
+        }
         var starPath = Path()
         for i in 0..<10 {
             let angle = -.pi / 2 + Double(i) * .pi / 5

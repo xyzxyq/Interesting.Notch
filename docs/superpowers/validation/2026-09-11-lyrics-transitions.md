@@ -54,3 +54,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swiftc -swift-ver
 ## 新句从右侧滑入
 
 新句起点移至右侧视区右边缘，使用 0.35 秒三次缓出位移接上原有滚动；与旧句 0.4 秒粒子消散同时进行，末字仍停在右侧中央。减少动态效果时保留原有分段显示。新增句首边界与 0.1 秒入场像素检查，修正裁切图像比较中计入行缓冲填充字节的问题；全部受控检查、完整构建和签名验证通过。生产预览已查看。按用户授权退出旧进程，并启动 `/tmp/interesting-notch-slide-build/Build/Products/Debug/boringNotch.app`。
+
+## 月面细节
+
+纯色月相改为冷灰色球面渐变与六处固定月坑，包含坑底阴影和亮边。纹理与月相使用同一遮罩，半月/月牙阶段保持连续；不新增图片资源或依赖。生产预览已查看，受控检查、完整构建与签名验证通过。应用已重启至 `/tmp/interesting-notch-moon-surface-build/Build/Products/Debug/boringNotch.app`。
