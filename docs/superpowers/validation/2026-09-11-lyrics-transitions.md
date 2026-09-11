@@ -58,3 +58,5 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swiftc -swift-ver
 ## 月面细节
 
 纯色月相改为冷灰色球面渐变与六处固定月坑，包含坑底阴影和亮边。纹理与月相使用同一遮罩，半月/月牙阶段保持连续；不新增图片资源或依赖。生产预览已查看，受控检查、完整构建与签名验证通过。应用已重启至 `/tmp/interesting-notch-moon-surface-build/Build/Products/Debug/boringNotch.app`。
+
+星星随后改为暖金渐变、五瓣切面高光、细亮边与柔和光晕，配一个微弱闪烁的星芒；消散粒子沿用金色。闪烁由播放时间驱动，暂停冻结，减少动态效果时静止。生产预览、受控检查、完整构建和签名验证通过，已重启至 `/tmp/interesting-notch-star-build/Build/Products/Debug/boringNotch.app`。

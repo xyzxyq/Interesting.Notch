@@ -258,7 +258,33 @@ struct PortalLyricsFrame: View {
         }
         starPath.closeSubpath()
         layer.opacity = star * pow(1 - dissolve, 2)
-        layer.fill(starPath, with: .color(tint))
+        layer.clip(to: Path(lane))
+        let gold = Color(red: 1, green: 0.76, blue: 0.32)
+        let shimmer = reduced ? 1 : 0.92 + 0.08 * sin(elapsed * 3)
+        layer.fill(Path(ellipseIn: CGRect(x: center.x - 11, y: center.y - 11, width: 22, height: 22)),
+                   with: .radialGradient(Gradient(colors: [gold.opacity(0.3 * shimmer), gold.opacity(0)]),
+                                         center: center, startRadius: 2, endRadius: 11))
+        layer.fill(starPath, with: .linearGradient(
+            Gradient(colors: [Color(red: 1, green: 0.97, blue: 0.8), gold, Color(red: 0.72, green: 0.4, blue: 0.12)]),
+            startPoint: CGPoint(x: center.x - 4, y: center.y - 8), endPoint: CGPoint(x: center.x + 5, y: center.y + 8)))
+        for i in 0..<5 {
+            let angle = -.pi / 2 + Double(i) * .pi * 2 / 5
+            var facet = Path()
+            facet.move(to: center)
+            facet.addLine(to: CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius))
+            facet.addLine(to: CGPoint(x: center.x + cos(angle + .pi / 5) * radius * 0.43,
+                                     y: center.y + sin(angle + .pi / 5) * radius * 0.43))
+            facet.closeSubpath()
+            layer.fill(facet, with: .color(.white.opacity(0.25 * shimmer)))
+        }
+        layer.stroke(starPath, with: .color(Color(red: 1, green: 0.91, blue: 0.6).opacity(0.65)), lineWidth: 0.4)
+        let glint = CGPoint(x: center.x + 8, y: center.y - 6)
+        var rays = Path()
+        rays.move(to: CGPoint(x: glint.x - 1.8 * shimmer, y: glint.y))
+        rays.addLine(to: CGPoint(x: glint.x + 1.8 * shimmer, y: glint.y))
+        rays.move(to: CGPoint(x: glint.x, y: glint.y - 2.4 * shimmer))
+        rays.addLine(to: CGPoint(x: glint.x, y: glint.y + 2.4 * shimmer))
+        layer.stroke(rays, with: .color(.white.opacity(0.75 * shimmer)), style: StrokeStyle(lineWidth: 0.6, lineCap: .round))
         if !reduced, dissolve > 0 {
             layer.opacity = sin(.pi * dissolve) * star
             for i in 0..<48 {
@@ -267,7 +293,7 @@ struct PortalLyricsFrame: View {
                 let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
                 if starPath.contains(point) {
                     let rect = CGRect(x: point.x - dissolve * 8, y: point.y + sin(Double(i)) * dissolve * 8, width: 1, height: 1)
-                    layer.fill(Path(ellipseIn: rect), with: .color(tint))
+                    layer.fill(Path(ellipseIn: rect), with: .color(gold))
                 }
             }
         }
