@@ -5,6 +5,12 @@ enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
 
+    static func entranceEdge(sideWidth: CGFloat, gap: CGFloat, progress: Double) -> CGFloat {
+        // Spend the one-second reveal on visible content, not the physical notch.
+        let visible = 2 * sideWidth * min(1, max(0, progress))
+        return visible + (visible >= sideWidth ? gap : 0)
+    }
+
     static func textX(_ text: String, width: CGFloat, sideWidth: CGFloat, progress: Double) -> CGFloat {
         let lastWidth = (String(text.trimmingCharacters(in: .whitespacesAndNewlines).last ?? " ") as NSString)
             .size(withAttributes: [.font: font]).width
@@ -90,7 +96,7 @@ struct PortalLyricsFrame: View {
             let left = CGRect(x: 0, y: 0, width: sideWidth, height: size.height)
             let right = CGRect(x: sideWidth + gap, y: 0, width: sideWidth, height: size.height)
             let reveal = min(1, max(0, entrance))
-            let edge = size.width * reveal
+            let edge = CompactLyricsLayout.entranceEdge(sideWidth: sideWidth, gap: gap, progress: reveal)
             if reduced { context.opacity = reveal }
             else { context.clip(to: Path(CGRect(x: 0, y: 0, width: edge, height: size.height))) }
             let dissolve = CompactLyrics.dissolve(at: elapsed, duration: duration)

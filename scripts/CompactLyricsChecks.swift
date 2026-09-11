@@ -109,6 +109,11 @@ import SwiftUI
 #if VISUAL_CHECKS
 extension CompactLyricsChecks {
     static func visualChecks() {
+        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0) == 0)
+        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.25) == 27)
+        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.5) == 204)
+        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.75) == 231)
+        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 1) == 258)
         let cover = NSImage(systemSymbolName: "music.note", accessibilityDescription: nil)!
         let cue = LyricSegment(id: 0, start: 0, end: 6, text: "歌颂这种平凡")
         let final = LyricSegment(id: 1, start: 25, end: 30, text: "一直唱到最后")

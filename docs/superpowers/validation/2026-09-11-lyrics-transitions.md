@@ -42,3 +42,9 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swiftc -swift-ver
 离屏 120 帧：中位数 0.101 ms、p95 0.143 ms；不代表实际屏幕帧率。仍依赖歌词源覆盖率及录音版本匹配，无法保证每首歌都有同步歌词。逐字同步、未标注伴奏识别没有新增能力。
 
 ![句尾居中、同时消散显现、首秒移动传送门](lyrics-transition-preview.png)
+
+## 入场速度后续调整
+
+此前一秒包含穿过物理刘海的不可见距离，两侧各只有约 0.21 秒可见动画（54/150/54 预览布局）。现改为将一秒分配给两侧可见区域：左侧 0–0.5 秒、右侧 0.5–1 秒，跳过物理刘海的距离。暂停与减少动态效果的行为保持不变。
+
+新增 0%、25%、50%、75%、100% 揭示位置断言，完整受控检查通过；更新后的生产渲染预览已查看。完整 Debug 构建和严格 ad-hoc 签名验证通过。此调整的测试应用为 `/tmp/interesting-notch-entry-build/Build/Products/Debug/boringNotch.app`。
