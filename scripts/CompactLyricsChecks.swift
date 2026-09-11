@@ -166,7 +166,7 @@ extension CompactLyricsChecks {
         let nextCue = LyricSegment(id: 2, start: 6, end: 12, text: "也曾像朋友一样和我诉说")
         let nextGlyph = PortalGlyph(text: nextCue.text)
         let transitionTimes = [5.999, 6.0, 6.1, 6.25, 6.4]
-        let entranceTimes = [0.05, 0.25, 0.5, 0.8, 1.0]
+        let entranceTimes = [0.1, 0.5, 1.0, 1.6, 2.0]
         let transitions = HStack(alignment: .top, spacing: 20) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("句尾居中 → 旧句消散、新句显现").font(.system(size: 12))
@@ -183,14 +183,14 @@ extension CompactLyricsChecks {
                 }
             }
             VStack(alignment: .leading, spacing: 12) {
-                Text("首秒 → 左到右传送门揭示内容").font(.system(size: 12))
+                Text("两秒 → 左到右传送门揭示内容").font(.system(size: 12))
                 ForEach(entranceTimes.indices, id: \.self) { i in
                     let time = entranceTimes[i]
                     VStack(alignment: .leading, spacing: 4) {
                         Text(String(format: "%.2f 秒", time)).font(.system(size: 10)).foregroundStyle(.gray)
                         PortalLyricsFrame(phase: .waves, elapsed: time, duration: 30,
                             sideWidth: 54, gap: 150, tint: .white, reduced: false,
-                            glyph: nil, cover: coverGlyph, albumArt: cover, entrance: time)
+                            glyph: nil, cover: coverGlyph, albumArt: cover, entrance: time / 2)
                             .frame(width: 258, height: 26).background(.black)
                     }
                 }
@@ -258,7 +258,7 @@ extension CompactLyricsChecks {
         clock.position = 0.3; clock.date = Date(); clock.revision += 1; settle()
         let entry = frame(); settle(0.3)
         assert(frame() == entry, "Paused entry portal advanced")
-        clock.position = 1; clock.date = Date(); settle()
+        clock.position = 2; clock.date = Date(); settle()
         assert(frame() != entry, "Entry did not reveal content")
         print("Portal runtime checks passed: pause, seek, ending rewind, waves, line dissolve, entry reveal")
     }

@@ -48,3 +48,5 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swiftc -swift-ver
 此前一秒包含穿过物理刘海的不可见距离，两侧各只有约 0.21 秒可见动画（54/150/54 预览布局）。现改为将一秒分配给两侧可见区域：左侧 0–0.5 秒、右侧 0.5–1 秒，跳过物理刘海的距离。暂停与减少动态效果的行为保持不变。
 
 新增 0%、25%、50%、75%、100% 揭示位置断言，完整受控检查通过；更新后的生产渲染预览已查看。完整 Debug 构建和严格 ad-hoc 签名验证通过。此调整的测试应用为 `/tmp/interesting-notch-entry-build/Build/Products/Debug/boringNotch.app`。
+
+用户后续将总时长延长至两秒：当前实现为左侧 0–1 秒、右侧 1–2 秒。受控检查、完整构建及签名验证通过；最新测试应用为 `/tmp/interesting-notch-entry2-build/Build/Products/Debug/boringNotch.app`。

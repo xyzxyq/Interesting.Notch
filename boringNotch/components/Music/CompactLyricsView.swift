@@ -6,7 +6,7 @@ enum CompactLyricsLayout {
     static let slotWidth: CGFloat = 54
 
     static func entranceEdge(sideWidth: CGFloat, gap: CGFloat, progress: Double) -> CGFloat {
-        // Spend the one-second reveal on visible content, not the physical notch.
+        // Spend the two-second reveal on visible content, not the physical notch.
         let visible = 2 * sideWidth * min(1, max(0, progress))
         return visible + (visible >= sideWidth ? gap : 0)
     }
@@ -52,7 +52,7 @@ struct CompactLyricsView: View {
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
                               glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
                               outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
-                              entrance: min(1, max(0, elapsed)))
+                              entrance: min(1, max(0, elapsed / 2)))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
                 .task(id: text) {
