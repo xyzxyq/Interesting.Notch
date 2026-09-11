@@ -17,8 +17,8 @@ import AppKit
         assert(hypot(contour.point(0).x - contour.point(1).x, contour.point(0).y - contour.point(1).y) < 0.0001)
         for i in 0..<100 { let p = contour.point(Double(i)/100, outward: 3); assert(p.x.isFinite && p.y.isFinite) }
         let styles = ["water", "waterWhite", "waterColor", "ripple", "dust", "meteor", "mist"]
-        func render(_ style: String, energy: Double, reduced: Bool = false, phase: Double = 0.7) -> Data {
-            let content = MusicEdgeFrame(shape: shape, style: style, strength: 1, energy: energy, phase: phase, color: .white, reduced: reduced)
+        func render(_ style: String, energy: Double, reduced: Bool = false, phase: Double = 0.7, sky: Bool = true) -> Data {
+            let content = MusicEdgeFrame(shape: shape, style: style, strength: 1, energy: energy, phase: phase, color: .white, reduced: reduced, sky: sky)
                 .frame(width: 352, height: 80)
             let renderer = ImageRenderer(content: content); renderer.scale = 2
             return NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!
@@ -61,6 +61,9 @@ import AppKit
             assert(WaterWave(phase: 0.7, slot: slot).paletteIndex == WaterWave(phase: 0.71, slot: slot).paletteIndex, "Travelling wave changed color")
         }
         assert(WaterWave(phase: 0, slot: 0).paletteIndex != WaterWave(phase: 1.55, slot: 0).paletteIndex, "New emission must change color")
+        assert(!samePixels(render("waterColor", energy: 0), render("waterColor", energy: 0, sky: false)), "Sky decoration must render")
+        assert(samePixels(render("water", energy: 0), render("water", energy: 0, sky: false)), "Sky changed black water")
+        assert(samePixels(render("waterColor", energy: 0, reduced: true), render("waterColor", energy: 0, reduced: true, sky: false)), "Reduced motion should omit sky")
         let preview = VStack(spacing: 18) {
             Text("音乐边缘 · 左：安静　右：强烈").font(.system(size: 15))
             ForEach(styles, id: \.self) { style in

@@ -75,6 +75,7 @@ struct MusicEdgeFrame: View {
     let phase: Double
     let color: Color
     let reduced: Bool
+    var sky = true
     var body: some View {
         Canvas { context, size in
             let rect = CGRect(origin: .zero, size: size).insetBy(dx: 24, dy: 24)
@@ -126,6 +127,7 @@ struct MusicEdgeFrame: View {
                 let edge = surface(distance: (isColorWater ? 1.5 : 2.5 + e * 2) * strength, amplitude: (isColorWater ? 0.3 : 0.6 + e * 1.4) * strength)
                 context.fill(edge, with: waterInk)
                 context.stroke(edge, with: .color((style == "waterWhite" ? Color.black : Color.white).opacity(0.10)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
+                if isColorWater && sky { drawSky(in: &context, rect: rect, energy: e) }
                 return
             }
             if style == "ripple" {
@@ -170,6 +172,57 @@ struct MusicEdgeFrame: View {
         }
         .allowsHitTesting(false).accessibilityHidden(true)
     }
+
+    private func drawSky(in context: inout GraphicsContext, rect: CGRect, energy: Double) {
+        // Decoration stays within the 24-point outer margin and shares the content mask.
+        let drift = phase * 0.22
+        let presence = min(1, 0.75 + energy * 0.15) * min(1.15, strength)
+        for i in 0..<2 {
+            let x = rect.minX + rect.width * (i == 0 ? 0.24 : 0.70) + sin(drift + Double(i) * 2) * 4
+            let y = rect.maxY + 15 + sin(drift * 0.7 + Double(i)) * 1.2
+            let scale = i == 0 ? 1.0 : 0.8
+            var cloud = Path()
+            cloud.move(to: CGPoint(x: -12, y: 3))
+            cloud.addCurve(to: CGPoint(x: -7, y: -1), control1: CGPoint(x: -14, y: -1), control2: CGPoint(x: -10, y: -3))
+            cloud.addCurve(to: CGPoint(x: 3, y: -3), control1: CGPoint(x: -6, y: -8), control2: CGPoint(x: 2, y: -8))
+            cloud.addCurve(to: CGPoint(x: 10, y: 0), control1: CGPoint(x: 7, y: -6), control2: CGPoint(x: 11, y: -4))
+            cloud.addCurve(to: CGPoint(x: 11, y: 5), control1: CGPoint(x: 16, y: 0), control2: CGPoint(x: 16, y: 5))
+            cloud.addQuadCurve(to: CGPoint(x: -12, y: 3), control: CGPoint(x: 0, y: 7))
+            cloud.closeSubpath()
+            context.drawLayer { layer in
+                layer.translateBy(x: x, y: y)
+                layer.scaleBy(x: scale, y: scale)
+                layer.opacity = presence
+                layer.addFilter(.blur(radius: 0.65))
+                layer.fill(cloud, with: .linearGradient(Gradient(colors: [
+                    .white.opacity(0.55), WaterWave.colors[i].opacity(0.30), .clear
+                ]), startPoint: CGPoint(x: 0, y: -7), endPoint: CGPoint(x: 0, y: 7)))
+            }
+        }
+        for i in 0..<5 {
+            let x = rect.minX + rect.width * [0.07, 0.39, 0.52, 0.86, 0.96][i]
+            let y = rect.maxY + [17.0, 19.0, 15.0, 18.0, 10.0][i]
+            let alpha = (0.40 + 0.22 * (0.5 + 0.5 * sin(drift * 2 + Double(i) * 1.7))) * presence
+            let radius = i == 1 || i == 3 ? 1.9 : 0.8
+            var star = Path()
+            if radius > 1 {
+                star.move(to: CGPoint(x: x, y: y-radius))
+                star.addQuadCurve(to: CGPoint(x: x+radius, y: y), control: CGPoint(x: x+0.3, y: y-0.3))
+                star.addQuadCurve(to: CGPoint(x: x, y: y+radius), control: CGPoint(x: x+0.3, y: y+0.3))
+                star.addQuadCurve(to: CGPoint(x: x-radius, y: y), control: CGPoint(x: x-0.3, y: y+0.3))
+                star.addQuadCurve(to: CGPoint(x: x, y: y-radius), control: CGPoint(x: x-0.3, y: y-0.3))
+                star.closeSubpath()
+            } else { star.addEllipse(in: CGRect(x: x-radius, y: y-radius, width: radius*2, height: radius*2)) }
+            context.fill(star, with: .color(Color(red: 0.87, green: 0.90, blue: 0.98).opacity(alpha)))
+        }
+        let moonRect = CGRect(x: rect.maxX + 7, y: rect.maxY - 9 + sin(drift) * 0.8, width: 7, height: 7)
+        let disc = Path(ellipseIn: moonRect)
+        var crescent = disc
+        crescent.addEllipse(in: moonRect.offsetBy(dx: 2.3, dy: -1.4))
+        var moon = context
+        moon.clip(to: disc)
+        moon.fill(crescent, with: .color(Color(red: 0.88, green: 0.90, blue: 0.97).opacity(0.65 * presence)), style: FillStyle(eoFill: true))
+    }
 }
 
 #if !EDGE_CHECKS
@@ -180,6 +233,7 @@ struct MusicEdgeEffect: View {
     @AppStorage("musicEdgeStyle") private var style = "off"
     @AppStorage("musicEdgeStrength") private var strength = 1.0
     @AppStorage("musicEdgeReactive") private var reactive = true
+    @AppStorage("musicEdgeSky") private var sky = true
     @Environment(\.accessibilityReduceMotion) private var reduced
     @State private var phase = 0.0
     @State private var previous = Date.now
@@ -191,7 +245,7 @@ struct MusicEdgeEffect: View {
             let period = CompactLyrics.timeOfDay(at: clock.date)
             let tint: Color = period == .dusk ? Color(red: 0.95, green: 0.80, blue: 0.67) : period == .day ? Color(red: 0.97, green: 0.94, blue: 0.86) : Color(white: period == .dawn ? 0.70 : 0.88)
             MusicEdgeFrame(shape: shape, style: style, strength: strength, energy: reactive ? audio.energy : 0,
-                           phase: phase, color: tint, reduced: reduced)
+                           phase: phase, color: tint, reduced: reduced, sky: sky)
                 .opacity(style == "off" || !music.isPlaying ? 0 : (1-ending) * min(1, max(0, elapsed / 2)))
                 .animation(.easeOut(duration: 0.4), value: music.isPlaying)
                 .onChange(of: clock.date) { _, date in
@@ -209,6 +263,7 @@ struct MusicEdgeSettings: View {
     @AppStorage("musicEdgeStyle") private var style = "off"
     @AppStorage("musicEdgeStrength") private var strength = 1.0
     @AppStorage("musicEdgeReactive") private var reactive = true
+    @AppStorage("musicEdgeSky") private var sky = true
     @ObservedObject private var audio = MusicEdgeAudio.shared
     var body: some View {
         Picker("音乐边缘动效", selection: Binding(
@@ -227,6 +282,9 @@ struct MusicEdgeSettings: View {
                 Text("白色").tag("waterWhite")
                 Text("彩色").tag("waterColor")
             }
+        }
+        if style == "waterColor" {
+            Toggle("云与星月", isOn: $sky)
         }
         if style != "off" {
             Picker("效果强度", selection: $strength) {
