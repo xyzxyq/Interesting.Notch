@@ -113,29 +113,30 @@ struct MusicEdgeFrame: View {
                         let p = expanded.point(f == 1 ? 0 : f, outward: offset)
                         if i == 0 { wave.move(to: p) } else { wave.addLine(to: p) }
                     }
-                    context.stroke(wave, with: .color(color.opacity((1-t) * (0.48+e*0.4))), style: StrokeStyle(lineWidth: 1.1, lineJoin: .round))
+                    context.stroke(wave, with: .color(color.opacity((1-t) * 0.22)), style: StrokeStyle(lineWidth: 4 * strength, lineJoin: .round))
+                    context.stroke(wave, with: .color(color.opacity((1-t) * (0.72+e*0.25))), style: StrokeStyle(lineWidth: 1.7 * strength, lineJoin: .round))
                 }
             } else {
-                let count = style == "meteor" ? 9 : style == "mist" ? 95 : 58
+                let count = style == "meteor" ? 11 : style == "mist" ? 110 : 78
                 for i in 0..<count {
                     let seed = Double(i) * 0.61803398875
                     let f = seed + phase * (style == "meteor" ? 0.15 : 0.04)
                     let life = 0.5 + 0.5 * sin(phase * 2 + seed * 17)
                     let offset = (1.5 + life * (3 + e * 5)) * strength
                     let point = contour.point(f, outward: offset)
-                    let alpha = (0.40 + e * 0.55) * (0.25 + life * 0.75)
+                    let alpha = (0.72 + e * 0.28) * (0.55 + life * 0.45)
                     if style == "meteor" {
-                        for tail in 0..<14 {
-                            let p = contour.point(f - Double(tail) * (2.5 + e*2.5) / max(1,contour.length), outward: offset)
-                            let r = 1.3 - Double(tail) * 0.07
+                        for tail in 0..<24 {
+                            let p = contour.point(f - Double(tail) * (2.2 + e*1.4) / max(1,contour.length), outward: offset)
+                            let r = (1.9 - Double(tail) * 0.06) * strength
                             context.fill(Path(ellipseIn: CGRect(x: p.x-r, y: p.y-r, width: 2*r, height: 2*r)),
-                                         with: .color(color.opacity(alpha * (1-Double(tail)/14))))
+                                         with: .color(color.opacity(alpha * (1-Double(tail)/24))))
                         }
                     } else {
-                        let radius = style == "mist" ? 2.8 + life * 1.5 : 0.8 + life * 0.65
+                        let radius = (style == "mist" ? 5 + life * 2.5 : 1.2 + life * 0.7) * strength
                         let dot = Path(ellipseIn: CGRect(x: point.x-radius, y: point.y-radius, width: 2*radius, height: 2*radius))
                         if style == "mist" {
-                            context.fill(dot, with: .radialGradient(Gradient(colors: [color.opacity(alpha*0.65), .clear]), center: point, startRadius: 0, endRadius: radius))
+                            context.fill(dot, with: .radialGradient(Gradient(colors: [color.opacity(alpha*0.85), .clear]), center: point, startRadius: 0, endRadius: radius))
                         } else { context.fill(dot, with: .color(color.opacity(alpha))) }
                     }
                 }
@@ -168,7 +169,7 @@ struct MusicEdgeEffect: View {
                 .opacity(style == "off" || !music.isPlaying ? 0 : (1-ending) * min(1, max(0, elapsed / 2)))
                 .animation(.easeOut(duration: 0.4), value: music.isPlaying)
                 .onChange(of: clock.date) { _, date in
-                    phase += min(0.1, max(0, date.timeIntervalSince(previous))) * (0.4 + (reactive ? audio.energy : 0) * 1.8)
+                    phase += min(0.1, max(0, date.timeIntervalSince(previous))) * ((style == "water" ? 0.4 : 0.65) + (reactive ? audio.energy : 0) * 1.8)
                     previous = date
                 }
         }
