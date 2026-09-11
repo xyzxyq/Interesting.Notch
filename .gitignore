@@ -53,3 +53,6 @@ build/
 *.xcarchive
 *.dSYM
 
+
+# Isolated development worktrees
+.worktrees/
