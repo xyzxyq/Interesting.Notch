@@ -9,7 +9,9 @@ import CoreLocation
     @Published private(set) var snapshot: NotchWeatherSnapshot?
     @Published private(set) var status = "天气动效未开启"
     @Published private(set) var selected: WeatherPlace?
-    private let location = CLLocationManager()
+    private let location: CLLocationManager
+    @Published private(set) var locationNotice: String?
+    private var switchingToAutomatic = false
     @Published private var located: WeatherPlace?
     var cityName: String { selected?.name ?? located?.name ?? "尚未获取城市" }
     private let geocoder = CLGeocoder()
@@ -26,7 +28,8 @@ import CoreLocation
     private var lastAuthorization: CLAuthorizationStatus?
     private var cached: NotchWeatherSnapshot?
 
-    override private init() {
+    init(location: CLLocationManager = CLLocationManager()) {
+        self.location = location
         super.init()
         selected = UserDefaults.standard.data(forKey: "weatherSelectedCity").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }
         cached = UserDefaults.standard.data(forKey: "weatherSnapshot").flatMap { try? JSONDecoder().decode(NotchWeatherSnapshot.self, from: $0) }
@@ -37,6 +40,14 @@ import CoreLocation
     }
     func start() { if enabled && loop == nil { restart() } }
     func select(_ place: WeatherPlace?) {
+        if place == nil, enabled, selected != nil {
+            switchingToAutomatic = true
+            locationNotice = "正在尝试自动定位，暂时保留手动城市"
+            restart()
+            return
+        }
+        switchingToAutomatic = false
+        locationNotice = nil
         selected = place
         UserDefaults.standard.set(place.flatMap { try? JSONEncoder().encode($0) }, forKey: "weatherSelectedCity")
         located = nil
@@ -54,7 +65,7 @@ import CoreLocation
         request?.cancel(); request = nil
         lastAttempt = .distantPast
         lastLocationRequest = .distantPast
-        guard enabled else { snapshot = nil; status = "天气动效未开启"; return }
+        guard enabled else { switchingToAutomatic = false; locationNotice = nil; snapshot = nil; status = "天气动效未开启"; return }
         status = "正在启动天气…"
         tick()
         loop = Task { [weak self] in
@@ -69,7 +80,7 @@ import CoreLocation
             snapshot = nil
             status = "天气已过期，暂用普通波浪"
         }
-        if selected == nil && Date.now.timeIntervalSince(lastLocationRequest) >= locationRetryInterval {
+        if (selected == nil || switchingToAutomatic) && Date.now.timeIntervalSince(lastLocationRequest) >= locationRetryInterval {
             lastLocationRequest = .now
             lastAuthorization = location.authorizationStatus
             switch location.authorizationStatus {
@@ -81,6 +92,11 @@ import CoreLocation
                 location.stopUpdatingLocation()
                 location.requestLocation()
             default:
+                if switchingToAutomatic {
+                    locationNotice = "自动定位未获许可，继续使用手动城市"
+                    switchingToAutomatic = false
+                    break
+                }
                 located = nil
                 snapshot = nil
                 generation += 1
@@ -117,18 +133,24 @@ import CoreLocation
         }
     }
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard enabled, selected == nil, lastAuthorization != manager.authorizationStatus else { return }
+        guard enabled, (selected == nil || switchingToAutomatic), lastAuthorization != manager.authorizationStatus else { return }
         lastAuthorization = manager.authorizationStatus
         lastLocationRequest = .distantPast
         tick()
     }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard enabled, selected == nil, let value = locations.last, value.horizontalAccuracy >= 0,
+        guard enabled, (selected == nil || switchingToAutomatic), let value = locations.last, value.horizontalAccuracy >= 0,
               abs(value.timestamp.timeIntervalSinceNow) < 600 else { return }
         // City-scale coordinates are sufficient for these decorative effects.
         let place = WeatherPlace(name: "正在解析城市…", latitude: (value.coordinate.latitude * 100).rounded() / 100,
                                  longitude: (value.coordinate.longitude * 100).rounded() / 100)
         guard place.valid else { return }
+        if switchingToAutomatic {
+            switchingToAutomatic = false
+            locationNotice = nil
+            selected = nil
+            UserDefaults.standard.removeObject(forKey: "weatherSelectedCity")
+        }
         if located?.id != place.id {
             generation += 1; request?.cancel(); request = nil
             snapshot = nil; lastAttempt = .distantPast
@@ -161,8 +183,13 @@ import CoreLocation
         }
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard enabled, selected == nil else { return }
+        guard enabled, selected == nil || switchingToAutomatic else { return }
         location.stopUpdatingLocation()
+        if switchingToAutomatic {
+            locationRetryInterval = 60
+            locationNotice = "自动定位失败，继续使用手动城市；一分钟后自动重试"
+            return
+        }
         let code = (error as? CLError)?.code
         if code == .denied {
             located = nil
@@ -186,6 +213,9 @@ struct NotchWeatherSettings: View {
         Toggle("天气波浪动效", isOn: $weather.enabled)
         if weather.enabled {
             Text(weather.status).font(.caption).foregroundStyle(.secondary)
+            if let notice = weather.locationNotice {
+                Text(notice).font(.caption).foregroundStyle(.secondary)
+            }
             Text("地点：\(weather.cityName)").font(.caption)
             if weather.selected != nil { Button("使用当前位置") { weather.select(nil) } }
             VStack(alignment: .leading, spacing: 8) {

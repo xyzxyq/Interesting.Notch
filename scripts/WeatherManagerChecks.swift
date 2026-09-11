@@ -16,6 +16,12 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
+private final class LocationStub: CLLocationManager {
+    override var authorizationStatus: CLAuthorizationStatus { .authorizedAlways }
+    override func requestLocation() {}
+    override func stopUpdatingLocation() {}
+}
+
 @main @MainActor struct WeatherManagerChecks {
     static func main() async throws {
         assert(NotchWeatherManager.resolvedCity(locality: "北京市", region: "其他区域") == "北京市")
@@ -24,7 +30,8 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
         URLProtocol.registerClass(WeatherStub.self)
         UserDefaults.standard.set(true, forKey: "weatherEffectsEnabled")
         UserDefaults.standard.set(try JSONEncoder().encode(WeatherPlace(name: "Saved city", latitude: 39.9, longitude: 116.4)), forKey: "weatherSelectedCity")
-        let manager = NotchWeatherManager.shared
+        let location = LocationStub()
+        let manager = NotchWeatherManager(location: location)
         assert(manager.status != "天气动效未开启", "Restored enabled setting retained disabled state")
         try await Task.sleep(for: .milliseconds(200))
         assert(manager.snapshot?.place.name == "Saved city", "Startup did not load saved city's weather")
@@ -49,6 +56,19 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
         host.cacheDisplay(in: host.bounds, to: bitmap)
         try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/tmp/weather-settings-preview.png"))
         window.orderOut(nil)
+        let manual = manager.selected
+        let weatherBeforeSwitch = manager.snapshot
+        manager.select(nil)
+        assert(manager.selected == manual && manager.snapshot == weatherBeforeSwitch, "Automatic attempt discarded manual weather")
+        manager.locationManager(location, didFailWithError: NSError(domain: kCLErrorDomain, code: CLError.locationUnknown.rawValue))
+        assert(manager.selected == manual && manager.snapshot == weatherBeforeSwitch, "Location failure discarded manual city")
+        assert(manager.locationNotice?.contains("继续使用手动城市") == true)
+        manager.locationManager(location, didUpdateLocations: [CLLocation(latitude: 24.48, longitude: 118.08)])
+        assert(manager.selected == nil, "Successful coordinates did not switch to automatic")
+        manager.enabled = false
+        manager.select(manual)
+        manager.enabled = true
+        try await Task.sleep(for: .milliseconds(200))
         manager.enabled = false
         assert(manager.snapshot == nil, "Disabled retained effects")
         WeatherStub.fail = true
