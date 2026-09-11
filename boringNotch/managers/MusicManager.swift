@@ -89,6 +89,11 @@ class MusicManager: ObservableObject {
             .sink { [weak self] _ in self?.refreshLyrics() }
             .store(in: &cancellables)
 
+        NotificationCenter.default.publisher(for: NSLocale.currentLocaleDidChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshLyrics(force: true) }
+            .store(in: &cancellables)
+
         // Initialize deprecation check asynchronously
         Task { @MainActor in
             do {
@@ -369,12 +374,12 @@ class MusicManager: ObservableObject {
     }
 
     @MainActor
-    private func refreshLyrics() {
+    private func refreshLyrics(force: Bool = false) {
         let compact = Defaults[.enableCompactLyrics] && bundleIdentifier == "com.apple.Music"
         let demand = (Defaults[.enableLyrics] ? 1 : 0) + (compact ? 2 : 0)
         let track = LyricTrack(bundleID: bundleIdentifier ?? "", title: songTitle,
                                artist: artistName, album: album, duration: songDuration)
-        guard demand != lyricsDemand || track != lyricsTrack else { return }
+        guard force || demand != lyricsDemand || track != lyricsTrack else { return }
         // A metadata change invalidates every publication from earlier requests.
         // Artwork and playback position are intentionally not part of this identity.
         if lyricsDemand != 0 || lyricsTrack != nil { invalidateLyrics() }
@@ -391,14 +396,16 @@ class MusicManager: ObservableObject {
             if track.bundleID == "com.apple.Music" {
                 let native = await Self.nativeLyrics(for: track)
                 guard !Task.isCancelled, generation == self.lyricsGeneration else { return }
-                self.currentLyrics = native
+                self.currentLyrics = CompactLyrics.displayText(native)
                 if !compact && !native.isEmpty { return }
             }
             do {
                 if let candidate = try await Self.webLyrics(for: track, requireSynced: compact) {
                     guard !Task.isCancelled, generation == self.lyricsGeneration else { return }
-                    let lines = CompactLyrics.parseLRC(candidate.syncedLyrics ?? "")
-                    let plain = candidate.plainLyrics?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    let lines = CompactLyrics.parseLRC(candidate.syncedLyrics ?? "").map {
+                        LyricLine(time: $0.time, text: CompactLyrics.displayText($0.text))
+                    }
+                    let plain = CompactLyrics.displayText(candidate.plainLyrics?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
                     if self.currentLyrics.isEmpty {
                         self.currentLyrics = plain.isEmpty ? lines.map(\.text).joined(separator: "\n") : plain
                     }

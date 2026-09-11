@@ -397,6 +397,20 @@ struct ContentView: View {
 
     @ViewBuilder
     func MusicLiveActivity() -> some View {
+        if compactLyricsMode {
+            CompactLyricsView(
+                segments: musicManager.compactSegments, revision: musicManager.lyricsRevision,
+                position: musicManager.elapsedTime, sampleDate: musicManager.timestampDate,
+                rate: musicManager.playbackRate, duration: musicManager.songDuration,
+                isPlaying: musicManager.isPlaying,
+                tint: Defaults[.coloredSpectrogram]
+                    ? Color(nsColor: (musicManager.avgColor.blended(withFraction: 0.65, of: .white) ?? .white).withAlphaComponent(1)) : .white,
+                albumArt: musicManager.albumArt, sideWidth: musicSideWidth,
+                gap: max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top + 16),
+                height: max(0, vm.effectiveClosedNotchHeight - 12)
+            )
+            .frame(height: vm.effectiveClosedNotchHeight)
+        } else {
         HStack {
             Image(nsImage: musicManager.albumArt)
                 .resizable()
@@ -459,25 +473,7 @@ struct ContentView: View {
                             + -cornerRadiusInsets.closed.top
                 )
 
-            HStack(spacing: 0) {
-                if compactLyricsMode {
-                    CompactLyricsView(
-                        segments: musicManager.compactSegments,
-                        revision: musicManager.lyricsRevision,
-                        position: musicManager.elapsedTime,
-                        sampleDate: musicManager.timestampDate,
-                        rate: musicManager.playbackRate,
-                        isPlaying: musicManager.isPlaying,
-                        tint: Defaults[.coloredSpectrogram]
-                            ? Color(nsColor: (musicManager.avgColor.blended(withFraction: 0.65, of: .white) ?? .white).withAlphaComponent(1)) : .white
-                    ) {
-                        musicVisualizer
-                            .frame(width: max(0, vm.effectiveClosedNotchHeight - 12))
-                    }
-                } else {
-                    musicVisualizer
-                }
-            }
+            musicVisualizer
             .frame(
                 width: max(
                     0,
@@ -494,6 +490,7 @@ struct ContentView: View {
             height: vm.effectiveClosedNotchHeight,
             alignment: .center
         )
+        }
     }
 
     @ViewBuilder

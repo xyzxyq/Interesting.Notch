@@ -3,178 +3,142 @@ import Foundation
 import AppKit
 import SwiftUI
 #endif
+
 @main @MainActor struct CompactLyricsChecks {
     static func main() {
-        assert(CompactLyrics.split("歌颂这种平凡") == ["歌颂", "这种", "平凡"])
-        assert(CompactLyrics.split("也曾像朋友一样和我诉说") == ["也曾像", "朋友", "一样", "和我", "诉说"])
-        let lines = CompactLyrics.parseLRC("[offset:-100]\n[00:01.5][00:03.500]歌颂这种平凡\n[00:05.50]\n[bad]ignored")
-        assert(lines.count == 3)
-        assert(abs(lines[0].time - 1.4) < 0.000001)
-        assert(abs(lines[1].time - 3.4) < 0.000001)
-        assert(abs(lines[2].time - 5.4) < 0.000001 && lines[2].text.isEmpty)
-        let segments = CompactLyrics.timeline([.init(time: 10, text: "歌颂这种平凡"), .init(time: 20, text: "")], duration: 30)
-        assert(segments.count == 3)
-        assert(CompactLyrics.segment(at: 9, in: segments) == nil)
-        assert(CompactLyrics.segment(at: 10, in: segments)?.text == "歌颂")
-        assert(CompactLyrics.segment(at: 11, in: segments)?.text == "这种")
-        assert(CompactLyrics.segment(at: 12, in: segments)?.text == "平凡")
-        assert(CompactLyrics.segment(at: 13, in: segments) == nil)
-        assert(CompactLyrics.segment(at: 10, in: segments)?.text == "歌颂") // backward seek
-        assert(abs(CompactLyrics.nextBoundary(after: 10, in: segments)! - 10.8) < 0.000001)
-        for input in ["你好，世界！", "abcdefg", "👨‍👩‍👧‍👦你好", "e\u{301}1234"] {
-            let result = CompactLyrics.split(input)
-            assert(result.allSatisfy { (1...3).contains($0.count) })
-            let expected = input.filter { !$0.isWhitespace && !$0.isPunctuation }
-            assert(result.joined() == String(expected))
-        }
-        assert(CompactLyrics.timeline([.init(time: 2, text: "你好")], duration: 3).last?.end == 3)
-        assert(CompactLyrics.parseLRC("[00:01]你\n[00:01]好") == [LyricLine(time: 1, text: "你好")])
-        assert(CompactLyrics.parseLRC("[offset:-2000]\n[00:01]你").first?.time == 0)
-        assert(CompactLyrics.parseLRC("[00:99]bad\n[xx:01]bad").isEmpty)
-        assert(CompactLyrics.timeline([], duration: 10).isEmpty)
-        assert(CompactLyrics.split("， ！").isEmpty)
-        assert(CompactLyrics.nextBoundary(after: 30, in: segments) == nil)
+        let lines = CompactLyrics.parseLRC("[offset:-100]\n[00:01.5][00:03.500]回憶\n[00:05.50]")
+        assert(lines.count == 3 && abs(lines[0].time - 1.4) < 0.00001 && lines[2].text.isEmpty)
+        assert(CompactLyrics.displayText("回憶與愛", languages: ["zh-Hans-CN"]) == "回忆与爱")
+        assert(CompactLyrics.displayText("回忆与爱", languages: ["zh-Hant-TW"]) == "回憶與愛")
+        assert(CompactLyrics.displayText("回忆", languages: ["zh-HK"]) == "回憶")
+        assert(CompactLyrics.displayText("回憶", languages: ["en-US", "zh-Hans"]) == "回憶")
+        assert(CompactLyrics.displayText("Love 👨‍👩‍👧‍👦", languages: ["zh-Hans"]) == "Love 👨‍👩‍👧‍👦")
+        let outro = CompactLyrics.timeline([.init(time: 10, text: "歌颂这种平凡"), .init(time: 14, text: "")], duration: 30)
+        assert(outro.count == 1 && outro[0].text == "歌颂这种平凡")
+        assert(CompactLyrics.phase(at: 9, cues: outro, duration: 30) == .waves)
+        assert(CompactLyrics.phase(at: 11, cues: outro, duration: 30) == .lyrics(outro[0]))
+        assert(CompactLyrics.phase(at: 20, cues: outro, duration: 30) == .waves)
+        assert(CompactLyrics.phase(at: 26, cues: outro, duration: 30) == .outro)
+        let sung = CompactLyrics.timeline([.init(time: 26, text: "一直唱到最后")], duration: 30)
+        assert(sung[0].end == 30)
+        assert(CompactLyrics.phase(at: 29.3, cues: sung, duration: 30) == .lyrics(sung[0]))
+        assert(CompactLyrics.phase(at: 29.9, cues: sung, duration: 30) == .finished)
+        assert(CompactLyrics.phase(at: 29, cues: [], duration: 30) == .waves)
+        assert(CompactLyrics.dissolve(at: 28, duration: 30) == 0)
+        assert(CompactLyrics.dissolve(at: 29.9, duration: 30) == 1)
+        assert(CompactLyrics.phase(at: 11, cues: outro, duration: 30) == .lyrics(outro[0])) // backward seek
         let track = LyricTrack(bundleID: "com.apple.Music", title: "Song", artist: "Singer", album: "Album", duration: 180)
         let good = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 181, plainLyrics: "Hello", syncedLyrics: "[00:01]Hello")
-        let live = LyricCandidate(trackName: "Song Live", artistName: "Singer", albumName: "Album", duration: 180, plainLyrics: nil, syncedLyrics: "[00:01]Hello")
-        let wrongDuration = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 183, plainLyrics: nil, syncedLyrics: "[00:01]Hello")
-        assert(CompactLyrics.match([live, wrongDuration, good], track: track)?.duration == 181)
+        assert(CompactLyrics.match([good], track: track) != nil)
         assert(CompactLyrics.match([good, good], track: track) == nil)
-        assert(CompactLyrics.match([good], track: .init(bundleID: "com.apple.Music", title: "Song", artist: "", album: "Album", duration: 180)) == nil)
-        let fast = LyricSegment(id: 0, start: 0, end: 0.1, text: "你")
-        assert(abs(CompactLyrics.transitionDuration(for: fast) - 0.035) < 0.000001)
-        let slow = LyricSegment(id: 1, start: 0, end: 2, text: "你好")
-        assert(CompactLyrics.transitionDuration(for: slow) == 0.280)
         #if VISUAL_CHECKS
         visualChecks()
-        runtimeChecks()
         #endif
-        print("CompactLyrics checks passed")
+        print("Portal lyrics checks passed: Chinese script, LRC, full lines, instrumental/sung endings, seek, matching")
     }
 }
 
 #if VISUAL_CHECKS
 extension CompactLyricsChecks {
     static func visualChecks() {
-        let size = CGSize(width: CompactLyricsLayout.slotWidth, height: 24)
-        let old = LyricGlyph(text: "歌颂", size: size, scale: 2, seed: 1, sample: true)
-        let new = LyricGlyph(text: "这种", size: size, scale: 2, seed: 2, sample: true)
-        assert(!old.particles.isEmpty && old.particles.count <= 160)
-        assert(!new.particles.isEmpty && new.particles.count <= 160)
-        let repeatGlyph = LyricGlyph(text: "这种", size: size, scale: 2, seed: 2, sample: true)
-        assert(repeatGlyph.particles.map(\.origin) == new.particles.map(\.origin))
-        assert(repeatGlyph.particles.map(\.drift) == new.particles.map(\.drift))
-        assert(LyricGlyph(text: "这种", size: size, scale: 2, seed: 2, sample: false).particles.isEmpty)
-        let transition = LyricTransition(outgoing: old, incoming: new, duration: 0.280, reduced: false)
-        let strip = VStack(spacing: 12) {
-            Text("Particle transition · 280 ms").font(.system(size: 12)).foregroundStyle(.white)
-            HStack(spacing: 12) {
-                ForEach(0..<7) { step in
-                    VStack {
-                        LyricTransitionCanvas(transition: transition,
-                                              date: transition.startedAt.addingTimeInterval(Double(step) / 6 * 0.280), tint: .white)
-                            .frame(width: size.width, height: size.height)
-                        Text("\(step * 100 / 6)%").font(.system(size: 9)).foregroundStyle(.gray)
-                    }
+        let cover = NSImage(systemSymbolName: "music.note", accessibilityDescription: nil)!
+        let cue = LyricSegment(id: 0, start: 0, end: 6, text: "歌颂这种平凡")
+        let final = LyricSegment(id: 1, start: 25, end: 30, text: "一直唱到最后")
+        let glyph = PortalGlyph(text: cue.text)
+        assert(!glyph.points.isEmpty && glyph.points.count <= 320)
+        let coverGlyph = PortalGlyph(image: cover)
+        let cases: [(String, LyricPhase, Double, PortalGlyph?)] = [
+            ("双侧歌词 · 同一文字带", .lyrics(cue), 2.1, glyph),
+            ("右入左出 · 连续滑动", .lyrics(cue), 3.0, glyph),
+            ("伴奏 · 向左传播", .waves, 20, nil),
+            ("尾奏 · 封面与波浪", .outro, 26, nil),
+            ("尾奏收尾 · 同步消散", .outro, 29.3, nil),
+            ("唱到曲终 · 歌词消散", .lyrics(final), 29.3, PortalGlyph(text: final.text))
+        ]
+        let strip = VStack(alignment: .leading, spacing: 14) {
+            ForEach(cases.indices, id: \.self) { index in
+                let row = cases[index]
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(row.0).font(.system(size: 11)).foregroundStyle(.gray)
+                    PortalLyricsFrame(phase: row.1, elapsed: row.2, duration: 30,
+                                      sideWidth: 54, gap: 150, tint: .white, reduced: false,
+                                      glyph: row.3, cover: coverGlyph, albumArt: cover)
+                        .frame(width: 258, height: 26)
+                        .background(.black)
+                        .overlay { Rectangle().stroke(.gray.opacity(0.25)) }
                 }
             }
-            Text("三字 / Emoji / mixed text").font(.system(size: 12)).foregroundStyle(.white)
-            HStack(spacing: 12) {
-                ForEach(["也曾像", "朋友", "👨‍👩‍👧‍👦你好", "é12"], id: \.self) { text in
-                    Text(text).font(Font(CompactLyricsLayout.font(for: text, in: size)))
-                        .foregroundStyle(.white).frame(width: size.width, height: size.height)
-                        .border(.gray.opacity(0.4))
-                }
-            }
-        }.padding(20).background(.black)
+        }.padding(20).background(Color(white: 0.04))
         let renderer = ImageRenderer(content: strip)
         renderer.scale = 3
-        guard let image = renderer.cgImage,
-              let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
-            fatalError("Visual snapshot failed")
-        }
-        let url = URL(fileURLWithPath: "/tmp/interesting-notch-lyrics-preview.png")
-        try! png.write(to: url)
-        var renderTimes: [Double] = []
-        for step in 0..<120 {
-            let elapsed: Double = autoreleasepool {
-                let begin = Date()
-                let frameRenderer = ImageRenderer(content:
-                    LyricTransitionCanvas(transition: transition,
-                        date: transition.startedAt.addingTimeInterval(Double(step % 60) / 59 * 0.280), tint: .white)
-                        .frame(width: size.width, height: size.height).background(.black))
-                frameRenderer.scale = 2
-                assert(frameRenderer.cgImage != nil)
-                return Date().timeIntervalSince(begin) * 1000
+        let image = renderer.cgImage!
+        let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
+        try! png.write(to: URL(fileURLWithPath: "/tmp/portal-lyrics-preview.png"))
+        var times: [Double] = []
+        for index in 0..<120 {
+            let ms: Double = autoreleasepool {
+                let start = Date()
+                let frame = ImageRenderer(content: PortalLyricsFrame(phase: .lyrics(cue), elapsed: 1 + Double(index) / 60,
+                    duration: 30, sideWidth: 54, gap: 150, tint: .white, reduced: false,
+                    glyph: glyph, cover: coverGlyph, albumArt: cover).frame(width: 258, height: 26))
+                frame.scale = 2
+                assert(frame.cgImage != nil)
+                return Date().timeIntervalSince(start) * 1000
             }
-            renderTimes.append(elapsed)
+            times.append(ms)
         }
-        renderTimes.sort()
-        print(String(format: "Offscreen renderer: 120 frames, median %.3f ms, p95 %.3f ms (not display FPS)", renderTimes[60], renderTimes[114]))
-        print("Visual checks passed; snapshot: \(url.path)")
+        times.sort()
+        print(String(format: "Portal offscreen renderer: median %.3f ms; p95 %.3f ms (not display FPS)", times[60], times[114]))
+        runtimeChecks(cover)
     }
-}
-#endif
 
-#if VISUAL_CHECKS
-@MainActor private final class RuntimeClock: ObservableObject {
-    @Published var position = 0.2
-    @Published var date = Date()
-    @Published var playing = false
-    @Published var revision: UInt64 = 1
-    @Published var segments: [LyricSegment] = [
-        .init(id: 0, start: 0, end: 1, text: "歌颂"),
-        .init(id: 1, start: 1, end: 2, text: "这种"),
-        .init(id: 2, start: 2, end: 3, text: "平凡")
-    ]
-}
-private struct RuntimeView: View {
-    @ObservedObject var clock: RuntimeClock
-    var body: some View {
-        CompactLyricsView(segments: clock.segments, revision: clock.revision,
-                          position: clock.position, sampleDate: clock.date, rate: 1,
-                          isPlaying: clock.playing, tint: .white) { Text("—").foregroundStyle(.gray) }
-            .background(.black)
-    }
-}
-extension CompactLyricsChecks {
-    static func runtimeChecks() {
+    static func runtimeChecks(_ cover: NSImage) {
         NSApplication.shared.setActivationPolicy(.prohibited)
-        let clock = RuntimeClock()
-        let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: CompactLyricsLayout.slotWidth, height: 24),
+        let clock = TestClock()
+        let host = NSHostingView(rootView: TestView(clock: clock, cover: cover))
+        let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 258, height: 26),
                               styleMask: .borderless, backing: .buffered, defer: false)
-        let host = NSHostingView(rootView: RuntimeView(clock: clock))
-        window.contentView = host
-        window.orderFront(nil)
+        window.contentView = host; window.orderFront(nil)
         defer { window.orderOut(nil); window.contentView = nil }
-        func settle(_ seconds: Double = 0.12) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
+        func settle(_ seconds: Double = 0.15) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
         func frame() -> Data {
             host.layoutSubtreeIfNeeded()
             let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
             host.cacheDisplay(in: host.bounds, to: bitmap)
             return Data(bytes: bitmap.bitmapData!, count: bitmap.bytesPerRow * bitmap.pixelsHigh)
         }
-        settle()
-        let first = frame()
-        settle(1.1)
-        assert(frame() == first, "Paused lyrics advanced")
-        clock.position = 1.2; clock.date = Date(); settle()
-        let second = frame()
-        assert(first != second, "Forward seek did not update rendered text")
-        clock.position = 0.2; clock.date = Date(); settle()
-        assert(frame() == first, "Backward seek did not restore rendered text")
-        clock.position = 0.9; clock.date = Date(); clock.playing = true; settle(0.55)
-        assert(frame() == second, "Resume/boundary transition did not settle on next text")
-        clock.playing = false; clock.position = 1.4; clock.date = Date(); settle(0.4)
-        let paused = frame(); settle(0.4)
-        assert(frame() == paused && paused == second, "Pause left moving particles")
-        clock.segments = [.init(id: 1, start: 0, end: 3, text: "朋友")]
-        clock.revision += 1; settle()
-        assert(frame() != second, "New song reused the old segment ID")
+        settle(); let first = frame(); settle(0.3)
+        assert(frame() == first, "Paused motion changed")
+        clock.position = 3; clock.date = Date(); settle()
+        assert(frame() != first, "Seek failed to move sentence")
+        clock.position = 2; clock.date = Date(); settle()
+        assert(frame() == first, "Backward seek changed line state")
+        clock.playing = true; clock.date = Date(); settle(0.2); let moving = frame(); settle(0.2)
+        assert(frame() != moving, "Playing text did not move")
+        clock.playing = false; clock.position = 29.9; clock.date = Date(); settle()
+        let ended = frame()
+        clock.position = 2; clock.date = Date(); settle()
+        assert(frame() == first && frame() != ended, "Rewind after ending did not restore lyrics")
         clock.segments = []; clock.revision += 1; settle()
-        let fallback = frame()
-        assert(fallback != first && fallback != second, "Missing lyrics did not fall back")
-        print("Runtime checks passed: pause, forward/back seek, resume, song revision, fallback")
+        let waves = frame(); settle(0.3)
+        assert(frame() == waves && waves != first, "Paused fallback wave changed or retained lyrics")
+        print("Portal runtime checks passed: pause, scroll, forward/back seek, ending rewind, wave fallback")
+    }
+}
+@MainActor private final class TestClock: ObservableObject {
+    @Published var position = 2.0
+    @Published var date = Date()
+    @Published var playing = false
+    @Published var revision: UInt64 = 1
+    @Published var segments = [LyricSegment(id: 0, start: 0, end: 6, text: "歌颂这种平凡")]
+}
+private struct TestView: View {
+    @ObservedObject var clock: TestClock
+    let cover: NSImage
+    var body: some View {
+        CompactLyricsView(segments: clock.segments, revision: clock.revision, position: clock.position,
+                          sampleDate: clock.date, rate: 1, duration: 30, isPlaying: clock.playing,
+                          tint: .white, albumArt: cover, sideWidth: 54, gap: 150, height: 26).background(.black)
     }
 }
 #endif

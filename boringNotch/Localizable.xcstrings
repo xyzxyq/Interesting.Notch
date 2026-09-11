@@ -1,34 +1,34 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Compact lyrics for Apple Music": {
+    "Portal lyrics for Apple Music": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Compact lyrics for Apple Music"
+            "value": "Portal lyrics for Apple Music"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple Music 右侧短语歌词"
+            "value": "Apple Music 双侧流动歌词"
           }
         }
       }
     },
-    "Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable.": {
+    "Lyrics flow through both sides of the notch. Instrumental passages show waves; Chinese script follows your system language.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable."
+            "value": "Lyrics flow through both sides of the notch. Instrumental passages show waves; Chinese script follows your system language."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "每次最多三字；按逐行歌词估算词语时间，无同步歌词时显示原有动画。"
+            "value": "歌词从右向左穿过粒子传送门，伴奏显示波浪；中文简繁跟随系统语言。"
           }
         }
       }

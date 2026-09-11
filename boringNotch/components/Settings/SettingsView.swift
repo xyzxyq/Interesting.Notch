@@ -646,14 +646,14 @@ struct Media: View {
                 )
                 Defaults.Toggle(key: .enableCompactLyrics) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Compact lyrics for Apple Music")
-                        Text("Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable.")
+                        Text("Portal lyrics for Apple Music")
+                        Text("Lyrics flow through both sides of the notch. Instrumental passages show waves; Chinese script follows your system language.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-                .accessibilityLabel(Text("Compact lyrics for Apple Music"))
-                .accessibilityHint(Text("Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable."))
+                .accessibilityLabel(Text("Portal lyrics for Apple Music"))
+                .accessibilityHint(Text("Lyrics flow through both sides of the notch. Instrumental passages show waves; Chinese script follows your system language."))
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
                 Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in
