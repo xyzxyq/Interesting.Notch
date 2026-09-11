@@ -218,27 +218,29 @@ struct PortalLyricsFrame: View {
         let star = duration > 0 ? min(1, max(0, (elapsed - (duration - 2.5)) / 1.0)) : 0
         var layer = context
         layer.opacity = (1 - star) * pow(1 - dissolve, 2)
+        let moonCenter = CGPoint(x: center.x, y: center.y - 1.5)
+        let moonRadius: CGFloat = 6.8
         // Lit limb is a semicircle plus an elliptical terminator: full -> half -> crescent.
         var shape = Path()
         for i in 0...40 {
             let angle = -.pi / 2 + Double(i) * .pi / 40
-            let point = CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+            let point = CGPoint(x: moonCenter.x + moonRadius * cos(angle), y: moonCenter.y + moonRadius * sin(angle))
             if i == 0 { shape.move(to: point) } else { shape.addLine(to: point) }
         }
         for i in 0...40 {
             let angle = .pi / 2 - Double(i) * .pi / 40
-            shape.addLine(to: CGPoint(x: center.x + radius * (2 * progress - 1) * cos(angle), y: center.y + radius * sin(angle)))
+            shape.addLine(to: CGPoint(x: moonCenter.x + moonRadius * (2 * progress - 1) * cos(angle), y: moonCenter.y + moonRadius * sin(angle)))
         }
         shape.closeSubpath()
         var surface = layer
         surface.clip(to: shape)
         surface.fill(shape, with: .radialGradient(
             Gradient(colors: [Color(white: 0.98), Color(red: 0.75, green: 0.78, blue: 0.82), Color(white: 0.38)]),
-            center: CGPoint(x: center.x - radius * 0.35, y: center.y - radius * 0.4),
-            startRadius: 0, endRadius: radius * 1.8))
+            center: CGPoint(x: moonCenter.x - moonRadius * 0.35, y: moonCenter.y - moonRadius * 0.4),
+            startRadius: 0, endRadius: moonRadius * 1.8))
         for (x, y, scale) in CompactLyricsLayout.moonCraters {
-            let r = radius * scale
-            let pit = CGRect(x: center.x + x * radius - r, y: center.y + y * radius - r,
+            let r = moonRadius * scale
+            let pit = CGRect(x: moonCenter.x + x * moonRadius - r, y: moonCenter.y + y * moonRadius - r,
                              width: r * 2, height: r * 1.7)
             surface.fill(Path(ellipseIn: pit), with: .radialGradient(
                 Gradient(colors: [Color(white: 0.22).opacity(0.55), Color(white: 0.45).opacity(0.12)]),
@@ -248,6 +250,27 @@ struct PortalLyricsFrame: View {
             rim.addArc(center: CGPoint(x: pit.midX, y: pit.midY), radius: r * 0.8,
                        startAngle: .degrees(15), endAngle: .degrees(140), clockwise: false)
             surface.stroke(rim, with: .color(.white.opacity(0.35)), lineWidth: 0.45)
+        }
+        // Small silver strands share the moon's fade and playback clock.
+        var fringe = layer
+        fringe.clip(to: Path(lane))
+        for i in 0..<3 {
+            let angle = (38 + Double(i) * 21) * .pi / 180
+            let root = CGPoint(x: moonCenter.x + cos(angle) * moonRadius * 0.98,
+                               y: moonCenter.y + sin(angle) * moonRadius * 0.98)
+            let sway = reduced ? 0 : sin(elapsed * 1.8 + Double(i) * 0.7) * 0.85
+            let tip = CGPoint(x: root.x + sway - 0.4,
+                              y: min(lane.maxY - 0.8, root.y + 3.5 + Double(i) * 0.45))
+            var thread = Path()
+            thread.move(to: root)
+            thread.addCurve(to: tip,
+                            control1: CGPoint(x: root.x - 0.7, y: root.y + 1.2),
+                            control2: CGPoint(x: tip.x + sway * 0.5, y: tip.y - 1))
+            fringe.stroke(thread, with: .linearGradient(
+                Gradient(colors: [Color(white: 0.92).opacity(0.8), Color(red: 0.65, green: 0.77, blue: 0.92).opacity(0.45)]),
+                startPoint: root, endPoint: tip), style: StrokeStyle(lineWidth: 0.5, lineCap: .round))
+            fringe.fill(Path(ellipseIn: CGRect(x: tip.x - 0.45, y: tip.y - 0.45, width: 0.9, height: 0.9)),
+                        with: .color(Color(white: 0.95).opacity(0.8)))
         }
         var starPath = Path()
         for i in 0..<10 {
