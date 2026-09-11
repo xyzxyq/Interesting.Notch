@@ -58,7 +58,7 @@ struct LyricSegment: Equatable, Identifiable {
 // transitionDuration(for segment: LyricSegment) -> Double
 ```
 
-- [ ] 先创建断言入口，运行并确认因缺少生产接口而失败：
+- [x] 先创建断言入口，运行并确认因缺少生产接口而失败：
 
 ```swift
 import Foundation
@@ -99,9 +99,9 @@ xcrun swiftc -swift-version 5 boringNotch/models/CompactLyrics.swift scripts/Com
 /tmp/interesting-notch-lyrics-checks
 ```
 
-- [ ] 实现 LRC：全局 offset 先解析；每行枚举所有时间标签，标签之外为正文。小数使用 Double("0." + fraction)，秒数限定小于 60；非有限时间拒绝。保留空正文，按时间和原序排序，同时间按源顺序拼接正文；负时间裁为零。正则只构造一次。
-- [ ] 实现分段：先按标点和空白分块，再 NLTokenizer。遍历 tokenizer 没覆盖的字符区间以保留 emoji；不按 UTF16 长度裁剪。优先识别“也曾像”“和我”边界修正，不跨标点；对单字段向右合并至三字，二三字词保留；超长词按三个 Character 切开。每次追加非空片段时断言 count <= 3。
-- [ ] 实现时间轴与二分定位；严格使用半开区间 `[start,end)`，原行下一标记或 duration 作为上界。核心公式如下，变量在遍历中由当前行、下一行和 split 结果取得：
+- [x] 实现 LRC：全局 offset 先解析；每行枚举所有时间标签，标签之外为正文。小数使用 Double("0." + fraction)，秒数限定小于 60；非有限时间拒绝。保留空正文，按时间和原序排序，同时间按源顺序拼接正文；负时间裁为零。正则只构造一次。
+- [x] 实现分段：先按标点和空白分块，再 NLTokenizer。遍历 tokenizer 没覆盖的字符区间以保留 emoji；不按 UTF16 长度裁剪。优先识别“也曾像”“和我”边界修正，不跨标点；对单字段向右合并至三字，二三字词保留；超长词按三个 Character 切开。每次追加非空片段时断言 count <= 3。
+- [x] 实现时间轴与二分定位；严格使用半开区间 `[start,end)`，原行下一标记或 duration 作为上界。核心公式如下，变量在遍历中由当前行、下一行和 split 结果取得：
 
 ```swift
 let count = parts.reduce(0) { $0 + $1.count }
@@ -133,7 +133,7 @@ assert(CompactLyrics.nextBoundary(after: 30, in: segments) == nil)
 
 MusicManager 增加 `@Published private(set) var compactSegments: [LyricSegment] = []` 和 `@Published private(set) var lyricsRevision: UInt64 = 0`；内部保存 `lyricsTask: Task<Void,Never>?`、`lyricsTrack: LyricTrack?`、`lyricsGeneration: UInt64`。新增 `@MainActor private func refreshLyrics()`，读取已经更新的公开播放器属性与两个开关。
 
-- [ ] 扩展同一个断言脚本验证匹配：构造歌名 Song、歌手 Singer、专辑 Album、时长 180 的 track，响应 Song Live/180、Song/183、Song/181，只有第三项可选；两个完全匹配候选返回 nil；空歌手返回 nil。使用初始化器创建以下固定数据，再调用 match 断言：
+- [x] 扩展同一个断言脚本验证匹配：构造歌名 Song、歌手 Singer、专辑 Album、时长 180 的 track，响应 Song Live/180、Song/183、Song/181，只有第三项可选；两个完全匹配候选返回 nil；空歌手返回 nil。使用初始化器创建以下固定数据，再调用 match 断言：
 
 ```swift
 let track = LyricTrack(bundleID: "com.apple.Music", title: "Song", artist: "Singer", album: "Album", duration: 180)
@@ -142,8 +142,8 @@ assert(CompactLyrics.match([good], track: track)?.duration == 181)
 assert(CompactLyrics.match([good, good], track: track) == nil)
 ```
 
-- [ ] 实现匹配为去除首尾空白、统一大小写后的字段相等，不删除版本描述。title/artist 非空、duration 有限且 > 0；提供专辑时必须相等，缺失专辑时仅在其余条件唯一命中才采用。`abs(candidate.duration-track.duration) <= 2`，同步模式只选有非空 syncedLyrics 的候选；所有条件在 parse 前检查。重复相同响应也保守视作歧义。
-- [ ] 增加 Defaults key 和设置 Toggle，中文文案“Apple Music 右侧短语歌词”，说明“每次最多三字；按逐行歌词估算词语时间，无同步歌词时显示原有动画”。沿用项目 xcstrings 格式和现有 Defaults.publisher 生命周期，不添加新观察器框架：
+- [x] 实现匹配为去除首尾空白、统一大小写后的字段相等，不删除版本描述。title/artist 非空、duration 有限且 > 0；提供专辑时必须相等，缺失专辑时仅在其余条件唯一命中才采用。`abs(candidate.duration-track.duration) <= 2`，同步模式只选有非空 syncedLyrics 的候选；所有条件在 parse 前检查。重复相同响应也保守视作歧义。
+- [x] 增加 Defaults key 和设置 Toggle，中文文案“Apple Music 右侧短语歌词”，说明“每次最多三字；按逐行歌词估算词语时间，无同步歌词时显示原有动画”。沿用项目 xcstrings 格式和现有 Defaults.publisher 生命周期，不添加新观察器框架：
 
 ```swift
 static let enableCompactLyrics = Key<Bool>("enableCompactLyrics", default: false)
@@ -153,8 +153,8 @@ Defaults.Toggle("Compact lyrics for Apple Music", key: .enableCompactLyrics)
 
 执行时核对 Defaults.Toggle 已安装版本的初始化器；若只使用 key + label 模式则照邻近现有代码书写，不更换依赖。两个 Defaults publisher 均在主线程触发 refreshLyrics，复用 cancellables。
 
-- [ ] 从 hasContentChange 封面分支移除歌词请求，在 `updateFromPlaybackState` 的属性赋值及 timestampDate 更新之后调用 refreshLyrics。以 track 和请求需求元组 `(expanded,compactAppleMusic)` 去重；设置需求变化允许当前歌曲重新请求，播放位置变化不触发网络。关闭全部需求、控制器重置或歌曲身份变化时取消任务，增加 generation，清空 compactSegments/syncedLyrics/currentLyrics，并增加 lyricsRevision。
-- [ ] 改写现有歌词获取链路，保留 AppleScript 获取文本能力。先 `/api/get` 按 track_name/artist_name/album_name/duration 查询；无匹配时仅回退一次 `/api/search`。复用 URLSession.shared，URLComponents.queryItems，不在日志输出完整歌词。所有发布，包括 native 纯文本、loading 和失败状态，都先检查 generation：
+- [x] 从 hasContentChange 封面分支移除歌词请求，在 `updateFromPlaybackState` 的属性赋值及 timestampDate 更新之后调用 refreshLyrics。以 track 和请求需求元组 `(expanded,compactAppleMusic)` 去重；设置需求变化允许当前歌曲重新请求，播放位置变化不触发网络。关闭全部需求、控制器重置或歌曲身份变化时取消任务，增加 generation，清空 compactSegments/syncedLyrics/currentLyrics，并增加 lyricsRevision。
+- [x] 改写现有歌词获取链路，保留 AppleScript 获取文本能力。先 `/api/get` 按 track_name/artist_name/album_name/duration 查询；无匹配时仅回退一次 `/api/search`。复用 URLSession.shared，URLComponents.queryItems，不在日志输出完整歌词。所有发布，包括 native 纯文本、loading 和失败状态，都先检查 generation：
 
 ```swift
 lyricsTask?.cancel()
@@ -174,7 +174,7 @@ guard !Task.isCancelled, generation == self.lyricsGeneration else { return }
 
 **Interfaces:** `CompactLyricsView` 接收 `segments: [LyricSegment]`、`revision: UInt64`、`position: Double`、`sampleDate: Date`、`rate: Double`、`isPlaying: Bool`、`tint: Color`，以及 `@ViewBuilder fallback: () -> Fallback`。使用泛型 Fallback: View，避免 AnyView。数据来自现有 MusicManager 的时间样本，不另建音乐观察模型。
 
-- [ ] 添加视图并注册工程；静态视图先完成，不在此任务引入 Canvas。内部当前位置用播放器样本估算：
+- [x] 添加视图并注册工程；静态视图先完成，不在此任务引入 Canvas。内部当前位置用播放器样本估算：
 
 ```swift
 let estimated = isPlaying
@@ -186,9 +186,9 @@ let segment = CompactLyrics.segment(at: max(0, estimated), in: segments)
 
 将 revision、position、sampleDate、rate、isPlaying 组成小型 Equatable task identity（定义在视图文件内）。`.task(id:)` 立即定位，再睡到 `nextBoundary`，醒来重新从绝对位置计算。rate <= 0、暂停或无未来边界直接结束；任务取消直接退出，禁止捕获取消后继续循环。视图消失由 SwiftUI 取消 task。不要把整个 ContentView 放进 TimelineView。
 
-- [ ] 在 ContentView 中增加 `@Default(.enableCompactLyrics)`，条件严格为该开关且 bundleIdentifier == "com.apple.Music"。提取已有频谱/Lottie 内容为一个 @ViewBuilder 属性并作为 fallback 传入；歌词视图不改变现有通知、隐藏及展开优先级。
-- [ ] 固定三字槽宽使用 NSFont.systemFont(ofSize: 13, weight: .medium) 测量三个全宽字；对实际三字符 cluster 的极端宽度采用单行缩放而非外框扩大。初始水平边距每侧 4 pt，字号视觉下限 10 pt。若复杂 emoji 在下限仍超过宽度，保持整个片段缩放以不裁切，并记录例外，不破坏字符守恒。所有宽度仅由模式和屏幕布局决定，不随当前文本变化。
-- [ ] 同步更新 `computedChinWidth`。按物理刘海中心保持左右占位等宽：歌词模式两侧均取 `max(originalSideWidth, compactSlotWidth)`，左封面在左槽内保持靠近刘海的原始相对位置；中心黑色覆盖区域不变。不是仅增加 HStack 右宽导致刘海偏移。复用相同宽度计算到音乐 HStack 与轮廓，不复制两个略有不同的公式。
+- [x] 在 ContentView 中增加 `@Default(.enableCompactLyrics)`，条件严格为该开关且 bundleIdentifier == "com.apple.Music"。提取已有频谱/Lottie 内容为一个 @ViewBuilder 属性并作为 fallback 传入；歌词视图不改变现有通知、隐藏及展开优先级。
+- [x] 固定三字槽宽使用 NSFont.systemFont(ofSize: 13, weight: .medium) 测量三个全宽字；对实际三字符 cluster 的极端宽度采用单行缩放而非外框扩大。初始水平边距每侧 4 pt，字号视觉下限 10 pt。若复杂 emoji 在下限仍超过宽度，保持整个片段缩放以不裁切，并记录例外，不破坏字符守恒。所有宽度仅由模式和屏幕布局决定，不随当前文本变化。
+- [x] 同步更新 `computedChinWidth`。按物理刘海中心保持左右占位等宽：歌词模式两侧均取 `max(originalSideWidth, compactSlotWidth)`，左封面在左槽内保持靠近刘海的原始相对位置；中心黑色覆盖区域不变。不是仅增加 HStack 右宽导致刘海偏移。复用相同宽度计算到音乐 HStack 与轮廓，不复制两个略有不同的公式。
 
 ```swift
 let font = NSFont.systemFont(ofSize: 13, weight: .medium)
@@ -205,7 +205,7 @@ let sideWidth = compactMode ? max(originalSideWidth, compactSlotWidth) : origina
 
 **Interfaces:** 视图内部增加 `Particle`，字段 `origin: CGPoint`、`drift: CGVector`、`radius: CGFloat`；`Transition` 保存 outgoing/incoming 字形采样、startedAt 与 duration。不暴露新的管理器。稳定状态始终普通 Text。
 
-- [ ] 添加过渡时长断言，运行上述 swiftc 命令确认失败再实现：
+- [x] 添加过渡时长边界断言并运行上述 swiftc 命令。函数已在 Task 1 实现，因此本步验证已有实现，不人为制造失败：
 
 ```swift
 let fast = LyricSegment(id: 0, start: 0, end: 0.1, text: "你")
@@ -214,8 +214,8 @@ let slow = LyricSegment(id: 1, start: 0, end: 2, text: "你好")
 assert(CompactLyrics.transitionDuration(for: slow) == 0.280)
 ```
 
-- [ ] 每次新目标由 `(revision, segment.id)` 标识。按实际字体与 Retina scale 使用 AppKit 位图绘制文字，读取 alpha>0 的像素中心，用均匀步长取最多 160 个样本。采样只在目标变化时执行；字形位图尺寸受槽位与字体约束。固定种子的简单生成器或索引函数计算方向，漂移长度 2–5 pt，不调用每帧随机函数。最多保存两个字形，不建无限缓存。
-- [ ] 只在 Transition 存在时插入 `TimelineView(.animation)` + Canvas。每帧由 startedAt 推导归一化进度，使用以下插值；Canvas 不写 @State，不执行字形采样：
+- [x] 每次新目标由 `(revision, segment.id)` 标识。按实际字体与 Retina scale 使用 AppKit 位图绘制文字，读取 alpha>0 的像素中心，用均匀步长取最多 160 个样本。采样只在目标变化时执行；字形位图尺寸受槽位与字体约束。固定种子的简单生成器或索引函数计算方向，漂移长度 2–5 pt，不调用每帧随机函数。最多保存两个字形，不建无限缓存。
+- [x] 只在 Transition 存在时插入 `TimelineView(.animation)` + Canvas。每帧由 startedAt 推导归一化进度，使用以下插值；Canvas 不写 @State，不执行字形采样：
 
 ```swift
 let p = min(1, max(0, now.timeIntervalSince(startedAt) / duration))
@@ -226,15 +226,15 @@ let eased = p * p * (3 - 2 * p)
 ```
 
 正常文字与采样点交接时限制叠加亮度，不让两组完整文本同时强可见。过渡开始可以重叠；完成时销毁 TimelineView，展示普通 Text。用视图拥有的可取消完成任务落回稳定状态；新片段取消旧完成任务并替换状态，过期任务不能清除新过渡。
-- [ ] `accessibilityReduceMotion` 为 true 使用 100 ms 或片段时长 35% 中较短值淡入淡出，不采样、不创建粒子。暂停允许完成当前过渡但不换词；seek 超过一个片段直接定位目标，后续正常边界再动画；关闭、隐藏、revision 变化均失效旧动画。字形采样失败显示正常 Text，不能空白或崩溃。
+- [x] `accessibilityReduceMotion` 为 true 使用 100 ms 或片段时长 35% 中较短值淡入淡出，不采样、不创建粒子。暂停允许完成当前过渡但不换词；seek 超过一个片段直接定位目标，后续正常边界再动画；关闭、隐藏、revision 变化均失效旧动画。字形采样失败显示正常 Text，不能空白或崩溃。
 - [ ] 重跑纯断言并构建。目视核对真实笔画散开与聚合、快速片段可读、暂停无持续运动、反复跳转没有过渡队列；验证粒子最多 320。提交 `feat: animate compact lyrics with bounded particles`。
 
 ## Task 5：构建、实机与交付记录
 
 **Files:** Create `docs/superpowers/validation/2026-09-11-compact-lyrics.md`; only fix scoped implementation defects found by checks。
 
-- [ ] 运行纯 Swift 检查，记录命令、退出码及输出。它仅证明数据处理和纯计算，不证明网络生命周期和视觉性能。
-- [ ] 单次指定已安装 Xcode，查询实际 scheme；当前系统 xcode-select 指向 `/Library/Developer/CommandLineTools`，不修改全局选择：
+- [x] 运行纯 Swift 检查，记录命令、退出码及输出。它仅证明数据处理和纯计算，不证明网络生命周期和视觉性能。
+- [x] 单次指定已安装 Xcode，查询实际 scheme；当前系统 xcode-select 指向 `/Library/Developer/CommandLineTools`，不修改全局选择：
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -list -project boringNotch.xcodeproj
@@ -267,4 +267,4 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project bor
 
 执行期间先读取每个将修改函数的所有调用方；尤其检查 MusicManager 原歌词消费者和 ContentView 的外框宽度。每任务结束运行对应检查并记录，不以“代码已写”替代“验证通过”。代码片段描述接口和关键实现，不是可直接覆盖现有文件的整文件补丁；集成前阅读完整受影响函数。
 
-当前计划已完成，应用实现尚未开始。默认在本对话串行执行，不另开任务，不启动子代理。
+实现已完成并提交到 feature/compact-lyrics；纯数据、离屏渲染、受控视图生命周期、完整构建和签名校验通过。真实播放器已观察到短语换词，设置开关已读回。多屏、慢歌/快歌/长间奏各 60 秒的性能矩阵仍待体验验收；未勾选的混合步骤包含这些尚未执行部分。详见 ../validation/2026-09-11-compact-lyrics.md。
