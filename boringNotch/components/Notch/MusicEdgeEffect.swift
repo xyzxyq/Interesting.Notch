@@ -48,6 +48,25 @@ struct EdgeContour {
     }
 }
 
+// Assign color by emission, so a travelling wave never changes color mid-flight.
+struct WaterWave {
+    let progress: Double
+    let paletteIndex: Int
+    init(phase: Double, slot: Int) {
+        let cycle = phase * 0.65 + Double(slot) / 3
+        progress = cycle - floor(cycle)
+        let emission = Int(floor(cycle)) * 3 - slot
+        paletteIndex = ((emission % 5) + 5) % 5
+    }
+    static let colors: [Color] = [
+        Color(red: 0.45, green: 0.68, blue: 0.94),
+        Color(red: 0.69, green: 0.56, blue: 0.89),
+        Color(red: 0.91, green: 0.59, blue: 0.69),
+        Color(red: 0.91, green: 0.75, blue: 0.48),
+        Color(red: 0.43, green: 0.79, blue: 0.74)
+    ]
+}
+
 struct MusicEdgeFrame: View {
     let shape: NotchShape
     let style: String
@@ -67,23 +86,10 @@ struct MusicEdgeFrame: View {
             let e = min(1, max(0, energy))
             guard style != "off" else { return }
             let isWater = style.hasPrefix("water")
-            let waterInk: GraphicsContext.Shading
-            if style == "waterColor" {
-                let angle = reduced ? 0 : phase * 0.18
-                let center = CGPoint(x: rect.midX, y: rect.midY)
-                let dx = cos(angle) * rect.width / 2
-                let dy = sin(angle) * rect.height / 2
-                waterInk = .linearGradient(Gradient(colors: [
-                    Color(red: 0.36, green: 0.83, blue: 0.96),
-                    Color(red: 0.64, green: 0.56, blue: 0.96),
-                    Color(red: 0.98, green: 0.57, blue: 0.73)
-                ]), startPoint: CGPoint(x: center.x - dx, y: center.y - dy),
-                    endPoint: CGPoint(x: center.x + dx, y: center.y + dy))
-            } else {
-                waterInk = .color(style == "waterWhite" ? .white : .black)
-            }
+            let isColorWater = style == "waterColor"
+            let waterInk: GraphicsContext.Shading = .color(style == "waterWhite" ? .white : .black)
             if reduced {
-                context.stroke(outline, with: isWater ? waterInk : .color(color.opacity(0.4)), lineWidth: 2)
+                context.stroke(outline, with: isColorWater ? .color(WaterWave.colors[0]) : isWater ? waterInk : .color(color.opacity(0.4)), lineWidth: 2)
                 return
             }
             if isWater {
@@ -103,19 +109,21 @@ struct MusicEdgeFrame: View {
                     path.closeSubpath()
                     return path
                 }
-                let reach = min(17, (10 + e * 8) * strength)
+                let reach = min(17, (isColorWater ? 14 + e * 4 : 10 + e * 8) * strength)
                 // Three waves travel outwards and disappear before their phase wraps.
                 for ring in 0..<3 {
-                    let t = (phase * 0.65 + Double(ring) / 3).truncatingRemainder(dividingBy: 1)
-                    let fade = sin(.pi * t) * (1 - t)
+                    let state = WaterWave(phase: phase, slot: ring)
+                    let t = state.progress
+                    let fade = sin(.pi * t) * (1 - t * (isColorWater ? 0.35 : 1))
+                    let ringInk: GraphicsContext.Shading = isColorWater ? .color(WaterWave.colors[state.paletteIndex]) : waterInk
                     let wave = surface(distance: 2 + t * reach, amplitude: (0.5 + e) * strength)
                     var waveContext = context
                     waveContext.opacity *= fade * 0.9
-                    waveContext.stroke(wave, with: waterInk, style: StrokeStyle(lineWidth: (2.5 + e * 1.5) * strength, lineCap: .round, lineJoin: .round))
+                    waveContext.stroke(wave, with: ringInk, style: StrokeStyle(lineWidth: (isColorWater ? 1.7 + e * 0.5 : 2.5 + e * 1.5) * strength, lineCap: .round, lineJoin: .round))
                     // A faint water highlight preserves the contour on dark wallpaper.
                     context.stroke(wave, with: .color(.white.opacity(fade * 0.16)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
                 }
-                let edge = surface(distance: (2.5 + e * 2) * strength, amplitude: (0.6 + e * 1.4) * strength)
+                let edge = surface(distance: (isColorWater ? 1.5 : 2.5 + e * 2) * strength, amplitude: (isColorWater ? 0.3 : 0.6 + e * 1.4) * strength)
                 context.fill(edge, with: waterInk)
                 context.stroke(edge, with: .color((style == "waterWhite" ? Color.black : Color.white).opacity(0.10)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
                 return

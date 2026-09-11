@@ -55,6 +55,12 @@ import AppKit
             assert(pixels.colorAt(x: pixels.pixelsWide/2, y: pixels.pixelsHigh/2)!.alphaComponent == 0, "Water palette covers content")
         }
         assert(!samePixels(render("waterWhite", energy: 1), render("waterColor", energy: 1)), "Color water must differ from white")
+        let ringColors = (0..<3).map { WaterWave(phase: 0.7, slot: $0).paletteIndex }
+        assert(Set(ringColors).count == 3, "Adjacent waves must have different colors")
+        for slot in 0..<3 {
+            assert(WaterWave(phase: 0.7, slot: slot).paletteIndex == WaterWave(phase: 0.71, slot: slot).paletteIndex, "Travelling wave changed color")
+        }
+        assert(WaterWave(phase: 0, slot: 0).paletteIndex != WaterWave(phase: 1.55, slot: 0).paletteIndex, "New emission must change color")
         let preview = VStack(spacing: 18) {
             Text("音乐边缘 · 左：安静　右：强烈").font(.system(size: 15))
             ForEach(styles, id: \.self) { style in
