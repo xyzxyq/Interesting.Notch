@@ -16,7 +16,7 @@ import AppKit
         assert(contour.length > 500)
         assert(hypot(contour.point(0).x - contour.point(1).x, contour.point(0).y - contour.point(1).y) < 0.0001)
         for i in 0..<100 { let p = contour.point(Double(i)/100, outward: 3); assert(p.x.isFinite && p.y.isFinite) }
-        let styles = ["water", "ripple", "dust", "meteor", "mist"]
+        let styles = ["water", "waterWhite", "waterColor", "ripple", "dust", "meteor", "mist"]
         func render(_ style: String, energy: Double, reduced: Bool = false, phase: Double = 0.7) -> Data {
             let content = MusicEdgeFrame(shape: shape, style: style, strength: 1, energy: energy, phase: phase, color: .white, reduced: reduced)
                 .frame(width: 352, height: 80)
@@ -48,11 +48,18 @@ import AppKit
         assert(darkPixels > 500, "Water must form a visible black perimeter")
         assert(water.colorAt(x: water.pixelsWide/2, y: water.pixelsHigh/2)!.alphaComponent == 0, "Effect covers notch contents")
         assert(!samePixels(render("water", energy: 1), render("water", energy: 1, phase: 1.2)), "Water must propagate over time")
+        for variant in ["waterWhite", "waterColor"] {
+            assert(!samePixels(render("water", energy: 1), render(variant, energy: 1)), "Water palette did not change")
+            assert(samePixels(render(variant, energy: 0, reduced: true), render(variant, energy: 1, reduced: true, phase: 4)), "Reduced water must keep a fixed palette")
+            let pixels = NSBitmapImageRep(data: render(variant, energy: 1))!
+            assert(pixels.colorAt(x: pixels.pixelsWide/2, y: pixels.pixelsHigh/2)!.alphaComponent == 0, "Water palette covers content")
+        }
+        assert(!samePixels(render("waterWhite", energy: 1), render("waterColor", energy: 1)), "Color water must differ from white")
         let preview = VStack(spacing: 18) {
             Text("音乐边缘 · 左：安静　右：强烈").font(.system(size: 15))
             ForEach(styles, id: \.self) { style in
                 HStack(spacing: 20) {
-                    Text(["water":"黑色水波", "ripple":"涟漪", "dust":"星尘", "meteor":"流星", "mist":"光雾"][style]!).frame(width: 70)
+                    Text(["water":"黑色水波", "waterWhite":"白色水波", "waterColor":"彩色水波", "ripple":"涟漪", "dust":"星尘", "meteor":"流星", "mist":"光雾"][style]!).frame(width: 70)
                     ForEach([0.0, 1.0], id: \.self) { energy in
                         ZStack {
                             if style == "water" { Color(white: 0.55) }
@@ -65,6 +72,6 @@ import AppKit
         }.padding(24).foregroundStyle(.white).background(Color(white: 0.13))
         let renderer = ImageRenderer(content: preview); renderer.scale = 2
         try NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/tmp/music-edge-preview.png"))
-        print("Music edge checks passed: attack/release, invalid audio, contour wrap, five styles, black water, interior mask and reduced motion")
+        print("Music edge checks passed: attack/release, invalid audio, contour wrap, seven styles, three water palettes, interior mask and reduced motion")
     }
 }

@@ -66,12 +66,28 @@ struct MusicEdgeFrame: View {
             let contour = EdgeContour(path: outline)
             let e = min(1, max(0, energy))
             guard style != "off" else { return }
+            let isWater = style.hasPrefix("water")
+            let waterInk: GraphicsContext.Shading
+            if style == "waterColor" {
+                let angle = reduced ? 0 : phase * 0.18
+                let center = CGPoint(x: rect.midX, y: rect.midY)
+                let dx = cos(angle) * rect.width / 2
+                let dy = sin(angle) * rect.height / 2
+                waterInk = .linearGradient(Gradient(colors: [
+                    Color(red: 0.36, green: 0.83, blue: 0.96),
+                    Color(red: 0.64, green: 0.56, blue: 0.96),
+                    Color(red: 0.98, green: 0.57, blue: 0.73)
+                ]), startPoint: CGPoint(x: center.x - dx, y: center.y - dy),
+                    endPoint: CGPoint(x: center.x + dx, y: center.y + dy))
+            } else {
+                waterInk = .color(style == "waterWhite" ? .white : .black)
+            }
             if reduced {
-                context.stroke(outline, with: .color(style == "water" ? .black : color.opacity(0.4)), lineWidth: 2)
+                context.stroke(outline, with: isWater ? waterInk : .color(color.opacity(0.4)), lineWidth: 2)
                 return
             }
-            if style == "water" {
-                // Keep the content fixed: only the black silhouette outside the mask moves.
+            if isWater {
+                // All water palettes share the same geometry; content stays fixed inside the mask.
                 func surface(distance: Double, amplitude: Double) -> Path {
                     let expanded = EdgeContour(path: shape.path(in: rect.insetBy(dx: -distance, dy: -distance)))
                     var path = Path()
@@ -93,13 +109,15 @@ struct MusicEdgeFrame: View {
                     let t = (phase * 0.65 + Double(ring) / 3).truncatingRemainder(dividingBy: 1)
                     let fade = sin(.pi * t) * (1 - t)
                     let wave = surface(distance: 2 + t * reach, amplitude: (0.5 + e) * strength)
-                    context.stroke(wave, with: .color(.black.opacity(fade * 0.9)), style: StrokeStyle(lineWidth: (2.5 + e * 1.5) * strength, lineCap: .round, lineJoin: .round))
+                    var waveContext = context
+                    waveContext.opacity *= fade * 0.9
+                    waveContext.stroke(wave, with: waterInk, style: StrokeStyle(lineWidth: (2.5 + e * 1.5) * strength, lineCap: .round, lineJoin: .round))
                     // A faint water highlight preserves the contour on dark wallpaper.
                     context.stroke(wave, with: .color(.white.opacity(fade * 0.16)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
                 }
                 let edge = surface(distance: (2.5 + e * 2) * strength, amplitude: (0.6 + e * 1.4) * strength)
-                context.fill(edge, with: .color(.black))
-                context.stroke(edge, with: .color(.white.opacity(0.10)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
+                context.fill(edge, with: waterInk)
+                context.stroke(edge, with: .color((style == "waterWhite" ? Color.black : Color.white).opacity(0.10)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
                 return
             }
             if style == "ripple" {
@@ -169,7 +187,7 @@ struct MusicEdgeEffect: View {
                 .opacity(style == "off" || !music.isPlaying ? 0 : (1-ending) * min(1, max(0, elapsed / 2)))
                 .animation(.easeOut(duration: 0.4), value: music.isPlaying)
                 .onChange(of: clock.date) { _, date in
-                    phase += min(0.1, max(0, date.timeIntervalSince(previous))) * ((style == "water" ? 0.4 : 0.65) + (reactive ? audio.energy : 0) * 1.8)
+                    phase += min(0.1, max(0, date.timeIntervalSince(previous))) * ((style.hasPrefix("water") ? 0.4 : 0.65) + (reactive ? audio.energy : 0) * 1.8)
                     previous = date
                 }
         }
@@ -185,9 +203,22 @@ struct MusicEdgeSettings: View {
     @AppStorage("musicEdgeReactive") private var reactive = true
     @ObservedObject private var audio = MusicEdgeAudio.shared
     var body: some View {
-        Picker("音乐边缘动效", selection: $style) {
-            Text("关闭").tag("off"); Text("黑色水波").tag("water"); Text("涟漪").tag("ripple"); Text("星尘").tag("dust")
+        Picker("音乐边缘动效", selection: Binding(
+            get: { style.hasPrefix("water") ? "water" : style },
+            set: { choice in
+                if choice != "water" || !style.hasPrefix("water") { style = choice }
+            }
+        )) {
+            Text("关闭").tag("off"); Text("水波").tag("water")
+            Text("涟漪").tag("ripple"); Text("星尘").tag("dust")
             Text("流星").tag("meteor"); Text("光雾").tag("mist")
+        }
+        if style.hasPrefix("water") {
+            Picker("水波颜色", selection: $style) {
+                Text("黑色").tag("water")
+                Text("白色").tag("waterWhite")
+                Text("彩色").tag("waterColor")
+            }
         }
         if style != "off" {
             Picker("效果强度", selection: $strength) {
