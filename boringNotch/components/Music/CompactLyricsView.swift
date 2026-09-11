@@ -45,6 +45,9 @@ struct CompactLyricsView: View {
     @State private var finished = false
 
     var body: some View {
+        // Keep local day/night selection live even when music is paused.
+        TimelineView(.periodic(from: .now, by: 1)) { clock in
+        let daylight = CompactLyrics.isDaytime(at: clock.date) ? 1.0 : 0.0
         TimelineView(.animation(minimumInterval: reduceMotion ? 0.25 : 1.0 / 60,
                                 paused: !isPlaying || finished)) { tick in
             let elapsed = max(0, isPlaying ? position + max(0, tick.date.timeIntervalSince(sampleDate)) * max(0, rate) : position)
@@ -56,7 +59,8 @@ struct CompactLyricsView: View {
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
                               glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
                               outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
-                              entrance: min(1, max(0, elapsed / 2)))
+                              entrance: min(1, max(0, elapsed / 2)), daylight: daylight)
+                .animation(.easeInOut(duration: 1), value: daylight)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
                 .task(id: text) {
@@ -67,6 +71,7 @@ struct CompactLyricsView: View {
                 }
                 .onChange(of: phase) { _, phase in finished = phase == .finished }
         }
+        }
         .frame(width: sideWidth * 2 + gap, height: height)
         .task(id: ObjectIdentifier(albumArt)) { cover = PortalGlyph(image: albumArt) }
         .onChange(of: revision) { _, _ in finished = false }
@@ -75,7 +80,7 @@ struct CompactLyricsView: View {
 }
 
 /// Artwork and progress moon on the left, timestamp-driven lyrics on the right.
-struct PortalLyricsFrame: View {
+struct PortalLyricsFrame: View, Animatable {
     let phase: LyricPhase
     let elapsed: Double
     let duration: Double
@@ -91,6 +96,11 @@ struct PortalLyricsFrame: View {
     var outgoing: LyricSegment? = nil
     var outgoingGlyph: PortalGlyph? = nil
     var entrance: Double = 1
+    var daylight: Double = 0
+    var animatableData: Double {
+        get { daylight }
+        set { daylight = newValue }
+    }
 
     var body: some View {
         Canvas { baseContext, size in
@@ -105,7 +115,8 @@ struct PortalLyricsFrame: View {
             else { context.clip(to: Path(CGRect(x: 0, y: 0, width: edge, height: size.height))) }
             let dissolve = CompactLyrics.dissolve(at: elapsed, duration: duration)
             artwork(in: left, dissolve: dissolve, context: context)
-            moon(in: left, dissolve: dissolve, context: context)
+            if daylight < 1 { moon(in: left, dissolve: dissolve, visibility: 1 - daylight, context: context) }
+            if daylight > 0 { sun(in: left, dissolve: dissolve, visibility: daylight, context: context) }
             switch phase {
             case .lyrics(let cue):
                 let width = glyph?.size.width ?? (cue.text as NSString).size(withAttributes: [.font: CompactLyricsLayout.font]).width
@@ -207,13 +218,65 @@ struct PortalLyricsFrame: View {
         }
     }
 
-    private func moon(in lane: CGRect, dissolve: Double, context: GraphicsContext) {
+    private func sun(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
+        let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
+        let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
+        let collapse = duration > 0 ? min(1, max(0, elapsed - (duration - 2.5))) : 0
+        let radius = 6.5 - collapse * 4.5
+        let time = reduced ? 0 : elapsed
+        let gold = Color(red: 1, green: 0.82 - progress * 0.22, blue: 0.28 - progress * 0.14)
+        var layer = context
+        layer.clip(to: Path(CGRect(x: lane.maxX - 26, y: lane.minY, width: 26, height: lane.height)))
+        layer.opacity = visibility * pow(1 - dissolve, 2)
+        let glow = CGRect(x: center.x - 12, y: center.y - 12, width: 24, height: 24)
+        layer.fill(Path(ellipseIn: glow), with: .radialGradient(
+            Gradient(colors: [gold.opacity(0.5), gold.opacity(0)]), center: center, startRadius: 2, endRadius: 12))
+        for i in 0..<12 {
+            let angle = Double(i) * .pi / 6 + time * 0.035
+            let length = (2.7 - progress * 1.1 + sin(time * 1.3 + Double(i)) * 0.45) * (1 - collapse)
+            let start = CGPoint(x: center.x + cos(angle) * (radius + 1), y: center.y + sin(angle) * (radius + 1))
+            let end = CGPoint(x: center.x + cos(angle) * (radius + 1 + length), y: center.y + sin(angle) * (radius + 1 + length))
+            var ray = Path(); ray.move(to: start); ray.addLine(to: end)
+            layer.stroke(ray, with: .linearGradient(Gradient(colors: [gold.opacity(0.8), gold.opacity(0.1)]),
+                startPoint: start, endPoint: end), style: StrokeStyle(lineWidth: i % 2 == 0 ? 0.8 : 0.5, lineCap: .round))
+        }
+        let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+        layer.fill(disc, with: .radialGradient(
+            Gradient(colors: [Color(red: 1, green: 0.98, blue: 0.8), gold, Color(red: 0.9, green: 0.36, blue: 0.06)]),
+            center: CGPoint(x: center.x - radius * 0.25, y: center.y - radius * 0.3), startRadius: 0, endRadius: radius * 1.6))
+        var surface = layer; surface.clip(to: disc)
+        for i in 0..<7 {
+            let angle = Double(i) * 2.4
+            let r = radius * (0.25 + Double(i % 3) * 0.18)
+            let spot = CGRect(x: center.x + cos(angle) * r - 0.6, y: center.y + sin(angle) * r - 0.45, width: 1.2, height: 0.9)
+            surface.fill(Path(ellipseIn: spot), with: .color(Color(red: 0.75, green: 0.26, blue: 0.04).opacity(0.16 * (1 - collapse))))
+        }
+        for i in 0..<12 {
+            let p = (time * 0.22 + Double(i) / 12).truncatingRemainder(dividingBy: 1)
+            let angle = Double(i) * 2.4
+            let r = radius + 1 + p * 4
+            let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
+            layer.fill(Path(ellipseIn: CGRect(x: point.x, y: point.y, width: 0.7, height: 0.7)),
+                       with: .color(gold.opacity(sin(.pi * p) * 0.55 * (1 - collapse))))
+        }
+        if !reduced, dissolve > 0 {
+            layer.opacity = visibility * sin(.pi * dissolve)
+            for i in 0..<24 {
+                let angle = Double(i) * 2.4
+                let r = Double(i % 4) * 0.45 + dissolve * 7
+                let point = CGPoint(x: center.x + cos(angle) * r - dissolve * 3, y: center.y + sin(angle) * r)
+                layer.fill(Path(ellipseIn: CGRect(x: point.x, y: point.y, width: 0.8, height: 0.8)), with: .color(gold))
+            }
+        }
+    }
+
+    private func moon(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let radius: CGFloat = 8
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
         let star = duration > 0 ? min(1, max(0, (elapsed - (duration - 2.5)) / 1.0)) : 0
         var layer = context
-        layer.opacity = (1 - star) * pow(1 - dissolve, 2)
+        layer.opacity = (1 - star) * pow(1 - dissolve, 2) * visibility
         let moonCenter = center
         let moonRadius: CGFloat = 8
         // A restrained star field behind the moon, confined to its own half of the lane.
@@ -283,7 +346,7 @@ struct PortalLyricsFrame: View {
             if i == 0 { starPath.move(to: point) } else { starPath.addLine(to: point) }
         }
         starPath.closeSubpath()
-        layer.opacity = star * pow(1 - dissolve, 2)
+        layer.opacity = star * pow(1 - dissolve, 2) * visibility
         layer.clip(to: Path(lane))
         let gold = Color(red: 1, green: 0.76, blue: 0.32)
         let shimmer = reduced ? 1 : 0.92 + 0.08 * sin(elapsed * 3)
@@ -312,7 +375,7 @@ struct PortalLyricsFrame: View {
         rays.addLine(to: CGPoint(x: glint.x, y: glint.y + 2.4 * shimmer))
         layer.stroke(rays, with: .color(.white.opacity(0.75 * shimmer)), style: StrokeStyle(lineWidth: 0.6, lineCap: .round))
         if !reduced, dissolve > 0 {
-            layer.opacity = sin(.pi * dissolve) * star
+            layer.opacity = sin(.pi * dissolve) * star * visibility
             for i in 0..<48 {
                 let angle = Double(i) * 2.4
                 let r = Double(i % 8)

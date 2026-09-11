@@ -649,13 +649,13 @@ struct Media: View {
                 Defaults.Toggle(key: .enableCompactLyrics) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Scrolling lyrics for Apple Music")
-                        Text("Scrolling lyrics on the right, artwork and a progress moon on the left. Chinese script follows your system language.")
+                        Text("Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 .accessibilityLabel(Text("Scrolling lyrics for Apple Music"))
-                .accessibilityHint(Text("Scrolling lyrics on the right, artwork and a progress moon on the left. Chinese script follows your system language."))
+                .accessibilityHint(Text("Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language."))
                 Text(LocalizedStringKey(musicManager.lyricsStatus))
                     .font(.caption).foregroundStyle(.secondary)
                 Stepper(value: $compactLyricsOffset, in: -10...10, step: 0.1) {

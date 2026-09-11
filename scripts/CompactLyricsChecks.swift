@@ -6,6 +6,15 @@ import SwiftUI
 
 @main @MainActor struct CompactLyricsChecks {
     static func main() async {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        for (hour, minute, expected) in [(7, 59, false), (8, 0, true), (17, 59, true), (18, 0, false), (0, 0, false)] {
+            let date = calendar.date(from: DateComponents(year: 2026, month: 9, day: 11, hour: hour, minute: minute))!
+            assert(CompactLyrics.isDaytime(at: date, calendar: calendar) == expected)
+        }
+        let utcMidnight = Date(timeIntervalSince1970: 0)
+        calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
+        assert(CompactLyrics.isDaytime(at: utcMidnight, calendar: calendar), "Use local rather than UTC hour")
         let lines = CompactLyrics.parseLRC("[offset:-100]\n[00:01.5][00:03.500]回憶\n[00:05.50]")
         assert(lines.count == 3 && abs(lines[0].time - 1.4) < 0.00001 && lines[2].text.isEmpty)
         assert(CompactLyrics.displayText("回憶與愛", languages: ["zh-Hans-CN"]) == "回忆与爱")
@@ -223,6 +232,28 @@ extension CompactLyricsChecks {
         transitionRenderer.scale = 2
         try! NSBitmapImageRep(cgImage: transitionRenderer.cgImage!).representation(using: .png, properties: [:])!
             .write(to: URL(fileURLWithPath: "/tmp/lyrics-transition-preview.png"))
+        let solarTimes = [0.0, 15, 28.7, 29.3]
+        let solarLabels = ["开始", "中段", "曲终前", "粒子消散"]
+        let celestialPreview = HStack(alignment: .top, spacing: 20) {
+            ForEach(0..<2, id: \.self) { mode in
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(mode == 0 ? "白天 08:00–18:00 · 太阳" : "夜间 18:00–08:00 · 月球").font(.system(size: 12))
+                    ForEach(solarTimes.indices, id: \.self) { i in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(solarLabels[i]).font(.system(size: 10)).foregroundStyle(.gray)
+                            PortalLyricsFrame(phase: i < 2 ? .waves : .outro, elapsed: solarTimes[i], duration: 30,
+                                sideWidth: 54, gap: 150, tint: .white, reduced: false, glyph: nil,
+                                cover: coverGlyph, albumArt: cover, daylight: mode == 0 ? 1 : 0)
+                                .frame(width: 258, height: 26).background(.black)
+                        }
+                    }
+                }
+            }
+        }.padding(20).foregroundStyle(.white).background(Color(white: 0.04))
+        let celestialRenderer = ImageRenderer(content: celestialPreview)
+        celestialRenderer.scale = 3
+        try! NSBitmapImageRep(cgImage: celestialRenderer.cgImage!).representation(using: .png, properties: [:])!
+            .write(to: URL(fileURLWithPath: "/tmp/sun-moon-preview.png"))
         var times: [Double] = []
         for index in 0..<120 {
             let ms: Double = autoreleasepool {

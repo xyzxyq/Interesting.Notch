@@ -25,18 +25,18 @@
         }
       }
     },
-    "Scrolling lyrics on the right, artwork and a progress moon on the left. Chinese script follows your system language.": {
+    "Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language.": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scrolling lyrics on the right, artwork and a progress moon on the left. Chinese script follows your system language."
+            "value": "Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "右侧滚动歌词与伴奏波纹，左侧显示封面和进度月球；中文简繁跟随系统语言。"
+            "value": "右侧滚动歌词与伴奏波纹，左侧显示封面；08:00–18:00 显示太阳，其余时间显示月球。中文简繁跟随系统语言。"
           }
         }
       }
