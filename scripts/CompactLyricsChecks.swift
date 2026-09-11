@@ -27,6 +27,25 @@ import SwiftUI
         assert(CompactLyrics.dissolve(at: 28, duration: 30) == 0)
         assert(CompactLyrics.dissolve(at: 29.9, duration: 30) == 1)
         assert(CompactLyrics.phase(at: 11, cues: outro, duration: 30) == .lyrics(outro[0])) // backward seek
+        let long = CompactLyrics.timeline([.init(time: 10, text: "爱"), .init(time: 20, text: "下一句")], duration: 30)
+        assert(long[0].end == 20, "Long vocal was truncated by character count")
+        assert(CompactLyrics.phase(at: 19.9, cues: long, duration: 30) == .lyrics(long[0]))
+        assert(CompactLyrics.phase(at: 20, cues: long, duration: 30) == .lyrics(long[1]))
+        var state = PlaybackState(bundleIdentifier: "com.apple.Music")
+        state.currentTime = 10; state.lastUpdated = Date(timeIntervalSince1970: 100); state.isPlaying = true
+        let pause = state.clockUpdate(elapsed: nil, timestamp: nil, diff: true, playing: false, rate: nil, now: Date(timeIntervalSince1970: 105))
+        assert(pause.position == 15 && pause.date.timeIntervalSince1970 == 105)
+        state.currentTime = pause.position; state.lastUpdated = pause.date; state.isPlaying = false
+        let resume = state.clockUpdate(elapsed: nil, timestamp: nil, diff: true, playing: true, rate: nil, now: Date(timeIntervalSince1970: 120))
+        assert(resume.position == 15 && resume.date.timeIntervalSince1970 == 120)
+        let fractional = state.clockUpdate(elapsed: 30, timestamp: "1970-01-01T00:02:00.250Z", diff: true, playing: nil, rate: nil)
+        assert(fractional.position == 30 && fractional.date.timeIntervalSince1970 == 120.25)
+        let plain = state.clockUpdate(elapsed: 30, timestamp: "1970-01-01T00:02:00Z", diff: true, playing: nil, rate: nil)
+        assert(plain.date.timeIntervalSince1970 == 120)
+        assert(CompactLyrics.phase(at: 19.5 + 0.5, cues: long, duration: 30) == .lyrics(long[1]))
+        assert(CompactLyrics.phase(at: 20.5 - 1, cues: long, duration: 30) == .lyrics(long[0]))
+        let unchanged = state.clockUpdate(elapsed: nil, timestamp: nil, diff: true, playing: nil, rate: nil)
+        assert(unchanged.position == state.currentTime && unchanged.date == state.lastUpdated)
         let track = LyricTrack(bundleID: "com.apple.Music", title: "Song", artist: "Singer", album: "Album", duration: 180)
         let good = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 181, plainLyrics: "Hello", syncedLyrics: "[00:01]Hello")
         assert(CompactLyrics.match([good], track: track) != nil)
@@ -34,7 +53,7 @@ import SwiftUI
         #if VISUAL_CHECKS
         visualChecks()
         #endif
-        print("Portal lyrics checks passed: Chinese script, LRC, full lines, instrumental/sung endings, seek, matching")
+        print("Moon lyrics checks passed: Chinese script, timestamp intervals, clock anchors, offsets, endings, matching")
     }
 }
 
@@ -47,11 +66,23 @@ extension CompactLyricsChecks {
         let glyph = PortalGlyph(text: cue.text)
         assert(!glyph.points.isEmpty && glyph.points.count <= 320)
         let coverGlyph = PortalGlyph(image: cover)
+        func pixels(_ phase: LyricPhase, _ rect: CGRect) -> Data {
+            let renderer = ImageRenderer(content: PortalLyricsFrame(phase: phase, elapsed: 0, duration: 30,
+                sideWidth: 54, gap: 150, tint: .white, reduced: false, glyph: glyph,
+                cover: coverGlyph, albumArt: cover).frame(width: 258, height: 26))
+            let bitmap = NSBitmapImageRep(cgImage: renderer.cgImage!.cropping(to: rect)!)
+            return Data(bytes: bitmap.bitmapData!, count: bitmap.bytesPerRow * bitmap.pixelsHigh)
+        }
+        let left = CGRect(x: 0, y: 0, width: 54, height: 26)
+        let right = CGRect(x: 204, y: 0, width: 54, height: 26)
+        assert(pixels(.lyrics(cue), left) == pixels(.waves, left), "Lyrics leaked into album/moon area")
+        assert(pixels(.lyrics(cue), right) != pixels(.finished, right), "First words invisible at exact start")
+
         let cases: [(String, LyricPhase, Double, PortalGlyph?)] = [
-            ("双侧歌词 · 同一文字带", .lyrics(cue), 2.1, glyph),
-            ("右入左出 · 连续滑动", .lyrics(cue), 3.0, glyph),
-            ("伴奏 · 向左传播", .waves, 20, nil),
-            ("尾奏 · 封面与波浪", .outro, 26, nil),
+            ("开始 · 封面与满月", .lyrics(cue), 0, glyph),
+            ("右侧歌词 · 连续滚动", .lyrics(cue), 3.0, glyph),
+            ("中途 · 半月与右侧波纹", .waves, 15, nil),
+            ("曲终前 · 月球变为星星", .outro, 28.7, nil),
             ("尾奏收尾 · 同步消散", .outro, 29.3, nil),
             ("唱到曲终 · 歌词消散", .lyrics(final), 29.3, PortalGlyph(text: final.text))
         ]
@@ -73,7 +104,7 @@ extension CompactLyricsChecks {
         renderer.scale = 3
         let image = renderer.cgImage!
         let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
-        try! png.write(to: URL(fileURLWithPath: "/tmp/portal-lyrics-preview.png"))
+        try! png.write(to: URL(fileURLWithPath: "/tmp/moon-lyrics-preview.png"))
         var times: [Double] = []
         for index in 0..<120 {
             let ms: Double = autoreleasepool {

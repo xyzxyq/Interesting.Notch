@@ -599,6 +599,7 @@ struct Media: View {
     @Default(.enableSneakPeek) private var enableSneakPeek
     @Default(.sneakPeekStyles) var sneakPeekStyles
 
+    @Default(.compactLyricsOffset) var compactLyricsOffset
     @Default(.enableLyrics) var enableLyrics
 
     var body: some View {
@@ -646,14 +647,21 @@ struct Media: View {
                 )
                 Defaults.Toggle(key: .enableCompactLyrics) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Portal lyrics for Apple Music")
-                        Text("Lyrics flow through both sides of the notch. Instrumental passages show waves; Chinese script follows your system language.")
+                        Text("Scrolling lyrics for Apple Music")
+                        Text("Scrolling lyrics on the right, artwork and a progress moon on the left. Chinese script follows your system language.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
-                .accessibilityLabel(Text("Portal lyrics for Apple Music"))
-                .accessibilityHint(Text("Lyrics flow through both sides of the notch. Instrumental passages show waves; Chinese script follows your system language."))
+                .accessibilityLabel(Text("Scrolling lyrics for Apple Music"))
+                .accessibilityHint(Text("Scrolling lyrics on the right, artwork and a progress moon on the left. Chinese script follows your system language."))
+                Stepper(value: $compactLyricsOffset, in: -10...10, step: 0.1) {
+                    Text("Lyric timing adjustment")
+                    Text(String(format: "%+.1f s", compactLyricsOffset))
+                        .monospacedDigit()
+                }
+                Text("Positive values advance lyrics; negative values delay them.")
+                    .font(.caption).foregroundStyle(.secondary)
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
                 Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in

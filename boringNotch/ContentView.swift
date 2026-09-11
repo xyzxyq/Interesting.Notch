@@ -33,6 +33,7 @@ struct ContentView: View {
 
     @Namespace var albumArtNamespace
 
+    @Default(.compactLyricsOffset) var compactLyricsOffset
     @Default(.enableCompactLyrics) var enableCompactLyrics
     @Default(.useMusicVisualizer) var useMusicVisualizer
 
@@ -407,7 +408,8 @@ struct ContentView: View {
                     ? Color(nsColor: (musicManager.avgColor.blended(withFraction: 0.65, of: .white) ?? .white).withAlphaComponent(1)) : .white,
                 albumArt: musicManager.albumArt, sideWidth: musicSideWidth,
                 gap: max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top + 16),
-                height: max(0, vm.effectiveClosedNotchHeight - 12)
+                height: max(0, vm.effectiveClosedNotchHeight - 12),
+                lyricOffset: compactLyricsOffset
             )
             .frame(height: vm.effectiveClosedNotchHeight)
         } else {

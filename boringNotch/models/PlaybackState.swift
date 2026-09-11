@@ -30,6 +30,28 @@ struct PlaybackState {
     var isFavorite: Bool = false
 }
 
+extension PlaybackState {
+    /// Keep the position and its reference date together, including transport-only diffs.
+    func clockUpdate(elapsed: Double?, timestamp: String?, diff: Bool,
+                     playing: Bool?, rate: Double?, now: Date = Date()) -> (position: Double, date: Date) {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let date = timestamp.flatMap { value -> Date? in
+            if let parsed = formatter.date(from: value) { return parsed }
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: value)
+        }
+        if let elapsed, elapsed.isFinite { return (max(0, elapsed), date ?? now) }
+        guard diff else { return (0, date ?? now) }
+        if let date { return (currentTime, date) }
+        if (playing != nil && playing != isPlaying) || (rate != nil && rate != playbackRate) {
+            let advance = isPlaying ? max(0, now.timeIntervalSince(lastUpdated)) * max(0, playbackRate) : 0
+            return (max(0, currentTime + advance), now)
+        }
+        return (currentTime, lastUpdated)
+    }
+}
+
 extension PlaybackState: Equatable {
     static func == (lhs: PlaybackState, rhs: PlaybackState) -> Bool {
         return lhs.bundleIdentifier == rhs.bundleIdentifier

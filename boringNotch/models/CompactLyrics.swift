@@ -103,12 +103,9 @@ enum CompactLyrics {
             guard upper > line.time else { continue }
             let count = line.text.filter { !$0.isWhitespace && !$0.isPunctuation }.count
             guard count > 0 else { continue }
-            // ponytail: LRC lacks vocal end times; long gaps use character timing.
-            // Replace this estimate with word/vocal timestamps when available.
-            let estimated = max(2, Double(count) * 0.4)
-            let reachesEnd = upper == duration && duration - line.time <= max(5, estimated + 1)
-            let end = next?.text.isEmpty == true || reachesEnd
-                ? upper : min(upper, line.time + estimated)
+            // ponytail: line LRC has no word/vocal end times. Preserve source timing;
+            // only explicit blank cues identify instrumental gaps. Do not guess from length.
+            let end = upper
             result.append(LyricSegment(id: result.count, start: line.time, end: end, text: line.text))
         }
         return result

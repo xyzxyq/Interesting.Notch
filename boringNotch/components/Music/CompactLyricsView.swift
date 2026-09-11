@@ -19,6 +19,7 @@ struct CompactLyricsView: View {
     let sideWidth: CGFloat
     let gap: CGFloat
     let height: CGFloat
+    var lyricOffset: Double = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var glyph: PortalGlyph?
     @State private var cover: PortalGlyph?
@@ -28,11 +29,12 @@ struct CompactLyricsView: View {
         TimelineView(.animation(minimumInterval: reduceMotion ? 0.25 : 1.0 / 60,
                                 paused: !isPlaying || finished)) { tick in
             let elapsed = max(0, isPlaying ? position + max(0, tick.date.timeIntervalSince(sampleDate)) * max(0, rate) : position)
-            let phase = CompactLyrics.phase(at: elapsed, cues: segments, duration: duration)
+            let lyricTime = max(0, elapsed + lyricOffset)
+            let phase = elapsed >= duration - 0.2 && duration > 0 ? LyricPhase.finished : CompactLyrics.phase(at: min(lyricTime, max(0, duration - 0.201)), cues: segments, duration: duration)
             let text: String = { if case .lyrics(let cue) = phase { return cue.text }; return "" }()
             PortalLyricsFrame(phase: phase, elapsed: elapsed, duration: duration,
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
-                              glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt)
+                              glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
                 .task(id: text) {
@@ -47,8 +49,7 @@ struct CompactLyricsView: View {
     }
 }
 
-/// One virtual strip with the physical notch removed: logical x=sideWidth
-/// is both the right entrance and the left exit. Nothing is drawn under the notch.
+/// Artwork and progress moon on the left, timestamp-driven lyrics on the right.
 struct PortalLyricsFrame: View {
     let phase: LyricPhase
     let elapsed: Double
@@ -61,28 +62,26 @@ struct PortalLyricsFrame: View {
     let cover: PortalGlyph?
     let albumArt: NSImage
 
+    var lyricTime: Double? = nil
+
     var body: some View {
         Canvas { context, size in
             guard sideWidth > 0, gap >= 0, size.height > 0, elapsed.isFinite else { return }
             if phase == .finished { return }
             let left = CGRect(x: 0, y: 0, width: sideWidth, height: size.height)
             let right = CGRect(x: sideWidth + gap, y: 0, width: sideWidth, height: size.height)
-            let ending: Bool = {
-                if phase == .outro { return true }
-                if case .lyrics(let cue) = phase { return cue.end >= duration - 0.2 }
-                return false
-            }()
-            let dissolve = ending ? CompactLyrics.dissolve(at: elapsed, duration: duration) : 0
+            let dissolve = CompactLyrics.dissolve(at: elapsed, duration: duration)
+            artwork(in: left, dissolve: dissolve, context: context)
+            moon(in: left, dissolve: dissolve, context: context)
             switch phase {
             case .lyrics(let cue):
                 let width = glyph?.size.width ?? (cue.text as NSString).size(withAttributes: [.font: CompactLyricsLayout.font]).width
-                // Freeze the last visible letters during dissolution, rather than scrolling
-                // them completely out of view before they can break into particles.
-                let travelEnd = ending ? max(cue.start + 0.1, duration - 1.2) : cue.end
-                let p = min(1, max(0, (min(elapsed, travelEnd) - cue.start) / max(0.1, cue.end - cue.start)))
-                let travel = (2 * sideWidth + width) * p
-                let x = 2 * sideWidth - (reduced ? floor(travel / sideWidth) * sideWidth : travel)
-                for (rect, shift) in [(left, CGFloat(0)), (right, gap)] {
+                // First characters are visible at the source timestamp. Scroll only overflow;
+                // unlike the old strip, no blank entrance/exit consumes the vocal interval.
+                let p = min(1, max(0, ((lyricTime ?? elapsed) - cue.start) / max(0.1, cue.end - cue.start)))
+                let travel = max(0, width - sideWidth + 8) * p
+                let x = right.minX + 4 - (reduced ? floor(travel / 26) * 26 : travel)
+                for rect in [right] {
                     var lane = context
                     lane.clip(to: Path(rect))
                     lane.clipToLayer { mask in
@@ -95,9 +94,9 @@ struct PortalLyricsFrame: View {
                     var textContext = lane
                     textContext.opacity = pow(1 - dissolve, 2)
                     textContext.draw(Text(cue.text).font(Font(CompactLyricsLayout.font)).foregroundColor(tint),
-                                     at: CGPoint(x: x + shift, y: size.height / 2), anchor: .leading)
+                                     at: CGPoint(x: x, y: size.height / 2), anchor: .leading)
                     if !reduced, let glyph, dissolve > 0 {
-                        dust(glyph, origin: CGPoint(x: x + shift, y: (size.height - glyph.size.height) / 2),
+                        dust(glyph, origin: CGPoint(x: x, y: (size.height - glyph.size.height) / 2),
                              progress: dissolve, tint: tint, context: lane)
                     }
                 }
@@ -105,29 +104,11 @@ struct PortalLyricsFrame: View {
                 let remaining = min(1, max(0, (duration - elapsed) / 5))
                 waves(in: right, logicalStart: sideWidth, amplitude: 0.15 + 2.7 * remaining * remaining,
                       dissolve: dissolve, context: context)
-                let coverSize = min(22, size.height - 2)
-                let rect = CGRect(x: (sideWidth - coverSize) / 2, y: (size.height - coverSize) / 2, width: coverSize, height: coverSize)
-                var imageContext = context
-                imageContext.opacity = pow(1 - dissolve, 2)
-                imageContext.clip(to: Path(roundedRect: rect, cornerRadius: 4))
-                imageContext.draw(Image(nsImage: albumArt), in: rect)
-                if !reduced, let cover, dissolve > 0 {
-                    var layer = context
-                    layer.clip(to: Path(left))
-                    let ratio = coverSize / cover.size.width
-                    layer.translateBy(x: rect.minX, y: rect.minY)
-                    layer.scaleBy(x: ratio, y: ratio)
-                    dust(cover, origin: .zero, progress: dissolve, tint: nil, context: layer)
-                }
             case .waves:
-                waves(in: left, logicalStart: 0, amplitude: 2.8, dissolve: 0, context: context)
-                waves(in: right, logicalStart: sideWidth, amplitude: 2.8, dissolve: 0, context: context)
+                waves(in: right, logicalStart: sideWidth, amplitude: 2.8, dissolve: dissolve, context: context)
             case .finished: break
             }
-            if !reduced {
-                let strength = (1 - dissolve) * (phase == .outro ? min(1, max(0, (duration - elapsed) / 5)) : 1)
-                portals(left: left, right: right, strength: strength, context: context)
-            }
+
         }
     }
 
@@ -154,16 +135,59 @@ struct PortalLyricsFrame: View {
         }
     }
 
-    private func portals(left: CGRect, right: CGRect, strength: Double, context: GraphicsContext) {
-        for (rect, edge, sign) in [(left, left.maxX - 1, -1.0), (right, right.minX + 1, 1.0)] {
-            var layer = context
-            layer.clip(to: Path(rect))
-            for index in 0..<22 {
-                let p = (elapsed * 0.75 + Double(index) / 22).truncatingRemainder(dividingBy: 1)
-                let x = edge + sign * p * 7
-                let y = rect.midY + sin(Double(index) * 2.4 + elapsed) * (2 + 6 * p)
-                layer.opacity = sin(.pi * p) * 0.6 * strength
-                layer.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 0.8, height: 0.8)), with: .color(tint))
+    private func artwork(in lane: CGRect, dissolve: Double, context: GraphicsContext) {
+        let rect = CGRect(x: lane.minX + 2, y: lane.midY - 11, width: 22, height: 22)
+        var layer = context
+        layer.opacity = pow(1 - dissolve, 2)
+        layer.clip(to: Path(roundedRect: rect, cornerRadius: 4))
+        layer.draw(Image(nsImage: albumArt), in: rect)
+        if !reduced, let cover, dissolve > 0 {
+            var particles = context
+            particles.clip(to: Path(lane))
+            dust(cover, origin: rect.origin, progress: dissolve, tint: nil, context: particles)
+        }
+    }
+
+    private func moon(in lane: CGRect, dissolve: Double, context: GraphicsContext) {
+        let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
+        let radius: CGFloat = 8
+        let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
+        let star = duration > 0 ? min(1, max(0, (elapsed - (duration - 2.5)) / 1.0)) : 0
+        var layer = context
+        layer.opacity = (1 - star) * pow(1 - dissolve, 2)
+        // Lit limb is a semicircle plus an elliptical terminator: full -> half -> crescent.
+        var shape = Path()
+        for i in 0...40 {
+            let angle = -.pi / 2 + Double(i) * .pi / 40
+            let point = CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+            if i == 0 { shape.move(to: point) } else { shape.addLine(to: point) }
+        }
+        for i in 0...40 {
+            let angle = .pi / 2 - Double(i) * .pi / 40
+            shape.addLine(to: CGPoint(x: center.x + radius * (2 * progress - 1) * cos(angle), y: center.y + radius * sin(angle)))
+        }
+        shape.closeSubpath()
+        layer.fill(shape, with: .color(tint))
+        var starPath = Path()
+        for i in 0..<10 {
+            let angle = -.pi / 2 + Double(i) * .pi / 5
+            let r = i % 2 == 0 ? radius : radius * 0.43
+            let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
+            if i == 0 { starPath.move(to: point) } else { starPath.addLine(to: point) }
+        }
+        starPath.closeSubpath()
+        layer.opacity = star * pow(1 - dissolve, 2)
+        layer.fill(starPath, with: .color(tint))
+        if !reduced, dissolve > 0 {
+            layer.opacity = sin(.pi * dissolve) * star
+            for i in 0..<48 {
+                let angle = Double(i) * 2.4
+                let r = Double(i % 8)
+                let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
+                if starPath.contains(point) {
+                    let rect = CGRect(x: point.x - dissolve * 8, y: point.y + sin(Double(i)) * dissolve * 8, width: 1, height: 1)
+                    layer.fill(Path(ellipseIn: rect), with: .color(tint))
+                }
             }
         }
     }
