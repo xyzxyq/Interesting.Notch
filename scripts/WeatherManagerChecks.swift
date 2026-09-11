@@ -18,10 +18,14 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
 
 @main @MainActor struct WeatherManagerChecks {
     static func main() async throws {
+        assert(NotchWeatherManager.resolvedCity(locality: "北京市", region: "其他区域") == "北京市")
+        assert(NotchWeatherManager.resolvedCity(locality: " ", region: "杭州市") == "杭州市")
+        assert(NotchWeatherManager.resolvedCity(locality: nil, region: nil) == nil)
         URLProtocol.registerClass(WeatherStub.self)
         let manager = NotchWeatherManager.shared
         manager.enabled = false
         manager.select(WeatherPlace(name: "Mock city", latitude: 39.9, longitude: 116.4))
+        assert(manager.cityName == "Mock city")
         manager.enabled = true
         try await Task.sleep(for: .milliseconds(200))
         assert(manager.snapshot?.kind == .rain, "Enabled did not load weather")
@@ -60,6 +64,7 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
         try await Task.sleep(for: .milliseconds(200))
         assert(manager.snapshot == nil && manager.status == "天气动效未开启", "Late request repopulated disabled effects")
         manager.select(nil)
+        assert(manager.cityName == "尚未获取城市")
         for key in ["weatherEffectsEnabled", "weatherSelectedCity", "weatherSnapshot"] { UserDefaults.standard.removeObject(forKey: key) }
         URLProtocol.unregisterClass(WeatherStub.self)
         print("Weather manager checks passed: enable, disable, 503 cache fallback, city change, toggle reload")
