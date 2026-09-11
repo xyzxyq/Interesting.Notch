@@ -214,8 +214,36 @@ struct PortalLyricsFrame: View {
         let star = duration > 0 ? min(1, max(0, (elapsed - (duration - 2.5)) / 1.0)) : 0
         var layer = context
         layer.opacity = (1 - star) * pow(1 - dissolve, 2)
-        let moonCenter = CGPoint(x: center.x, y: center.y - 1.5)
-        let moonRadius: CGFloat = 6.8
+        let moonCenter = center
+        let moonRadius: CGFloat = 8
+        // A restrained star field behind the moon, confined to its own half of the lane.
+        let skyRect = CGRect(x: lane.maxX - 26, y: lane.minY, width: 26, height: lane.height)
+        var skyMask = Path(skyRect)
+        skyMask.addEllipse(in: CGRect(x: moonCenter.x - moonRadius, y: moonCenter.y - moonRadius,
+                                     width: moonRadius * 2, height: moonRadius * 2))
+        var sky = layer
+        sky.clip(to: skyMask, style: FillStyle(eoFill: true))
+        let time = reduced ? 0 : elapsed
+        for i in 0..<14 {
+            let phase = (Double(i) * 0.618 + time * 0.035).truncatingRemainder(dividingBy: 1)
+            let x = skyRect.minX + (1 - phase) * skyRect.width
+            let y = skyRect.minY + 1 + Double((i * 7) % 19) / 19 * max(0, skyRect.height - 2)
+            let brightness = (0.45 + 0.2 * sin(Double(i) * 2.4 + time * 0.8)) * sin(.pi * phase)
+            let size: CGFloat = i % 4 == 0 ? 1.2 : 0.8
+            sky.fill(Path(ellipseIn: CGRect(x: x, y: y, width: size, height: size)),
+                     with: .color(Color(red: 0.75, green: 0.86, blue: 1).opacity(brightness)))
+        }
+        let meteorTime = elapsed.truncatingRemainder(dividingBy: 6)
+        if !reduced, meteorTime < 1.4 {
+            let p = meteorTime / 1.4
+            let head = CGPoint(x: skyRect.maxX - p * skyRect.width, y: skyRect.minY + 0.8 + p * max(1, skyRect.height / 2 - moonRadius - 1.5))
+            let tail = CGPoint(x: head.x + 6, y: head.y - 1.5)
+            var trail = Path()
+            trail.move(to: tail); trail.addLine(to: head)
+            sky.stroke(trail, with: .linearGradient(
+                Gradient(colors: [.clear, Color(red: 0.7, green: 0.85, blue: 1).opacity(sin(.pi * p) * 0.75)]),
+                startPoint: tail, endPoint: head), style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
+        }
         // Lit limb is a semicircle plus an elliptical terminator: full -> half -> crescent.
         var shape = Path()
         for i in 0...40 {
@@ -246,27 +274,6 @@ struct PortalLyricsFrame: View {
             rim.addArc(center: CGPoint(x: pit.midX, y: pit.midY), radius: r * 0.8,
                        startAngle: .degrees(15), endAngle: .degrees(140), clockwise: false)
             surface.stroke(rim, with: .color(.white.opacity(0.35)), lineWidth: 0.45)
-        }
-        // Small silver strands share the moon's fade and playback clock.
-        var fringe = layer
-        fringe.clip(to: Path(lane))
-        for i in 0..<3 {
-            let angle = (38 + Double(i) * 21) * .pi / 180
-            let root = CGPoint(x: moonCenter.x + cos(angle) * moonRadius * 0.98,
-                               y: moonCenter.y + sin(angle) * moonRadius * 0.98)
-            let sway = reduced ? 0 : sin(elapsed * 1.8 + Double(i) * 0.7) * 0.85
-            let tip = CGPoint(x: root.x + sway - 0.4,
-                              y: min(lane.maxY - 0.8, root.y + 3.5 + Double(i) * 0.45))
-            var thread = Path()
-            thread.move(to: root)
-            thread.addCurve(to: tip,
-                            control1: CGPoint(x: root.x - 0.7, y: root.y + 1.2),
-                            control2: CGPoint(x: tip.x + sway * 0.5, y: tip.y - 1))
-            fringe.stroke(thread, with: .linearGradient(
-                Gradient(colors: [Color(white: 0.92).opacity(0.8), Color(red: 0.65, green: 0.77, blue: 0.92).opacity(0.45)]),
-                startPoint: root, endPoint: tip), style: StrokeStyle(lineWidth: 0.5, lineCap: .round))
-            fringe.fill(Path(ellipseIn: CGRect(x: tip.x - 0.45, y: tip.y - 0.45, width: 0.9, height: 0.9)),
-                        with: .color(Color(white: 0.95).opacity(0.8)))
         }
         var starPath = Path()
         for i in 0..<10 {
