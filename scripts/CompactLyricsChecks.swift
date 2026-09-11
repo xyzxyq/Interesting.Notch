@@ -118,6 +118,12 @@ import SwiftUI
 #if VISUAL_CHECKS
 extension CompactLyricsChecks {
     static func visualChecks() {
+        assert(CompactLyricsLayout.sunCollapse(elapsed: 10, duration: 0) == 0)
+        assert(CompactLyricsLayout.sunCollapse(elapsed: 97.5, duration: 100) == 0)
+        assert(CompactLyricsLayout.sunCollapse(elapsed: 98, duration: 100) == 0.5)
+        assert(CompactLyricsLayout.sunCollapse(elapsed: 98.5, duration: 100) == 1)
+        assert(CompactLyricsLayout.sunCollapse(elapsed: 98.8, duration: 100) == 1)
+        assert(CompactLyricsLayout.sunCollapse(elapsed: 50, duration: 100) == 0)
         assert(CompactLyricsLayout.moonBoundary(progress: 0, angle: 0) == -1)
         assert(CompactLyricsLayout.moonBoundary(progress: 1, angle: 0) == 1)
         assert(abs(CompactLyricsLayout.moonBoundary(progress: 0.5, angle: 0) - 0.35) < 0.00001)
@@ -240,8 +246,8 @@ extension CompactLyricsChecks {
         transitionRenderer.scale = 2
         try! NSBitmapImageRep(cgImage: transitionRenderer.cgImage!).representation(using: .png, properties: [:])!
             .write(to: URL(fileURLWithPath: "/tmp/lyrics-transition-preview.png"))
-        let solarTimes = [0.0, 15, 28.7, 29.3]
-        let solarLabels = ["开始", "中段", "曲终前", "粒子消散"]
+        let solarTimes = [0.0, 15, 28, 28.7, 29.3]
+        let solarLabels = ["开始", "中段", "收拢中", "曲终前", "粒子消散"]
         let celestialPreview = HStack(alignment: .top, spacing: 20) {
             ForEach(0..<2, id: \.self) { mode in
                 VStack(alignment: .leading, spacing: 12) {

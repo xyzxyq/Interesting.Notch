@@ -4,6 +4,11 @@ import SwiftUI
 enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
+    static func sunCollapse(elapsed: Double, duration: Double) -> Double {
+        guard duration > 0 else { return 0 }
+        let t = min(1, max(0, elapsed - (duration - 2.5)))
+        return t * t * (3 - 2 * t)
+    }
     static func moonBoundary(progress: Double, angle: Double) -> Double {
         let p = min(1, max(0, progress))
         let arc = cos(angle)
@@ -226,26 +231,29 @@ struct PortalLyricsFrame: View, Animatable {
     private func sun(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
+        let collapse = CompactLyricsLayout.sunCollapse(elapsed: elapsed, duration: duration)
         var layer = context
         layer.clip(to: Path(lane))
         layer.opacity = visibility * pow(1 - dissolve, 2)
         let tint = Color(red: 0.96, green: 0.94, blue: 0.87)
-        let disc = Path(ellipseIn: CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8))
-        layer.fill(disc, with: .color(tint.opacity(1 - progress)))
+        let discRadius = 4 - 2.5 * collapse
+        let disc = Path(ellipseIn: CGRect(x: center.x - discRadius, y: center.y - discRadius,
+                                         width: discRadius * 2, height: discRadius * 2))
+        layer.fill(disc, with: .color(tint.opacity(1 - progress * (1 - collapse))))
         layer.stroke(disc, with: .color(tint), lineWidth: 0.8)
-        // Playback straightens and shortens each ray; the central outline stays fixed.
+        // Finish the one-second contraction before the existing particle dissolve begins.
         for ray in 0..<8 {
             let angle = Double(ray) * .pi / 4
             var path = Path()
             for step in 0...16 {
                 let t = Double(step) / 16
-                let radius = 5.8 + t * (4 - 2.5 * progress)
-                let bend = sin(t * 2 * .pi) * 0.85 * (1 - progress)
+                let radius = 1.5 * collapse + (5.8 + t * (4 - 2.5 * progress)) * (1 - collapse)
+                let bend = sin(t * 2 * .pi) * 0.85 * (1 - progress) * (1 - collapse)
                 let point = CGPoint(x: center.x + cos(angle) * radius - sin(angle) * bend,
                                     y: center.y + sin(angle) * radius + cos(angle) * bend)
                 if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
             }
-            layer.stroke(path, with: .color(tint.opacity(0.85)),
+            layer.stroke(path, with: .color(tint.opacity(0.85 * (1 - collapse))),
                          style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round))
         }
         celestialDust(at: center, progress: dissolve, visibility: visibility, lane: lane, context: context)
