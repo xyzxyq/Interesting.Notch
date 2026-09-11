@@ -22,7 +22,12 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
         assert(NotchWeatherManager.resolvedCity(locality: " ", region: "杭州市") == "杭州市")
         assert(NotchWeatherManager.resolvedCity(locality: nil, region: nil) == nil)
         URLProtocol.registerClass(WeatherStub.self)
+        UserDefaults.standard.set(true, forKey: "weatherEffectsEnabled")
+        UserDefaults.standard.set(try JSONEncoder().encode(WeatherPlace(name: "Saved city", latitude: 39.9, longitude: 116.4)), forKey: "weatherSelectedCity")
         let manager = NotchWeatherManager.shared
+        assert(manager.status != "天气动效未开启", "Restored enabled setting retained disabled state")
+        try await Task.sleep(for: .milliseconds(200))
+        assert(manager.snapshot?.place.name == "Saved city", "Startup did not load saved city's weather")
         manager.enabled = false
         manager.select(WeatherPlace(name: "Mock city", latitude: 39.9, longitude: 116.4))
         assert(manager.cityName == "Mock city")

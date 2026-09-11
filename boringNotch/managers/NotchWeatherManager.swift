@@ -23,6 +23,7 @@ import CoreLocation
     private var lastAttempt = Date.distantPast
     private var lastLocationRequest = Date.distantPast
     private var locationRetryInterval: TimeInterval = 900
+    private var lastAuthorization: CLAuthorizationStatus?
     private var cached: NotchWeatherSnapshot?
 
     override private init() {
@@ -32,6 +33,7 @@ import CoreLocation
         // Created on the main actor; Core Location delegates use this run loop.
         location.delegate = self
         location.desiredAccuracy = kCLLocationAccuracyKilometer
+        start()
     }
     func start() { if enabled && loop == nil { restart() } }
     func select(_ place: WeatherPlace?) {
@@ -45,6 +47,7 @@ import CoreLocation
     }
     func restart() {
         generation += 1
+        location.stopUpdatingLocation()
         cityRequest?.cancel(); cityRequest = nil
         geocoder.cancelGeocode()
         loop?.cancel(); loop = nil
@@ -52,6 +55,7 @@ import CoreLocation
         lastAttempt = .distantPast
         lastLocationRequest = .distantPast
         guard enabled else { snapshot = nil; status = "天气动效未开启"; return }
+        status = "正在启动天气…"
         tick()
         loop = Task { [weak self] in
             while !Task.isCancelled {
@@ -67,11 +71,15 @@ import CoreLocation
         }
         if selected == nil && Date.now.timeIntervalSince(lastLocationRequest) >= locationRetryInterval {
             lastLocationRequest = .now
+            lastAuthorization = location.authorizationStatus
             switch location.authorizationStatus {
             case .notDetermined:
                 status = "请允许定位，或在下方选择城市"
                 location.requestWhenInUseAuthorization()
-            case .authorizedAlways, .authorizedWhenInUse: location.requestLocation()
+            case .authorizedAlways, .authorizedWhenInUse:
+                if located == nil { status = "定位已授权，正在获取城市位置…" }
+                location.stopUpdatingLocation()
+                location.requestLocation()
             default:
                 located = nil
                 snapshot = nil
@@ -109,7 +117,8 @@ import CoreLocation
         }
     }
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard enabled, selected == nil else { return }
+        guard enabled, selected == nil, lastAuthorization != manager.authorizationStatus else { return }
+        lastAuthorization = manager.authorizationStatus
         lastLocationRequest = .distantPast
         tick()
     }
@@ -153,6 +162,7 @@ import CoreLocation
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         guard enabled, selected == nil else { return }
+        location.stopUpdatingLocation()
         let code = (error as? CLError)?.code
         if code == .denied {
             located = nil
