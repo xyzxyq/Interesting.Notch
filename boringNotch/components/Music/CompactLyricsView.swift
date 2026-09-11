@@ -4,12 +4,6 @@ import SwiftUI
 enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
-    // Normalized, fixed surface features keep the moon stable while its phase changes.
-    static let moonCraters: [(CGFloat, CGFloat, CGFloat)] = [
-        (-0.32, -0.38, 0.23), (0.3, -0.13, 0.29), (-0.24, 0.24, 0.2),
-        (0.3, 0.48, 0.14), (-0.55, -0.02, 0.1), (0.15, -0.62, 0.09)
-    ]
-
     static func entranceEdge(sideWidth: CGFloat, gap: CGFloat, progress: Double) -> CGFloat {
         // Spend the two-second reveal on visible content, not the physical notch.
         let visible = 2 * sideWidth * min(1, max(0, progress))
@@ -227,169 +221,61 @@ struct PortalLyricsFrame: View, Animatable {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
         let collapse = duration > 0 ? min(1, max(0, elapsed - (duration - 2.5))) : 0
-        let radius = 6.5 - collapse * 4.5
-        let time = reduced ? 0 : elapsed
-        let gold = Color(red: 1, green: 0.82 - progress * 0.22, blue: 0.28 - progress * 0.14)
         var layer = context
-        layer.clip(to: Path(CGRect(x: lane.maxX - 26, y: lane.minY, width: 26, height: lane.height)))
-        layer.opacity = visibility * pow(1 - dissolve, 2)
-        let glow = CGRect(x: center.x - 12, y: center.y - 12, width: 24, height: 24)
-        layer.fill(Path(ellipseIn: glow), with: .radialGradient(
-            Gradient(colors: [gold.opacity(0.5), gold.opacity(0)]), center: center, startRadius: 2, endRadius: 12))
-        for i in 0..<12 {
-            let angle = Double(i) * .pi / 6 + time * 0.035
-            let length = (2.7 - progress * 1.1 + sin(time * 1.3 + Double(i)) * 0.45) * (1 - collapse)
-            let start = CGPoint(x: center.x + cos(angle) * (radius + 1), y: center.y + sin(angle) * (radius + 1))
-            let end = CGPoint(x: center.x + cos(angle) * (radius + 1 + length), y: center.y + sin(angle) * (radius + 1 + length))
-            var ray = Path(); ray.move(to: start); ray.addLine(to: end)
-            layer.stroke(ray, with: .linearGradient(Gradient(colors: [gold.opacity(0.8), gold.opacity(0.1)]),
-                startPoint: start, endPoint: end), style: StrokeStyle(lineWidth: i % 2 == 0 ? 0.8 : 0.5, lineCap: .round))
-        }
-        let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
-        layer.fill(disc, with: .radialGradient(
-            Gradient(colors: [Color(red: 1, green: 0.98, blue: 0.8), gold, Color(red: 0.9, green: 0.36, blue: 0.06)]),
-            center: CGPoint(x: center.x - radius * 0.25, y: center.y - radius * 0.3), startRadius: 0, endRadius: radius * 1.6))
-        var surface = layer; surface.clip(to: disc)
-        for i in 0..<7 {
-            let angle = Double(i) * 2.4
-            let r = radius * (0.25 + Double(i % 3) * 0.18)
-            let spot = CGRect(x: center.x + cos(angle) * r - 0.6, y: center.y + sin(angle) * r - 0.45, width: 1.2, height: 0.9)
-            surface.fill(Path(ellipseIn: spot), with: .color(Color(red: 0.75, green: 0.26, blue: 0.04).opacity(0.16 * (1 - collapse))))
-        }
-        for i in 0..<12 {
-            let p = (time * 0.22 + Double(i) / 12).truncatingRemainder(dividingBy: 1)
-            let angle = Double(i) * 2.4
-            let r = radius + 1 + p * 4
-            let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
-            layer.fill(Path(ellipseIn: CGRect(x: point.x, y: point.y, width: 0.7, height: 0.7)),
-                       with: .color(gold.opacity(sin(.pi * p) * 0.55 * (1 - collapse))))
-        }
-        if !reduced, dissolve > 0 {
-            layer.opacity = visibility * sin(.pi * dissolve)
-            for i in 0..<24 {
-                let angle = Double(i) * 2.4
-                let r = Double(i % 4) * 0.45 + dissolve * 7
-                let point = CGPoint(x: center.x + cos(angle) * r - dissolve * 3, y: center.y + sin(angle) * r)
-                layer.fill(Path(ellipseIn: CGRect(x: point.x, y: point.y, width: 0.8, height: 0.8)), with: .color(gold))
-            }
-        }
+        layer.clip(to: Path(lane))
+        // Use the system symbol's restrained proportions instead of decorative rays.
+        layer.opacity = visibility * pow(1 - dissolve, 2) * (1 - collapse)
+        layer.draw(Text(Image(systemName: "sun.max"))
+            .font(.system(size: (17 - progress) * (1 - collapse * 0.65), weight: .regular))
+            .foregroundColor(Color(red: 0.96, green: 0.94, blue: 0.87)), at: center)
+        layer.opacity = visibility * pow(1 - dissolve, 2) * collapse
+        layer.fill(Path(ellipseIn: CGRect(x: center.x - 1.5, y: center.y - 1.5, width: 3, height: 3)),
+                   with: .color(Color(white: 0.93)))
+        celestialDust(at: center, progress: dissolve, visibility: visibility, lane: lane, context: context)
     }
 
     private func moon(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
-        let radius: CGFloat = 8
+        let radius: CGFloat = 7
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
-        let star = duration > 0 ? min(1, max(0, (elapsed - (duration - 2.5)) / 1.0)) : 0
+        let star = duration > 0 ? min(1, max(0, elapsed - (duration - 2.5))) : 0
         var layer = context
-        layer.opacity = (1 - star) * pow(1 - dissolve, 2) * visibility
-        let moonCenter = center
-        let moonRadius: CGFloat = 8
-        // A restrained star field behind the moon, confined to its own half of the lane.
-        let skyRect = CGRect(x: lane.maxX - 26, y: lane.minY, width: 26, height: lane.height)
-        var skyMask = Path(skyRect)
-        skyMask.addEllipse(in: CGRect(x: moonCenter.x - moonRadius, y: moonCenter.y - moonRadius,
-                                     width: moonRadius * 2, height: moonRadius * 2))
-        var sky = layer
-        sky.clip(to: skyMask, style: FillStyle(eoFill: true))
-        let time = reduced ? 0 : elapsed
-        for i in 0..<14 {
-            let phase = (Double(i) * 0.618 + time * 0.035).truncatingRemainder(dividingBy: 1)
-            let x = skyRect.minX + (1 - phase) * skyRect.width
-            let y = skyRect.minY + 1 + Double((i * 7) % 19) / 19 * max(0, skyRect.height - 2)
-            let brightness = (0.45 + 0.2 * sin(Double(i) * 2.4 + time * 0.8)) * sin(.pi * phase)
-            let size: CGFloat = i % 4 == 0 ? 1.2 : 0.8
-            sky.fill(Path(ellipseIn: CGRect(x: x, y: y, width: size, height: size)),
-                     with: .color(Color(red: 0.75, green: 0.86, blue: 1).opacity(brightness)))
-        }
-        let meteorTime = elapsed.truncatingRemainder(dividingBy: 6)
-        if !reduced, meteorTime < 1.4 {
-            let p = meteorTime / 1.4
-            let head = CGPoint(x: skyRect.maxX - p * skyRect.width, y: skyRect.minY + 0.8 + p * max(1, skyRect.height / 2 - moonRadius - 1.5))
-            let tail = CGPoint(x: head.x + 6, y: head.y - 1.5)
-            var trail = Path()
-            trail.move(to: tail); trail.addLine(to: head)
-            sky.stroke(trail, with: .linearGradient(
-                Gradient(colors: [.clear, Color(red: 0.7, green: 0.85, blue: 1).opacity(sin(.pi * p) * 0.75)]),
-                startPoint: tail, endPoint: head), style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
-        }
-        // Lit limb is a semicircle plus an elliptical terminator: full -> half -> crescent.
+        layer.clip(to: Path(lane))
+        layer.opacity = visibility * (1 - star) * pow(1 - dissolve, 2)
+        let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
+        layer.fill(disc, with: .color(Color(white: 0.12)))
         var shape = Path()
         for i in 0...40 {
             let angle = -.pi / 2 + Double(i) * .pi / 40
-            let point = CGPoint(x: moonCenter.x + moonRadius * cos(angle), y: moonCenter.y + moonRadius * sin(angle))
+            let point = CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
             if i == 0 { shape.move(to: point) } else { shape.addLine(to: point) }
         }
         for i in 0...40 {
             let angle = .pi / 2 - Double(i) * .pi / 40
-            shape.addLine(to: CGPoint(x: moonCenter.x + moonRadius * (2 * progress - 1) * cos(angle), y: moonCenter.y + moonRadius * sin(angle)))
+            shape.addLine(to: CGPoint(x: center.x + radius * (2 * progress - 1) * cos(angle), y: center.y + radius * sin(angle)))
         }
         shape.closeSubpath()
-        var surface = layer
-        surface.clip(to: shape)
-        surface.fill(shape, with: .radialGradient(
-            Gradient(colors: [Color(white: 0.98), Color(red: 0.75, green: 0.78, blue: 0.82), Color(white: 0.38)]),
-            center: CGPoint(x: moonCenter.x - moonRadius * 0.35, y: moonCenter.y - moonRadius * 0.4),
-            startRadius: 0, endRadius: moonRadius * 1.8))
-        for (x, y, scale) in CompactLyricsLayout.moonCraters {
-            let r = moonRadius * scale
-            let pit = CGRect(x: moonCenter.x + x * moonRadius - r, y: moonCenter.y + y * moonRadius - r,
-                             width: r * 2, height: r * 1.7)
-            surface.fill(Path(ellipseIn: pit), with: .radialGradient(
-                Gradient(colors: [Color(white: 0.22).opacity(0.55), Color(white: 0.45).opacity(0.12)]),
-                center: CGPoint(x: pit.midX - r * 0.2, y: pit.midY - r * 0.2),
-                startRadius: 0, endRadius: r))
-            var rim = Path()
-            rim.addArc(center: CGPoint(x: pit.midX, y: pit.midY), radius: r * 0.8,
-                       startAngle: .degrees(15), endAngle: .degrees(140), clockwise: false)
-            surface.stroke(rim, with: .color(.white.opacity(0.35)), lineWidth: 0.45)
-        }
-        var starPath = Path()
-        for i in 0..<10 {
-            let angle = -.pi / 2 + Double(i) * .pi / 5
-            let r = i % 2 == 0 ? radius : radius * 0.43
-            let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
-            if i == 0 { starPath.move(to: point) } else { starPath.addLine(to: point) }
-        }
-        starPath.closeSubpath()
-        layer.opacity = star * pow(1 - dissolve, 2) * visibility
+        layer.fill(shape, with: .radialGradient(
+            Gradient(colors: [Color(white: 0.95), Color(white: 0.67)]),
+            center: CGPoint(x: center.x - 3, y: center.y - 3), startRadius: 0, endRadius: radius * 1.8))
+        layer.stroke(disc, with: .color(.white.opacity(0.12)), lineWidth: 0.35)
+        layer.opacity = visibility * star * pow(1 - dissolve, 2)
+        layer.draw(Text(Image(systemName: "star.fill"))
+            .font(.system(size: 14, weight: .regular)).foregroundColor(Color(white: 0.9)), at: center)
+        celestialDust(at: center, progress: dissolve, visibility: visibility * star, lane: lane, context: context)
+    }
+
+    private func celestialDust(at center: CGPoint, progress: Double, visibility: Double, lane: CGRect, context: GraphicsContext) {
+        guard !reduced, progress > 0 else { return }
+        var layer = context
         layer.clip(to: Path(lane))
-        let gold = Color(red: 1, green: 0.76, blue: 0.32)
-        let shimmer = reduced ? 1 : 0.92 + 0.08 * sin(elapsed * 3)
-        layer.fill(Path(ellipseIn: CGRect(x: center.x - 11, y: center.y - 11, width: 22, height: 22)),
-                   with: .radialGradient(Gradient(colors: [gold.opacity(0.3 * shimmer), gold.opacity(0)]),
-                                         center: center, startRadius: 2, endRadius: 11))
-        layer.fill(starPath, with: .linearGradient(
-            Gradient(colors: [Color(red: 1, green: 0.97, blue: 0.8), gold, Color(red: 0.72, green: 0.4, blue: 0.12)]),
-            startPoint: CGPoint(x: center.x - 4, y: center.y - 8), endPoint: CGPoint(x: center.x + 5, y: center.y + 8)))
-        for i in 0..<5 {
-            let angle = -.pi / 2 + Double(i) * .pi * 2 / 5
-            var facet = Path()
-            facet.move(to: center)
-            facet.addLine(to: CGPoint(x: center.x + cos(angle) * radius, y: center.y + sin(angle) * radius))
-            facet.addLine(to: CGPoint(x: center.x + cos(angle + .pi / 5) * radius * 0.43,
-                                     y: center.y + sin(angle + .pi / 5) * radius * 0.43))
-            facet.closeSubpath()
-            layer.fill(facet, with: .color(.white.opacity(0.25 * shimmer)))
-        }
-        layer.stroke(starPath, with: .color(Color(red: 1, green: 0.91, blue: 0.6).opacity(0.65)), lineWidth: 0.4)
-        let glint = CGPoint(x: center.x + 8, y: center.y - 6)
-        var rays = Path()
-        rays.move(to: CGPoint(x: glint.x - 1.8 * shimmer, y: glint.y))
-        rays.addLine(to: CGPoint(x: glint.x + 1.8 * shimmer, y: glint.y))
-        rays.move(to: CGPoint(x: glint.x, y: glint.y - 2.4 * shimmer))
-        rays.addLine(to: CGPoint(x: glint.x, y: glint.y + 2.4 * shimmer))
-        layer.stroke(rays, with: .color(.white.opacity(0.75 * shimmer)), style: StrokeStyle(lineWidth: 0.6, lineCap: .round))
-        if !reduced, dissolve > 0 {
-            layer.opacity = sin(.pi * dissolve) * star * visibility
-            for i in 0..<48 {
-                let angle = Double(i) * 2.4
-                let r = Double(i % 8)
-                let point = CGPoint(x: center.x + cos(angle) * r, y: center.y + sin(angle) * r)
-                if starPath.contains(point) {
-                    let rect = CGRect(x: point.x - dissolve * 8, y: point.y + sin(Double(i)) * dissolve * 8, width: 1, height: 1)
-                    layer.fill(Path(ellipseIn: rect), with: .color(gold))
-                }
-            }
+        layer.opacity = visibility * sin(.pi * progress) * 0.55
+        for i in 0..<16 {
+            let angle = Double(i) * 2.4
+            let radius = Double(i % 4) * 0.6 + progress * 5
+            let point = CGPoint(x: center.x + cos(angle) * radius - progress * 3, y: center.y + sin(angle) * radius)
+            layer.fill(Path(ellipseIn: CGRect(x: point.x, y: point.y, width: 0.7, height: 0.7)),
+                       with: .color(Color(white: 0.9)))
         }
     }
 
