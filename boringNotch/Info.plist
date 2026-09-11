@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSLocationUsageDescription</key>
+	<string>使用城市级位置获取天气，让音乐波浪显示雨、风、晴、阴或雪的动效。</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>使用城市级位置获取天气，让音乐波浪显示对应天气动效。</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

@@ -600,6 +600,7 @@ struct Media: View {
     @Default(.enableSneakPeek) private var enableSneakPeek
     @Default(.sneakPeekStyles) var sneakPeekStyles
 
+    @Default(.enableCompactLyrics) var compactLyricsEnabled
     @Default(.compactLyricsOffset) var compactLyricsOffset
     @Default(.enableLyrics) var enableLyrics
 
@@ -654,10 +655,14 @@ struct Media: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .onChange(of: compactLyricsEnabled) { _, enabled in
+                    if enabled && NotchWeatherManager.shared.enabled { NotchWeatherManager.shared.restart() }
+                }
                 .accessibilityLabel(Text("Scrolling lyrics for Apple Music"))
                 .accessibilityHint(Text("Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language."))
                 Text(LocalizedStringKey(musicManager.lyricsStatus))
                     .font(.caption).foregroundStyle(.secondary)
+                NotchWeatherSettings()
                 Stepper(value: $compactLyricsOffset, in: -10...10, step: 0.1) {
                     Text("Lyric timing adjustment")
                     Text(String(format: "%+.1f s", compactLyricsOffset))

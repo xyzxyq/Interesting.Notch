@@ -51,6 +51,10 @@ struct CompactLyricsView: View {
     @State private var cover: PortalGlyph?
     @State private var outgoingGlyph: PortalGlyph?
     @State private var finished = false
+    @ObservedObject private var weather = NotchWeatherManager.shared
+    @State private var shownWeather: NotchWeatherSnapshot?
+    @State private var previousWeather: NotchWeatherSnapshot?
+    @State private var weatherBlend = 1.0
 
     var body: some View {
         // Keep local day/night selection live even when music is paused.
@@ -73,7 +77,9 @@ struct CompactLyricsView: View {
                               glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
                               outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
                               entrance: min(1, max(0, elapsed / 2)),
-                              daylight: period == .day ? 1 : 0, dawn: period == .dawn ? 1 : 0, dusk: period == .dusk ? 1 : 0)
+                              daylight: period == .day ? 1 : 0, dawn: period == .dawn ? 1 : 0, dusk: period == .dusk ? 1 : 0,
+                              weather: shownWeather, previousWeather: previousWeather, weatherBlend: weatherBlend,
+                              weatherPresence: min(1, max(0, ((segments.first { $0.start > lyricTime }?.start ?? (lyricTime + 1)) - lyricTime) / 0.3)))
                 .animation(.easeInOut(duration: 1), value: period)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
@@ -87,6 +93,18 @@ struct CompactLyricsView: View {
         }
         }
         .frame(width: sideWidth * 2 + gap, height: height)
+        .onAppear { weather.start() }
+        .task(id: weather.snapshot) {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                previousWeather = shownWeather
+                shownWeather = weather.snapshot
+                weatherBlend = 0
+            }
+            do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
+            withAnimation(.easeInOut(duration: 1)) { weatherBlend = 1 }
+        }
         .task(id: ObjectIdentifier(albumArt)) { cover = PortalGlyph(image: albumArt) }
         .onChange(of: revision) { _, _ in finished = false }
         .onChange(of: sampleDate) { _, _ in finished = false }
@@ -113,9 +131,18 @@ struct PortalLyricsFrame: View, Animatable {
     var daylight: Double = 0
     var dawn: Double = 0
     var dusk: Double = 0
-    var animatableData: AnimatablePair<Double, AnimatablePair<Double, Double>> {
-        get { .init(daylight, .init(dawn, dusk)) }
-        set { daylight = newValue.first; dawn = newValue.second.first; dusk = newValue.second.second }
+    var weather: NotchWeatherSnapshot? = nil
+    var previousWeather: NotchWeatherSnapshot? = nil
+    var weatherBlend: Double = 1
+    var weatherPresence: Double = 1
+    var animatableData: AnimatablePair<AnimatablePair<Double, Double>, AnimatablePair<Double, Double>> {
+        get { .init(.init(daylight, dawn), .init(dusk, weatherBlend)) }
+        set { daylight = newValue.first.first; dawn = newValue.first.second; dusk = newValue.second.first; weatherBlend = newValue.second.second }
+    }
+    private var waveColor: Color {
+        Color(red: 0.86 + 0.10 * daylight + 0.08 * dusk - 0.13 * dawn,
+              green: 0.88 + 0.06 * daylight - 0.08 * dusk - 0.13 * dawn,
+              blue: 0.92 - 0.05 * daylight - 0.26 * dusk - 0.13 * dawn)
     }
 
     var body: some View {
@@ -164,12 +191,10 @@ struct PortalLyricsFrame: View, Animatable {
                              progress: dissolve, tint: tint, context: lane)
                     }
                 }
-            case .outro:
-                let remaining = min(1, max(0, (duration - elapsed) / 5))
-                waves(in: right, logicalStart: sideWidth, amplitude: 0.15 + 2.7 * remaining * remaining,
+            case .outro, .waves:
+                let remaining = duration > 0 ? min(1, max(0, (duration - elapsed) / 5)) : 1
+                waves(in: right, logicalStart: sideWidth, amplitude: 0.15 + 2.65 * remaining * remaining,
                       dissolve: dissolve, context: context)
-            case .waves:
-                waves(in: right, logicalStart: sideWidth, amplitude: 2.8, dissolve: dissolve, context: context)
             case .finished: break
             }
             if let outgoing, let asset = outgoingGlyph {
@@ -205,22 +230,105 @@ struct PortalLyricsFrame: View, Animatable {
         var layer = context
         layer.clip(to: Path(rect))
         let time = reduced ? 0 : elapsed
+        let amplitude = amplitude * (0.85 + 0.15 * daylight - 0.15 * dawn)
         for band in 0..<3 {
             var path = Path()
             for step in 0...Int(ceil(rect.width)) {
                 let local = CGFloat(step)
-                let phase = (logicalStart + local) / 15 + time * 2.4 + Double(band) * 0.55
+                let phase = (logicalStart + local) / (15 + 3 * dawn + 2 * dusk) + time * 2.4 + Double(band) * 0.55
                 let y = rect.midY + sin(phase) * amplitude * (1 - Double(band) * 0.2)
                 let point = CGPoint(x: rect.minX + local, y: y)
                 if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
                 if !reduced, dissolve > 0, step % 3 == 0 {
                     let drift = CGPoint(x: point.x - dissolve * 8, y: point.y + sin(Double(step * 7)) * dissolve * 7)
                     layer.opacity = sin(.pi * dissolve) * 0.55
-                    layer.fill(Path(ellipseIn: CGRect(x: drift.x, y: drift.y, width: 0.9, height: 0.9)), with: .color(tint))
+                    layer.fill(Path(ellipseIn: CGRect(x: drift.x, y: drift.y, width: 0.9, height: 0.9)), with: .color(waveColor))
                 }
             }
             layer.opacity = (0.65 - Double(band) * 0.17) * pow(1 - dissolve, 2)
-            layer.stroke(path, with: .color(tint), style: StrokeStyle(lineWidth: band == 0 ? 1.2 : 0.7, lineCap: .round))
+            layer.stroke(path, with: .color(waveColor), style: StrokeStyle(lineWidth: band == 0 ? 1.2 : 0.7, lineCap: .round))
+        }
+        weatherParticles(previousWeather, in: rect, dissolve: dissolve, visibility: 1 - weatherBlend, context: context)
+        weatherParticles(weather, in: rect, dissolve: dissolve, visibility: weatherBlend, context: context)
+    }
+
+    private func weatherParticles(_ weather: NotchWeatherSnapshot?, in rect: CGRect, dissolve: Double,
+                                  visibility: Double, context: GraphicsContext) {
+        guard !reduced, let weather, visibility > 0, weatherPresence > 0 else { return }
+        let ending = CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration)
+        var layer = context
+        layer.clip(to: Path(rect))
+        let color: Color = weather.kind == .clear
+            ? Color(red: 0.94, green: 0.87, blue: 0.65 + 0.17 * (1 - daylight - dusk))
+            : weather.kind == .wind ? Color(red: 0.83, green: 0.82 - 0.08 * dusk, blue: 0.70) : waveColor
+        let count = weather.kind == .rain ? 7 : weather.kind == .snow ? 5 : 4
+        for i in 0..<count {
+            let seed = Double(i) * 0.61803398875
+            let speed = weather.kind == .rain ? 0.65 : weather.kind == .wind ? 0.23 : 0.10
+            let cycle = elapsed * speed + seed
+            let p = cycle - floor(cycle)
+            let x = rect.maxX - p * rect.width
+            let waveY = rect.midY + sin(x / 15 + elapsed * 2.4) * 2 * (1 - ending)
+            let opacity = visibility * weatherPresence * sin(.pi * p) * (0.55 - 0.17 * dawn) * (1 - 0.65 * ending)
+            layer.opacity = opacity * pow(1 - dissolve, 2)
+            var particleOrigin = CGPoint(x: x, y: waveY)
+            switch weather.kind {
+            case .rain:
+                let dropX = rect.minX + (seed - floor(seed)) * rect.width - p * min(8, weather.wind)
+                if p < 0.8 {
+                    let y = rect.minY + p / 0.8 * (waveY - rect.minY)
+                    particleOrigin = CGPoint(x: dropX, y: y)
+                    var rain = Path()
+                    rain.move(to: CGPoint(x: dropX + 0.8, y: y - 2.5))
+                    rain.addLine(to: CGPoint(x: dropX, y: y))
+                    layer.stroke(rain, with: .color(color), style: StrokeStyle(lineWidth: 0.65, lineCap: .round))
+                } else {
+                    particleOrigin = CGPoint(x: dropX, y: waveY)
+                    let r = (p - 0.8) * 16
+                    layer.stroke(Path(ellipseIn: CGRect(x: dropX - r, y: waveY - 0.45, width: r * 2, height: 0.9)),
+                                 with: .color(color), lineWidth: 0.45)
+                }
+            case .snow:
+                let y = rect.minY + p * rect.height
+                let snowX = rect.minX + (seed - floor(seed)) * rect.width + sin(p * .pi * 2 + seed) * 2 - p * min(5, weather.wind)
+                particleOrigin = CGPoint(x: snowX, y: y)
+                if i == 0 {
+                    var flake = Path()
+                    for arm in 0..<3 {
+                        let angle = Double(arm) * .pi / 3
+                        flake.move(to: CGPoint(x: snowX - cos(angle) * 1.6, y: y - sin(angle) * 1.6))
+                        flake.addLine(to: CGPoint(x: snowX + cos(angle) * 1.6, y: y + sin(angle) * 1.6))
+                    }
+                    layer.stroke(flake, with: .color(color), lineWidth: 0.5)
+                } else { layer.fill(Path(ellipseIn: CGRect(x: snowX, y: y, width: 1.1, height: 1.1)), with: .color(color)) }
+            case .wind:
+                let y = waveY + sin(p * 4 + seed) * 3 * (1 - ending)
+                particleOrigin = CGPoint(x: x, y: y)
+                var wind = Path()
+                wind.move(to: CGPoint(x: x, y: y))
+                wind.addQuadCurve(to: CGPoint(x: x + 7, y: y - 0.5), control: CGPoint(x: x + 4, y: y - 1.5))
+                layer.stroke(wind, with: .color(color.opacity(0.5)), style: StrokeStyle(lineWidth: 0.55, lineCap: .round))
+                if i < 2 {
+                    var leaf = layer
+                    leaf.translateBy(x: x, y: y)
+                    leaf.rotate(by: .radians(sin(p * 5 + seed) * 0.8))
+                    var shape = Path()
+                    shape.move(to: CGPoint(x: -2, y: 0))
+                    shape.addQuadCurve(to: CGPoint(x: 2, y: 0), control: CGPoint(x: 0, y: -1.8))
+                    shape.addQuadCurve(to: CGPoint(x: -2, y: 0), control: CGPoint(x: 0, y: 1.8))
+                    leaf.fill(shape, with: .color(color))
+                }
+            case .clear, .cloudy:
+                let y = waveY + sin(p * 5 + seed) * (weather.kind == .clear ? 3 : 1.5) * (1 - ending) + dusk * p * 2
+                particleOrigin = CGPoint(x: x, y: y)
+                layer.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1.1, height: 1.1)), with: .color(color))
+            }
+            // The same points disperse during the existing ending, without a second emitter.
+            if dissolve > 0 {
+                layer.opacity = opacity * sin(.pi * dissolve)
+                layer.fill(Path(ellipseIn: CGRect(x: particleOrigin.x - dissolve * 6, y: particleOrigin.y + sin(seed * 9) * dissolve * 5,
+                                                 width: 0.8, height: 0.8)), with: .color(color))
+            }
         }
     }
 

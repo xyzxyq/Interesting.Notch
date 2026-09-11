@@ -246,6 +246,25 @@ extension CompactLyricsChecks {
         transitionRenderer.scale = 2
         try! NSBitmapImageRep(cgImage: transitionRenderer.cgImage!).representation(using: .png, properties: [:])!
             .write(to: URL(fileURLWithPath: "/tmp/lyrics-transition-preview.png"))
+        let weatherPreview = VStack(alignment: .leading, spacing: 12) {
+            ForEach(NotchWeatherKind.allCases, id: \.self) { kind in
+                HStack {
+                    Text(kind.label).frame(width: 55)
+                    ForEach([8.0, 27.55, 29.3], id: \.self) { time in
+                        PortalLyricsFrame(phase: time < 26 ? .waves : .outro, elapsed: time, duration: 30,
+                            sideWidth: 54, gap: 0, tint: .white, reduced: false, glyph: nil,
+                            cover: coverGlyph, albumArt: cover, daylight: 1,
+                            weather: NotchWeatherSnapshot(kind: kind, wind: 7, observed: .now, fetched: .now,
+                                place: WeatherPlace(name: "Preview", latitude: 0, longitude: 0)))
+                            .frame(width: 108, height: 26).background(.black)
+                    }
+                }
+            }
+        }.padding(20).foregroundStyle(.white).background(Color(white: 0.04))
+        let weatherRenderer = ImageRenderer(content: weatherPreview)
+        weatherRenderer.scale = 4
+        try! NSBitmapImageRep(cgImage: weatherRenderer.cgImage!).representation(using: .png, properties: [:])!
+            .write(to: URL(fileURLWithPath: "/tmp/notch-weather-preview.png"))
         let solarTimes = [0.0, 15, 27.55, 28.8, 29.3]
         let solarLabels = ["开始", "中段", "收拢中", "曲终前", "粒子消散"]
         let celestialPreview = HStack(alignment: .top, spacing: 20) {
