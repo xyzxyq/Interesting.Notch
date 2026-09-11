@@ -16,14 +16,11 @@ enum CompactLyricsLayout {
         return visible + (visible >= sideWidth ? gap : 0)
     }
 
-    static func textX(_ text: String, width: CGFloat, sideWidth: CGFloat, progress: Double, entryProgress: Double = 1) -> CGFloat {
+    static func textX(_ text: String, width: CGFloat, sideWidth: CGFloat, progress: Double) -> CGFloat {
         let lastWidth = (String(text.trimmingCharacters(in: .whitespacesAndNewlines).last ?? " ") as NSString)
             .size(withAttributes: [.font: font]).width
         let end = sideWidth / 2 - width + lastWidth / 2
-        let start = max(4, end)
-        let entry = min(1, max(0, entryProgress))
-        return start + (end - start) * min(1, max(0, progress))
-            + (sideWidth - start) * pow(1 - entry, 3)
+        return sideWidth + (end - sideWidth) * min(1, max(0, progress))
     }
 }
 
@@ -112,12 +109,11 @@ struct PortalLyricsFrame: View {
             switch phase {
             case .lyrics(let cue):
                 let width = glyph?.size.width ?? (cue.text as NSString).size(withAttributes: [.font: CompactLyricsLayout.font]).width
-                // Start at the right boundary, then ease into the timestamp-driven scroll.
-                // The short entrance overlaps the old line's dissolution without delaying cues.
+                // One constant velocity for the entire line, including entry from the right.
+                // No separate entrance impulse: the last character still ends at the center.
                 let p = min(1, max(0, ((lyricTime ?? elapsed) - cue.start) / max(0.1, cue.end - cue.start)))
                 let motion = reduced ? floor(p * 3) / 3 : p
-                let entry = reduced ? 1 : ((lyricTime ?? elapsed) - cue.start) / 0.35
-                let x = right.minX + CompactLyricsLayout.textX(cue.text, width: width, sideWidth: sideWidth, progress: motion, entryProgress: entry)
+                let x = right.minX + CompactLyricsLayout.textX(cue.text, width: width, sideWidth: sideWidth, progress: motion)
                 for rect in [right] {
                     var lane = context
                     lane.clip(to: Path(rect))

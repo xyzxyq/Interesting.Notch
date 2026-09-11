@@ -62,3 +62,5 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swiftc -swift-ver
 星星随后改为暖金渐变、五瓣切面高光、细亮边与柔和光晕，配一个微弱闪烁的星芒；消散粒子沿用金色。闪烁由播放时间驱动，暂停冻结，减少动态效果时静止。生产预览、受控检查、完整构建和签名验证通过，已重启至 `/tmp/interesting-notch-star-build/Build/Products/Debug/boringNotch.app`。
 
 月球下缘增加三缕银蓝渐变流苏及细小珠光端点，按播放时钟轻摆，暂停和减少动态效果时静止；随月球转星星淡出。月球半径调整为 6.8 点并上移 1.5 点，为流苏留出高度，星星尺寸不变。生产预览、受控检查、完整构建和签名验证通过，已重启至 `/tmp/interesting-notch-fringe-build/Build/Products/Debug/boringNotch.app`。
+
+用户反馈新句入场太快后，移除额外的 0.35 秒缓出位移。当前每句从右边缘至末字居中只使用一条线性轨迹，速度按该句时间区间计算，入场与后续滚动速度一致。新增 60 个等时间步的恒速断言，全部受控检查、完整构建和签名验证通过，已重启至 `/tmp/interesting-notch-uniform-build/Build/Products/Debug/boringNotch.app`。

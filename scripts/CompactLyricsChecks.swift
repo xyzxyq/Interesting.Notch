@@ -123,9 +123,18 @@ extension CompactLyricsChecks {
         let lastWidth = ("凡" as NSString).size(withAttributes: [.font: CompactLyricsLayout.font]).width
         let endX = CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 1)
         assert(abs(endX + glyph.size.width - lastWidth / 2 - 27) < 0.001, "Last character must finish centered")
-        assert(CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 0, entryProgress: 0) == 54)
-        let enteringX = CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 0.1 / 6, entryProgress: 0.1 / 0.35)
+        assert(CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 0 ) == 54)
+        let enteringX = CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 0.1 / 6)
         assert(enteringX > 4 && enteringX < 54, "New line must enter from the right")
+        let positions = (0...60).map { step in
+            CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: Double(step) / 60)
+        }
+        let stepDistance = positions[1] - positions[0]
+        assert(stepDistance < 0)
+        for i in 1..<positions.count {
+            assert(abs((positions[i] - positions[i - 1]) - stepDistance) < 0.00001,
+                   "Entry velocity must equal the rest of the line")
+        }
 
         func pixels(_ phase: LyricPhase, _ rect: CGRect, time: Double = 0) -> Data {
             let renderer = ImageRenderer(content: PortalLyricsFrame(phase: phase, elapsed: time, duration: 30,
