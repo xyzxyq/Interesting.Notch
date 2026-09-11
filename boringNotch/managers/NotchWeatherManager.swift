@@ -16,6 +16,7 @@ import CoreLocation
     private var generation = 0
     private var lastAttempt = Date.distantPast
     private var lastLocationRequest = Date.distantPast
+    private var locationRetryInterval: TimeInterval = 900
     private var cached: NotchWeatherSnapshot?
 
     override private init() {
@@ -56,7 +57,7 @@ import CoreLocation
             snapshot = nil
             status = "天气已过期，暂用普通波浪"
         }
-        if selected == nil && Date.now.timeIntervalSince(lastLocationRequest) >= 900 {
+        if selected == nil && Date.now.timeIntervalSince(lastLocationRequest) >= locationRetryInterval {
             lastLocationRequest = .now
             switch location.authorizationStatus {
             case .notDetermined:
@@ -115,11 +116,22 @@ import CoreLocation
             snapshot = nil; lastAttempt = .distantPast
         }
         located = place
+        locationRetryInterval = 900
         tick()
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         guard enabled, selected == nil else { return }
-        status = "定位暂不可用，可在下方选择城市"
+        let code = (error as? CLError)?.code
+        if code == .denied {
+            located = nil
+            snapshot = nil
+            generation += 1
+            request?.cancel(); request = nil
+            status = "系统未允许定位，请手动选择城市"
+        } else {
+            locationRetryInterval = 60
+            status = "系统暂未返回位置，一分钟后自动重试；也可手动选择城市"
+        }
     }
 }
 
@@ -134,11 +146,21 @@ struct NotchWeatherSettings: View {
             Text(weather.status).font(.caption).foregroundStyle(.secondary)
             Text("地点：\(weather.selected?.name ?? "当前位置")").font(.caption)
             if weather.selected != nil { Button("使用当前位置") { weather.select(nil) } }
-            TextField("搜索城市（定位不可用时可手动选择）", text: $query)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("手动选择城市")
+                TextField("城市名称", text: $query, prompt: Text("例如：北京 / Beijing"))
+                    .labelsHidden()
+                    .textFieldStyle(.roundedBorder)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityLabel("城市名称")
+                Text("输入至少两个字或字母，再点击下方搜索结果。")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
                 .task(id: query) {
                     cities = []; searchStatus = ""
                     let name = query.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard name.count >= 2 else { return }
+                    searchStatus = "正在搜索城市…"
                     do {
                         try await Task.sleep(for: .milliseconds(400))
                         let results = try await NotchWeatherAPI.cities(name)
@@ -150,7 +172,18 @@ struct NotchWeatherSettings: View {
                     }
                 }
             ForEach(cities) { city in
-                Button(city.name) { weather.select(city); query = ""; cities = [] }
+                Button {
+                    weather.select(city); query = ""; cities = []
+                } label: {
+                    HStack {
+                        Image(systemName: "mappin.and.ellipse")
+                        Text(city.name)
+                        Spacer()
+                        Text("选择").foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             if !searchStatus.isEmpty { Text(searchStatus).font(.caption).foregroundStyle(.secondary) }
             Text("每 15 分钟更新。位置坐标用于向 Open-Meteo 查询天气；歌词出现时隐藏天气粒子。").font(.caption).foregroundStyle(.secondary)

@@ -1,4 +1,7 @@
 import Foundation
+import AppKit
+import SwiftUI
+import CoreLocation
 
 private final class WeatherStub: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var fail = false
@@ -22,6 +25,21 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
         manager.enabled = true
         try await Task.sleep(for: .milliseconds(200))
         assert(manager.snapshot?.kind == .rain, "Enabled did not load weather")
+        let host = NSHostingView(rootView: Form { Section { NotchWeatherSettings() } }.formStyle(.grouped))
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 620), styleMask: [.titled], backing: .buffered, defer: false)
+        window.contentView = host
+        window.orderFront(nil)
+        try await Task.sleep(for: .milliseconds(300))
+        host.layoutSubtreeIfNeeded()
+        func fields(_ view: NSView) -> [NSTextField] {
+            (view as? NSTextField).map { [$0] } ?? view.subviews.flatMap { fields($0) }
+        }
+        let input = fields(host).first { $0.isEditable }
+        assert(input != nil && input!.bounds.width > 200, "Manual city input missing or collapsed")
+        let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds)!
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/tmp/weather-settings-preview.png"))
+        window.orderOut(nil)
         manager.enabled = false
         assert(manager.snapshot == nil, "Disabled retained effects")
         WeatherStub.fail = true
