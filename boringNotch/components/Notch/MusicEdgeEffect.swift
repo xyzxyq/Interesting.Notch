@@ -58,47 +58,84 @@ struct MusicEdgeFrame: View {
     let reduced: Bool
     var body: some View {
         Canvas { context, size in
-            let rect = CGRect(origin: .zero, size: size).insetBy(dx: 8, dy: 8)
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: 24, dy: 24)
             guard rect.width > 0, rect.height > 0 else { return }
             let outline = shape.path(in: rect)
             var mask = Path(CGRect(origin: .zero, size: size)); mask.addPath(outline)
             context.clip(to: mask, style: FillStyle(eoFill: true))
             let contour = EdgeContour(path: outline)
             let e = min(1, max(0, energy))
-            if reduced { context.stroke(outline, with: .color(color.opacity(0.22)), lineWidth: 1); return }
+            guard style != "off" else { return }
+            if reduced {
+                context.stroke(outline, with: .color(style == "water" ? .black : color.opacity(0.4)), lineWidth: 2)
+                return
+            }
+            if style == "water" {
+                // Keep the content fixed: only the black silhouette outside the mask moves.
+                func surface(distance: Double, amplitude: Double) -> Path {
+                    let expanded = EdgeContour(path: shape.path(in: rect.insetBy(dx: -distance, dy: -distance)))
+                    var path = Path()
+                    for i in 0..<240 {
+                        let f = Double(i) / 240
+                        let undulation = sin(f * .pi * 10 - phase * 3) * 0.65
+                            + sin(f * .pi * 18 + phase * 2) * 0.35
+                        let base = expanded.point(f)
+                        let taper = min(1, max(0, (base.y - rect.minY) / 12))
+                        let point = expanded.point(f, outward: undulation * amplitude * taper)
+                        if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                    }
+                    path.closeSubpath()
+                    return path
+                }
+                let reach = min(17, (10 + e * 8) * strength)
+                // Three waves travel outwards and disappear before their phase wraps.
+                for ring in 0..<3 {
+                    let t = (phase * 0.65 + Double(ring) / 3).truncatingRemainder(dividingBy: 1)
+                    let fade = sin(.pi * t) * (1 - t)
+                    let wave = surface(distance: 2 + t * reach, amplitude: (0.5 + e) * strength)
+                    context.stroke(wave, with: .color(.black.opacity(fade * 0.9)), style: StrokeStyle(lineWidth: (2.5 + e * 1.5) * strength, lineCap: .round, lineJoin: .round))
+                    // A faint water highlight preserves the contour on dark wallpaper.
+                    context.stroke(wave, with: .color(.white.opacity(fade * 0.16)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
+                }
+                let edge = surface(distance: (2.5 + e * 2) * strength, amplitude: (0.6 + e * 1.4) * strength)
+                context.fill(edge, with: .color(.black))
+                context.stroke(edge, with: .color(.white.opacity(0.10)), style: StrokeStyle(lineWidth: 0.65, lineJoin: .round))
+                return
+            }
             if style == "ripple" {
-                for ring in 0..<2 {
-                    let t = (phase * 0.9 + Double(ring) / 2).truncatingRemainder(dividingBy: 1)
+                for ring in 0..<3 {
+                    let t = (phase * 0.9 + Double(ring) / 3).truncatingRemainder(dividingBy: 1)
+                    let expanded = EdgeContour(path: shape.path(in: rect.insetBy(dx: -0.7 - t * (5 + e * 6) * strength, dy: -0.7 - t * (5 + e * 6) * strength)))
                     var wave = Path()
                     for i in 0...180 {
                         let f = Double(i) / 180
-                        let offset = 0.7 + t * (2 + e * 3) * strength + sin(f * .pi * 12 + phase * 4) * (0.2 + e * 0.7)
-                        let p = contour.point(f == 1 ? 0 : f, outward: offset)
+                        let offset = sin(f * .pi * 12 + phase * 4) * (0.4 + e * 1.0) * min(1, max(0, (expanded.point(f).y - rect.minY) / 12))
+                        let p = expanded.point(f == 1 ? 0 : f, outward: offset)
                         if i == 0 { wave.move(to: p) } else { wave.addLine(to: p) }
                     }
-                    context.stroke(wave, with: .color(color.opacity((1-t) * (0.25+e*0.4))), lineWidth: 0.7)
+                    context.stroke(wave, with: .color(color.opacity((1-t) * (0.48+e*0.4))), style: StrokeStyle(lineWidth: 1.1, lineJoin: .round))
                 }
             } else {
-                let count = style == "meteor" ? 7 : style == "mist" ? 85 : 44
+                let count = style == "meteor" ? 9 : style == "mist" ? 95 : 58
                 for i in 0..<count {
                     let seed = Double(i) * 0.61803398875
                     let f = seed + phase * (style == "meteor" ? 0.15 : 0.04)
                     let life = 0.5 + 0.5 * sin(phase * 2 + seed * 17)
-                    let offset = min(5, (1 + life * (1 + e * 3)) * strength)
+                    let offset = (1.5 + life * (3 + e * 5)) * strength
                     let point = contour.point(f, outward: offset)
-                    let alpha = (0.18 + e * 0.65) * (0.25 + life * 0.75)
+                    let alpha = (0.40 + e * 0.55) * (0.25 + life * 0.75)
                     if style == "meteor" {
-                        for tail in 0..<10 {
-                            let p = contour.point(f - Double(tail) * (2 + e*2) / max(1,contour.length), outward: offset)
-                            let r = 1.0 - Double(tail) * 0.065
+                        for tail in 0..<14 {
+                            let p = contour.point(f - Double(tail) * (2.5 + e*2.5) / max(1,contour.length), outward: offset)
+                            let r = 1.3 - Double(tail) * 0.07
                             context.fill(Path(ellipseIn: CGRect(x: p.x-r, y: p.y-r, width: 2*r, height: 2*r)),
-                                         with: .color(color.opacity(alpha * (1-Double(tail)/10))))
+                                         with: .color(color.opacity(alpha * (1-Double(tail)/14))))
                         }
                     } else {
-                        let radius = style == "mist" ? 1.8 + life : 0.5 + life * 0.5
+                        let radius = style == "mist" ? 2.8 + life * 1.5 : 0.8 + life * 0.65
                         let dot = Path(ellipseIn: CGRect(x: point.x-radius, y: point.y-radius, width: 2*radius, height: 2*radius))
                         if style == "mist" {
-                            context.fill(dot, with: .radialGradient(Gradient(colors: [color.opacity(alpha*0.45), .clear]), center: point, startRadius: 0, endRadius: radius))
+                            context.fill(dot, with: .radialGradient(Gradient(colors: [color.opacity(alpha*0.65), .clear]), center: point, startRadius: 0, endRadius: radius))
                         } else { context.fill(dot, with: .color(color.opacity(alpha))) }
                     }
                 }
@@ -135,7 +172,7 @@ struct MusicEdgeEffect: View {
                     previous = date
                 }
         }
-        .padding(-8)
+        .padding(-24)
         .allowsHitTesting(false)
         .task(id: captureKey) { audio.configure(bundleID: music.bundleIdentifier, active: style != "off" && reactive && music.isPlaying && !reduced) }
     }
@@ -148,7 +185,7 @@ struct MusicEdgeSettings: View {
     @ObservedObject private var audio = MusicEdgeAudio.shared
     var body: some View {
         Picker("音乐边缘动效", selection: $style) {
-            Text("关闭").tag("off"); Text("涟漪").tag("ripple"); Text("星尘").tag("dust")
+            Text("关闭").tag("off"); Text("黑色水波").tag("water"); Text("涟漪").tag("ripple"); Text("星尘").tag("dust")
             Text("流星").tag("meteor"); Text("光雾").tag("mist")
         }
         if style != "off" {
