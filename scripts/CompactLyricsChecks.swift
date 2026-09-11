@@ -118,6 +118,14 @@ import SwiftUI
 #if VISUAL_CHECKS
 extension CompactLyricsChecks {
     static func visualChecks() {
+        assert(CompactLyricsLayout.moonBoundary(progress: 0, angle: 0) == -1)
+        assert(CompactLyricsLayout.moonBoundary(progress: 1, angle: 0) == 1)
+        assert(abs(CompactLyricsLayout.moonBoundary(progress: 0.5, angle: 0) - 0.35) < 0.00001)
+        assert(abs(CompactLyricsLayout.moonBoundary(progress: 0.5, angle: .pi / 2)) < 0.00001)
+        for step in 0..<100 {
+            assert(CompactLyricsLayout.moonBoundary(progress: Double(step) / 100, angle: 0)
+                < CompactLyricsLayout.moonBoundary(progress: Double(step + 1) / 100, angle: 0))
+        }
         assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0) == 0)
         assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.25) == 27)
         assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.5) == 204)

@@ -4,6 +4,12 @@ import SwiftUI
 enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
+    static func moonBoundary(progress: Double, angle: Double) -> Double {
+        let p = min(1, max(0, progress))
+        let arc = cos(angle)
+        // Stylized curved terminator: retain curvature at half progress as well.
+        return (2 * p - 1) * arc + 1.4 * p * (1 - p) * arc * arc
+    }
     static func entranceEdge(sideWidth: CGFloat, gap: CGFloat, progress: Double) -> CGFloat {
         // Spend the two-second reveal on visible content, not the physical notch.
         let visible = 2 * sideWidth * min(1, max(0, progress))
@@ -225,8 +231,16 @@ struct PortalLyricsFrame: View, Animatable {
         layer.clip(to: Path(lane))
         // Use the system symbol's restrained proportions instead of decorative rays.
         layer.opacity = visibility * pow(1 - dissolve, 2) * (1 - collapse)
+        let ringRadius = max(1, min(9.5, lane.height / 2 - 1))
+        let ring = Path(ellipseIn: CGRect(x: center.x - ringRadius, y: center.y - ringRadius,
+                                         width: ringRadius * 2, height: ringRadius * 2))
+        layer.stroke(ring, with: .color(.white.opacity(0.12)), lineWidth: 0.7)
+        var remaining = Path()
+        remaining.addArc(center: center, radius: ringRadius, startAngle: .degrees(-90),
+                         endAngle: .degrees(-90 + 360 * (1 - progress)), clockwise: false)
+        layer.stroke(remaining, with: .color(Color(white: 0.85)), style: StrokeStyle(lineWidth: 0.85, lineCap: .round))
         layer.draw(Text(Image(systemName: "sun.max"))
-            .font(.system(size: (17 - progress) * (1 - collapse * 0.65), weight: .regular))
+            .font(.system(size: 12 * (1 - collapse * 0.65), weight: .regular))
             .foregroundColor(Color(red: 0.96, green: 0.94, blue: 0.87)), at: center)
         layer.opacity = visibility * pow(1 - dissolve, 2) * collapse
         layer.fill(Path(ellipseIn: CGRect(x: center.x - 1.5, y: center.y - 1.5, width: 3, height: 3)),
@@ -252,7 +266,8 @@ struct PortalLyricsFrame: View, Animatable {
         }
         for i in 0...40 {
             let angle = .pi / 2 - Double(i) * .pi / 40
-            shape.addLine(to: CGPoint(x: center.x + radius * (2 * progress - 1) * cos(angle), y: center.y + radius * sin(angle)))
+            shape.addLine(to: CGPoint(x: center.x + radius * CompactLyricsLayout.moonBoundary(progress: progress, angle: angle),
+                                     y: center.y + radius * sin(angle)))
         }
         shape.closeSubpath()
         layer.fill(shape, with: .radialGradient(
