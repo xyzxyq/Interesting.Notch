@@ -50,3 +50,7 @@ DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcrun swiftc -swift-ver
 新增 0%、25%、50%、75%、100% 揭示位置断言，完整受控检查通过；更新后的生产渲染预览已查看。完整 Debug 构建和严格 ad-hoc 签名验证通过。此调整的测试应用为 `/tmp/interesting-notch-entry-build/Build/Products/Debug/boringNotch.app`。
 
 用户后续将总时长延长至两秒：当前实现为左侧 0–1 秒、右侧 1–2 秒。受控检查、完整构建及签名验证通过；最新测试应用为 `/tmp/interesting-notch-entry2-build/Build/Products/Debug/boringNotch.app`。
+
+## 新句从右侧滑入
+
+新句起点移至右侧视区右边缘，使用 0.35 秒三次缓出位移接上原有滚动；与旧句 0.4 秒粒子消散同时进行，末字仍停在右侧中央。减少动态效果时保留原有分段显示。新增句首边界与 0.1 秒入场像素检查，修正裁切图像比较中计入行缓冲填充字节的问题；全部受控检查、完整构建和签名验证通过。生产预览已查看。按用户授权退出旧进程，并启动 `/tmp/interesting-notch-slide-build/Build/Products/Debug/boringNotch.app`。

@@ -123,18 +123,32 @@ extension CompactLyricsChecks {
         let lastWidth = ("凡" as NSString).size(withAttributes: [.font: CompactLyricsLayout.font]).width
         let endX = CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 1)
         assert(abs(endX + glyph.size.width - lastWidth / 2 - 27) < 0.001, "Last character must finish centered")
+        assert(CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 0, entryProgress: 0) == 54)
+        let enteringX = CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 0.1 / 6, entryProgress: 0.1 / 0.35)
+        assert(enteringX > 4 && enteringX < 54, "New line must enter from the right")
 
-        func pixels(_ phase: LyricPhase, _ rect: CGRect) -> Data {
-            let renderer = ImageRenderer(content: PortalLyricsFrame(phase: phase, elapsed: 0, duration: 30,
+        func pixels(_ phase: LyricPhase, _ rect: CGRect, time: Double = 0) -> Data {
+            let renderer = ImageRenderer(content: PortalLyricsFrame(phase: phase, elapsed: time, duration: 30,
                 sideWidth: 54, gap: 150, tint: .white, reduced: false, glyph: glyph,
                 cover: coverGlyph, albumArt: cover).frame(width: 258, height: 26))
             let bitmap = NSBitmapImageRep(cgImage: renderer.cgImage!.cropping(to: rect)!)
-            return Data(bytes: bitmap.bitmapData!, count: bitmap.bytesPerRow * bitmap.pixelsHigh)
+            // Compare only cropped pixels, excluding backing-row padding outside this lane.
+            var values = Data()
+            for y in 0..<bitmap.pixelsHigh {
+                for x in 0..<bitmap.pixelsWide {
+                    let color = bitmap.colorAt(x: x, y: y)!.usingColorSpace(.deviceRGB)!
+                    let alpha = color.alphaComponent
+                    values.append(contentsOf: [color.redComponent * alpha, color.greenComponent * alpha,
+                                               color.blueComponent * alpha, alpha].map { UInt8(min(255, max(0, ($0 * 255).rounded()))) })
+                }
+            }
+            return values
         }
         let left = CGRect(x: 0, y: 0, width: 54, height: 26)
         let right = CGRect(x: 204, y: 0, width: 54, height: 26)
         assert(pixels(.lyrics(cue), left) == pixels(.waves, left), "Lyrics leaked into album/moon area")
-        assert(pixels(.lyrics(cue), right) != pixels(.finished, right), "First words invisible at exact start")
+        assert(pixels(.lyrics(cue), right) == pixels(.finished, right), "New line appeared inside the viewport")
+        assert(pixels(.lyrics(cue), right, time: 0.1) != pixels(.finished, right), "New line did not slide in")
 
         let cases: [(String, LyricPhase, Double, PortalGlyph?)] = [
             ("开始 · 封面与满月", .lyrics(cue), 0, glyph),
