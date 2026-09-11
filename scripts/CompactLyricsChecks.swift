@@ -8,13 +8,13 @@ import SwiftUI
     static func main() async {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        for (hour, minute, expected) in [(7, 59, false), (8, 0, true), (17, 59, true), (18, 0, false), (0, 0, false)] {
+        for (hour, minute, expected) in [(7, 59, CompactLyrics.TimeOfDay.dawn), (8, 0, .day), (16, 59, .day), (17, 0, .dusk), (18, 59, .dusk), (19, 0, .night), (23, 59, .night), (0, 0, .dawn)] {
             let date = calendar.date(from: DateComponents(year: 2026, month: 9, day: 11, hour: hour, minute: minute))!
-            assert(CompactLyrics.isDaytime(at: date, calendar: calendar) == expected)
+            assert(CompactLyrics.timeOfDay(at: date, calendar: calendar) == expected)
         }
         let utcMidnight = Date(timeIntervalSince1970: 0)
         calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
-        assert(CompactLyrics.isDaytime(at: utcMidnight, calendar: calendar), "Use local rather than UTC hour")
+        assert(CompactLyrics.timeOfDay(at: utcMidnight, calendar: calendar) == .day, "Use local rather than UTC hour")
         let lines = CompactLyrics.parseLRC("[offset:-100]\n[00:01.5][00:03.500]回憶\n[00:05.50]")
         assert(lines.count == 3 && abs(lines[0].time - 1.4) < 0.00001 && lines[2].text.isEmpty)
         assert(CompactLyrics.displayText("回憶與愛", languages: ["zh-Hans-CN"]) == "回忆与爱")
@@ -249,15 +249,15 @@ extension CompactLyricsChecks {
         let solarTimes = [0.0, 15, 27.55, 28.8, 29.3]
         let solarLabels = ["开始", "中段", "收拢中", "曲终前", "粒子消散"]
         let celestialPreview = HStack(alignment: .top, spacing: 20) {
-            ForEach(0..<2, id: \.self) { mode in
+            ForEach(0..<4, id: \.self) { mode in
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(mode == 0 ? "白天 08:00–18:00 · 太阳" : "夜间 18:00–08:00 · 月球").font(.system(size: 12))
+                    Text(["凌晨 00–08 · 微星月球", "白天 08–17 · 太阳", "傍晚 17–19 · 落日", "夜间 19–24 · 月球"][mode]).font(.system(size: 12))
                     ForEach(solarTimes.indices, id: \.self) { i in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(solarLabels[i]).font(.system(size: 10)).foregroundStyle(.gray)
                             PortalLyricsFrame(phase: i < 2 ? .waves : .outro, elapsed: solarTimes[i], duration: 30,
                                 sideWidth: 54, gap: 150, tint: .white, reduced: false, glyph: nil,
-                                cover: coverGlyph, albumArt: cover, daylight: mode == 0 ? 1 : 0)
+                                cover: coverGlyph, albumArt: cover, daylight: mode == 1 ? 1 : 0, dawn: mode == 0 ? 1 : 0, dusk: mode == 2 ? 1 : 0)
                                 .frame(width: 258, height: 26).background(.black)
                         }
                     }

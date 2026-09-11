@@ -30,9 +30,15 @@ struct LyricCandidate: Decodable {
 }
 
 enum CompactLyrics {
-    static func isDaytime(at date: Date, calendar: Calendar = .autoupdatingCurrent) -> Bool {
-        let hour = calendar.component(.hour, from: date)
-        return hour >= 8 && hour < 18
+    enum TimeOfDay: CaseIterable { case dawn, day, dusk, night }
+
+    static func timeOfDay(at date: Date, calendar: Calendar = .autoupdatingCurrent) -> TimeOfDay {
+        switch calendar.component(.hour, from: date) {
+        case 0..<8: return .dawn
+        case 8..<17: return .day
+        case 17..<19: return .dusk
+        default: return .night
+        }
     }
 
     static func normalized(_ text: String) -> String {

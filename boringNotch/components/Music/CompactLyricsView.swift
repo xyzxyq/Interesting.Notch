@@ -55,11 +55,11 @@ struct CompactLyricsView: View {
     var body: some View {
         // Keep local day/night selection live even when music is paused.
         TimelineView(.periodic(from: .now, by: 1)) { clock in
-        let daylight: Double = {
+        let period: CompactLyrics.TimeOfDay = {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("--preview-sun") { return 1 }
+            if ProcessInfo.processInfo.arguments.contains("--preview-sun") { return .day }
             #endif
-            return CompactLyrics.isDaytime(at: clock.date) ? 1 : 0
+            return CompactLyrics.timeOfDay(at: clock.date)
         }()
         TimelineView(.animation(minimumInterval: reduceMotion ? 0.25 : 1.0 / 60,
                                 paused: !isPlaying || finished)) { tick in
@@ -72,8 +72,9 @@ struct CompactLyricsView: View {
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
                               glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
                               outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
-                              entrance: min(1, max(0, elapsed / 2)), daylight: daylight)
-                .animation(.easeInOut(duration: 1), value: daylight)
+                              entrance: min(1, max(0, elapsed / 2)),
+                              daylight: period == .day ? 1 : 0, dawn: period == .dawn ? 1 : 0, dusk: period == .dusk ? 1 : 0)
+                .animation(.easeInOut(duration: 1), value: period)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
                 .task(id: text) {
@@ -110,9 +111,11 @@ struct PortalLyricsFrame: View, Animatable {
     var outgoingGlyph: PortalGlyph? = nil
     var entrance: Double = 1
     var daylight: Double = 0
-    var animatableData: Double {
-        get { daylight }
-        set { daylight = newValue }
+    var dawn: Double = 0
+    var dusk: Double = 0
+    var animatableData: AnimatablePair<Double, AnimatablePair<Double, Double>> {
+        get { .init(daylight, .init(dawn, dusk)) }
+        set { daylight = newValue.first; dawn = newValue.second.first; dusk = newValue.second.second }
     }
 
     var body: some View {
@@ -128,7 +131,10 @@ struct PortalLyricsFrame: View, Animatable {
             else { context.clip(to: Path(CGRect(x: 0, y: 0, width: edge, height: size.height))) }
             let dissolve = CompactLyrics.dissolve(at: elapsed, duration: duration)
             artwork(in: left, dissolve: dissolve, context: context)
-            if daylight < 1 { moon(in: left, dissolve: dissolve, visibility: 1 - daylight, context: context) }
+            let night = max(0, 1 - daylight - dawn - dusk)
+            if night > 0 { moon(in: left, dissolve: dissolve, visibility: night, context: context) }
+            if dawn > 0 { moon(in: left, dissolve: dissolve, visibility: dawn, early: true, context: context) }
+            if dusk > 0 { sunset(in: left, dissolve: dissolve, visibility: dusk, context: context) }
             if daylight > 0 { sun(in: left, dissolve: dissolve, visibility: daylight, context: context) }
             switch phase {
             case .lyrics(let cue):
@@ -262,7 +268,43 @@ struct PortalLyricsFrame: View, Animatable {
         celestialDust(at: center, progress: dissolve, visibility: visibility, lane: lane, context: context)
     }
 
-    private func moon(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
+    private func sunset(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
+        let center = CGPoint(x: lane.maxX - 13, y: lane.midY + 4)
+        let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
+        let transition = CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration)
+        let tint = Color(red: 0.94, green: 0.80, blue: 0.66)
+        var layer = context
+        layer.clip(to: Path(lane))
+        layer.opacity = visibility * pow(1 - dissolve, 2)
+        var scene = layer
+        scene.translateBy(x: center.x, y: center.y)
+        scene.scaleBy(x: 1 - 0.85 * transition, y: 1 - 0.85 * transition)
+        scene.opacity *= 1 - transition
+        let radius = 4.5
+        let y = -radius + 1.8 * radius * progress
+        var sky = scene
+        sky.clip(to: Path(CGRect(x: -12, y: -24, width: 24, height: 24)))
+        let disc = Path(ellipseIn: CGRect(x: -radius, y: y - radius, width: radius * 2, height: radius * 2))
+        sky.fill(disc, with: .color(tint.opacity(1 - 0.35 * progress)))
+        sky.stroke(disc, with: .color(tint), lineWidth: 0.8)
+        for ray in 0..<5 {
+            let angle = Double(ray) * .pi / 4 + .pi
+            var path = Path()
+            path.move(to: CGPoint(x: cos(angle) * 6, y: y + sin(angle) * 6))
+            let end = 6 + 2 * (1 - progress)
+            path.addLine(to: CGPoint(x: cos(angle) * end, y: y + sin(angle) * end))
+            sky.stroke(path, with: .color(tint.opacity(0.8)), style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
+        }
+        var horizon = Path()
+        horizon.move(to: CGPoint(x: -7, y: 0))
+        horizon.addLine(to: CGPoint(x: 7, y: 0))
+        scene.stroke(horizon, with: .color(tint.opacity(0.75)), style: StrokeStyle(lineWidth: 0.7, lineCap: .round))
+        layer.opacity *= transition
+        layer.fill(Path(ellipseIn: CGRect(x: center.x - 1.5, y: center.y - 1.5, width: 3, height: 3)), with: .color(tint))
+        celestialDust(at: center, progress: dissolve, visibility: visibility, lane: lane, context: context)
+    }
+
+    private func moon(in lane: CGRect, dissolve: Double, visibility: Double, early: Bool = false, context: GraphicsContext) {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let radius: CGFloat = 7
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
@@ -270,6 +312,11 @@ struct PortalLyricsFrame: View, Animatable {
         var layer = context
         layer.clip(to: Path(lane))
         layer.opacity = visibility * (1 - star) * pow(1 - dissolve, 2)
+        if early {
+            layer.fill(Path(ellipseIn: CGRect(x: center.x + 8, y: center.y - 8, width: 1.2, height: 1.2)),
+                       with: .color(Color(white: 0.65)))
+            layer.opacity *= 0.78
+        }
         let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
         layer.fill(disc, with: .color(Color(white: 0.12)))
         var shape = Path()
