@@ -652,6 +652,8 @@ struct Media: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                .accessibilityLabel(Text("Compact lyrics for Apple Music"))
+                .accessibilityHint(Text("Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable."))
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
                 Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in

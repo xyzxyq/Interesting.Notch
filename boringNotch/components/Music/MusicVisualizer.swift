@@ -20,6 +20,8 @@ class AudioSpectrum: NSView {
         setupBars()
     }
     
+    deinit { animationTimer?.invalidate() }
+
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         wantsLayer = true

@@ -459,7 +459,7 @@ struct ContentView: View {
                             + -cornerRadiusInsets.closed.top
                 )
 
-            Group {
+            HStack(spacing: 0) {
                 if compactLyricsMode {
                     CompactLyricsView(
                         segments: musicManager.compactSegments,
@@ -469,7 +469,7 @@ struct ContentView: View {
                         rate: musicManager.playbackRate,
                         isPlaying: musicManager.isPlaying,
                         tint: Defaults[.coloredSpectrogram]
-                            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .white
+                            ? Color(nsColor: (musicManager.avgColor.blended(withFraction: 0.65, of: .white) ?? .white).withAlphaComponent(1)) : .white
                     ) {
                         musicVisualizer
                             .frame(width: max(0, vm.effectiveClosedNotchHeight - 12))
@@ -498,23 +498,23 @@ struct ContentView: View {
 
     @ViewBuilder
     private var musicVisualizer: some View {
-                if useMusicVisualizer {
-                    Rectangle()
-                        .fill(
-                            Defaults[.coloredSpectrogram]
-                                ? Color(nsColor: musicManager.avgColor).gradient
-                                : Color.gray.gradient
-                        )
-                        .frame(width: 50, alignment: .center)
-                        .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
-                        .mask {
-                            AudioSpectrumView(isPlaying: $musicManager.isPlaying)
-                                .frame(width: 16, height: 12)
-                        }
-                } else {
-                    LottieAnimationContainer()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        if useMusicVisualizer {
+            Rectangle()
+                .fill(
+                    Defaults[.coloredSpectrogram]
+                        ? Color(nsColor: musicManager.avgColor).gradient
+                        : Color.gray.gradient
+                )
+                .frame(width: 50, alignment: .center)
+                .matchedGeometryEffect(id: "spectrum", in: albumArtNamespace)
+                .mask {
+                    AudioSpectrumView(isPlaying: $musicManager.isPlaying)
+                        .frame(width: 16, height: 12)
                 }
+        } else {
+            LottieAnimationContainer()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
     }
 
     @ViewBuilder
