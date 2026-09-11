@@ -226,25 +226,28 @@ struct PortalLyricsFrame: View, Animatable {
     private func sun(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
-        let collapse = duration > 0 ? min(1, max(0, elapsed - (duration - 2.5))) : 0
         var layer = context
         layer.clip(to: Path(lane))
-        // Use the system symbol's restrained proportions instead of decorative rays.
-        layer.opacity = visibility * pow(1 - dissolve, 2) * (1 - collapse)
-        let ringRadius = max(1, min(9.5, lane.height / 2 - 1))
-        let ring = Path(ellipseIn: CGRect(x: center.x - ringRadius, y: center.y - ringRadius,
-                                         width: ringRadius * 2, height: ringRadius * 2))
-        layer.stroke(ring, with: .color(.white.opacity(0.12)), lineWidth: 0.7)
-        var remaining = Path()
-        remaining.addArc(center: center, radius: ringRadius, startAngle: .degrees(-90),
-                         endAngle: .degrees(-90 + 360 * (1 - progress)), clockwise: false)
-        layer.stroke(remaining, with: .color(Color(white: 0.85)), style: StrokeStyle(lineWidth: 0.85, lineCap: .round))
-        layer.draw(Text(Image(systemName: "sun.max"))
-            .font(.system(size: 12 * (1 - collapse * 0.65), weight: .regular))
-            .foregroundColor(Color(red: 0.96, green: 0.94, blue: 0.87)), at: center)
-        layer.opacity = visibility * pow(1 - dissolve, 2) * collapse
-        layer.fill(Path(ellipseIn: CGRect(x: center.x - 1.5, y: center.y - 1.5, width: 3, height: 3)),
-                   with: .color(Color(white: 0.93)))
+        layer.opacity = visibility * pow(1 - dissolve, 2)
+        let tint = Color(red: 0.96, green: 0.94, blue: 0.87)
+        let disc = Path(ellipseIn: CGRect(x: center.x - 4, y: center.y - 4, width: 8, height: 8))
+        layer.fill(disc, with: .color(tint.opacity(1 - progress)))
+        layer.stroke(disc, with: .color(tint), lineWidth: 0.8)
+        // Playback straightens and shortens each ray; the central outline stays fixed.
+        for ray in 0..<8 {
+            let angle = Double(ray) * .pi / 4
+            var path = Path()
+            for step in 0...16 {
+                let t = Double(step) / 16
+                let radius = 5.8 + t * (4 - 2.5 * progress)
+                let bend = sin(t * 2 * .pi) * 0.85 * (1 - progress)
+                let point = CGPoint(x: center.x + cos(angle) * radius - sin(angle) * bend,
+                                    y: center.y + sin(angle) * radius + cos(angle) * bend)
+                if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
+            }
+            layer.stroke(path, with: .color(tint.opacity(0.85)),
+                         style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round))
+        }
         celestialDust(at: center, progress: dissolve, visibility: visibility, lane: lane, context: context)
     }
 
