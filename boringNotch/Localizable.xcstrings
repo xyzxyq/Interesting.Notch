@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Lyrics idle" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "歌词未启用或暂无歌曲"}}}},
+    "Loading lyrics…" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "正在加载歌词…"}}}},
+    "Plain lyrics available" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "仅有文本歌词"}}}},
+    "Synced lyrics ready" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "同步歌词已就绪"}}}},
+    "No matching synced lyrics" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "未找到匹配的同步歌词"}}}},
+    "Lyrics request failed" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "歌词请求失败"}}}},
     "Lyric timing adjustment" : {"localizations" : {"zh-Hans" : {"stringUnit" : {"state" : "translated", "value" : "歌词时间微调"}}}},
     "Positive values advance lyrics; negative values delay them." : {"localizations" : {"zh-Hans" : {"stringUnit" : {"state" : "translated", "value" : "正值让歌词提前，负值让歌词延后。"}}}},
     "Scrolling lyrics for Apple Music": {

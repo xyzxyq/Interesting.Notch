@@ -592,6 +592,7 @@ struct HUD: View {
 }
 
 struct Media: View {
+    @ObservedObject private var musicManager = MusicManager.shared
     @Default(.waitInterval) var waitInterval
     @Default(.mediaController) var mediaController
     @ObservedObject var coordinator = BoringViewCoordinator.shared
@@ -655,6 +656,8 @@ struct Media: View {
                 }
                 .accessibilityLabel(Text("Scrolling lyrics for Apple Music"))
                 .accessibilityHint(Text("Scrolling lyrics on the right, artwork and a progress moon on the left. Chinese script follows your system language."))
+                Text(LocalizedStringKey(musicManager.lyricsStatus))
+                    .font(.caption).foregroundStyle(.secondary)
                 Stepper(value: $compactLyricsOffset, in: -10...10, step: 0.1) {
                     Text("Lyric timing adjustment")
                     Text(String(format: "%+.1f s", compactLyricsOffset))

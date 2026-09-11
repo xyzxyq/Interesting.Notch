@@ -4,6 +4,14 @@ import SwiftUI
 enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
+
+    static func textX(_ text: String, width: CGFloat, sideWidth: CGFloat, progress: Double) -> CGFloat {
+        let lastWidth = (String(text.trimmingCharacters(in: .whitespacesAndNewlines).last ?? " ") as NSString)
+            .size(withAttributes: [.font: font]).width
+        let end = sideWidth / 2 - width + lastWidth / 2
+        let start = max(4, end)
+        return start + (end - start) * min(1, max(0, progress))
+    }
 }
 
 struct CompactLyricsView: View {
@@ -23,6 +31,7 @@ struct CompactLyricsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var glyph: PortalGlyph?
     @State private var cover: PortalGlyph?
+    @State private var outgoingGlyph: PortalGlyph?
     @State private var finished = false
 
     var body: some View {
@@ -32,19 +41,25 @@ struct CompactLyricsView: View {
             let lyricTime = max(0, elapsed + lyricOffset)
             let phase = elapsed >= duration - 0.2 && duration > 0 ? LyricPhase.finished : CompactLyrics.phase(at: min(lyricTime, max(0, duration - 0.201)), cues: segments, duration: duration)
             let text: String = { if case .lyrics(let cue) = phase { return cue.text }; return "" }()
+            let outgoing = segments.last { $0.end <= lyricTime && lyricTime < $0.end + 0.4 }
             PortalLyricsFrame(phase: phase, elapsed: elapsed, duration: duration,
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
-                              glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime)
+                              glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
+                              outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
+                              entrance: min(1, max(0, elapsed)))
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
                 .task(id: text) {
                     glyph = text.isEmpty ? nil : PortalGlyph(text: text)
                 }
+                .task(id: outgoing?.text) {
+                    outgoingGlyph = outgoing.map { PortalGlyph(text: $0.text) }
+                }
                 .onChange(of: phase) { _, phase in finished = phase == .finished }
         }
         .frame(width: sideWidth * 2 + gap, height: height)
         .task(id: ObjectIdentifier(albumArt)) { cover = PortalGlyph(image: albumArt) }
-        .onChange(of: revision) { _, _ in finished = false; glyph = nil }
+        .onChange(of: revision) { _, _ in finished = false }
         .onChange(of: sampleDate) { _, _ in finished = false }
     }
 }
@@ -63,13 +78,21 @@ struct PortalLyricsFrame: View {
     let albumArt: NSImage
 
     var lyricTime: Double? = nil
+    var outgoing: LyricSegment? = nil
+    var outgoingGlyph: PortalGlyph? = nil
+    var entrance: Double = 1
 
     var body: some View {
-        Canvas { context, size in
+        Canvas { baseContext, size in
+            var context = baseContext
             guard sideWidth > 0, gap >= 0, size.height > 0, elapsed.isFinite else { return }
             if phase == .finished { return }
             let left = CGRect(x: 0, y: 0, width: sideWidth, height: size.height)
             let right = CGRect(x: sideWidth + gap, y: 0, width: sideWidth, height: size.height)
+            let reveal = min(1, max(0, entrance))
+            let edge = size.width * reveal
+            if reduced { context.opacity = reveal }
+            else { context.clip(to: Path(CGRect(x: 0, y: 0, width: edge, height: size.height))) }
             let dissolve = CompactLyrics.dissolve(at: elapsed, duration: duration)
             artwork(in: left, dissolve: dissolve, context: context)
             moon(in: left, dissolve: dissolve, context: context)
@@ -79,8 +102,8 @@ struct PortalLyricsFrame: View {
                 // First characters are visible at the source timestamp. Scroll only overflow;
                 // unlike the old strip, no blank entrance/exit consumes the vocal interval.
                 let p = min(1, max(0, ((lyricTime ?? elapsed) - cue.start) / max(0.1, cue.end - cue.start)))
-                let travel = max(0, width - sideWidth + 8) * p
-                let x = right.minX + 4 - (reduced ? floor(travel / 26) * 26 : travel)
+                let motion = reduced ? floor(p * 3) / 3 : p
+                let x = right.minX + CompactLyricsLayout.textX(cue.text, width: width, sideWidth: sideWidth, progress: motion)
                 for rect in [right] {
                     var lane = context
                     lane.clip(to: Path(rect))
@@ -92,7 +115,8 @@ struct PortalLyricsFrame: View {
                         mask.fill(Path(rect), with: .linearGradient(Gradient(stops: stops), startPoint: CGPoint(x: rect.minX, y: 0), endPoint: CGPoint(x: rect.maxX, y: 0)))
                     }
                     var textContext = lane
-                    textContext.opacity = pow(1 - dissolve, 2)
+                    let appearing = outgoing == nil ? 1 : min(1, max(0.15, ((lyricTime ?? elapsed) - cue.start) / 0.25))
+                    textContext.opacity = pow(1 - dissolve, 2) * appearing
                     textContext.draw(Text(cue.text).font(Font(CompactLyricsLayout.font)).foregroundColor(tint),
                                      at: CGPoint(x: x, y: size.height / 2), anchor: .leading)
                     if !reduced, let glyph, dissolve > 0 {
@@ -108,7 +132,32 @@ struct PortalLyricsFrame: View {
                 waves(in: right, logicalStart: sideWidth, amplitude: 2.8, dissolve: dissolve, context: context)
             case .finished: break
             }
-
+            if let outgoing, let asset = outgoingGlyph {
+                let p = min(1, max(0, ((lyricTime ?? elapsed) - outgoing.end) / 0.4))
+                let x = right.minX + CompactLyricsLayout.textX(outgoing.text, width: asset.size.width, sideWidth: sideWidth, progress: 1)
+                var old = context
+                old.clip(to: Path(right))
+                old.opacity = pow(1 - p, 2) * (1 - dissolve)
+                old.draw(Text(outgoing.text).font(Font(CompactLyricsLayout.font)).foregroundColor(tint),
+                         at: CGPoint(x: x, y: size.height / 2), anchor: .leading)
+                if !reduced {
+                    dust(asset, origin: CGPoint(x: x, y: (size.height - asset.size.height) / 2),
+                         progress: p, tint: tint, context: old)
+                }
+            }
+            if !reduced, reveal > 0, reveal < 1 {
+                var portal = baseContext
+                portal.clip(to: Path(CGRect(origin: .zero, size: size)))
+                portal.opacity = sin(.pi * reveal)
+                let beam = CGRect(x: edge - 0.7, y: 1, width: 1.4, height: size.height - 2)
+                portal.fill(Path(roundedRect: beam, cornerRadius: 1), with: .color(tint.opacity(0.8)))
+                for i in 0..<42 {
+                    let phase = (reveal * 3 + Double(i) / 42).truncatingRemainder(dividingBy: 1)
+                    let x = edge - phase * 15
+                    let y = size.height * Double(i) / 42 + sin(Double(i) * 2.4) * phase * 4
+                    portal.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 0.9, height: 0.9)), with: .color(tint.opacity(1 - phase)))
+                }
+            }
         }
     }
 

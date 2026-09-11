@@ -5,7 +5,7 @@ import SwiftUI
 #endif
 
 @main @MainActor struct CompactLyricsChecks {
-    static func main() {
+    static func main() async {
         let lines = CompactLyrics.parseLRC("[offset:-100]\n[00:01.5][00:03.500]回憶\n[00:05.50]")
         assert(lines.count == 3 && abs(lines[0].time - 1.4) < 0.00001 && lines[2].text.isEmpty)
         assert(CompactLyrics.displayText("回憶與愛", languages: ["zh-Hans-CN"]) == "回忆与爱")
@@ -49,12 +49,61 @@ import SwiftUI
         let track = LyricTrack(bundleID: "com.apple.Music", title: "Song", artist: "Singer", album: "Album", duration: 180)
         let good = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 181, plainLyrics: "Hello", syncedLyrics: "[00:01]Hello")
         assert(CompactLyrics.match([good], track: track) != nil)
-        assert(CompactLyrics.match([good, good], track: track) == nil)
+        assert(CompactLyrics.match([good, good], track: track) != nil)
+        let other = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 180, plainLyrics: nil, syncedLyrics: "[00:10]Other")
+        assert(CompactLyrics.match([good, other], track: track) == nil)
+        let reissue = LyricCandidate(trackName: "Ｓｏｎｇ", artistName: "Singer", albumName: "Reissue", duration: 180, plainLyrics: nil, syncedLyrics: "[00:01]Hello")
+        assert(CompactLyrics.match([reissue], track: track) != nil)
+        let live = LyricCandidate(trackName: "Song (Live)", artistName: "Singer", albumName: "Album", duration: 180, plainLyrics: nil, syncedLyrics: "[00:01]Hello")
+        assert(CompactLyrics.match([live], track: track) == nil)
+        await networkChecks(track)
         #if VISUAL_CHECKS
         visualChecks()
         #endif
         print("Moon lyrics checks passed: Chinese script, timestamp intervals, clock anchors, offsets, endings, matching")
     }
+    static func networkChecks(_ track: LyricTrack) async {
+        let payload: [String: Any] = ["trackName": "Song", "artistName": "Singer", "albumName": "Reissue", "duration": 180,
+                                      "syncedLyrics": "[00:01]Hello"]
+        func response(_ request: URLRequest, _ code: Int, _ data: Data = Data()) -> (Data, URLResponse) {
+            (data, HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!)
+        }
+        var calls = 0
+        let recovered = try! await CompactLyrics.fetch(track, transport: { request in
+            calls += 1
+            if calls == 1 { return response(request, 503) }
+            return response(request, 200, try JSONSerialization.data(withJSONObject: payload))
+        }, sleep: { _ in })
+        assert(recovered != nil && calls == 2, "Transient failure did not retry")
+        calls = 0
+        let fallback = try! await CompactLyrics.fetch(track, transport: { request in
+            calls += 1
+            if calls == 1 { return response(request, 404) }
+            if calls == 2 { return response(request, 200, Data("[]".utf8)) }
+            assert(!URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!.contains { $0.name == "album_name" })
+            return response(request, 200, try JSONSerialization.data(withJSONObject: [payload]))
+        }, sleep: { _ in })
+        assert(fallback != nil && calls == 3, "Album-free fallback was not attempted")
+        calls = 0
+        do {
+            _ = try await CompactLyrics.fetch(track, transport: { request in
+                calls += 1; return response(request, 503)
+            }, sleep: { _ in })
+            assertionFailure("Permanent outage was reported as not found")
+        } catch { assert(calls == 9, "Retries must be bounded") }
+        let cancellation = Task { () -> Bool in
+            do {
+                _ = try await CompactLyrics.fetch(track, transport: { _ in throw URLError(.timedOut) },
+                    sleep: { _ in throw CancellationError() })
+                return false
+            } catch is CancellationError { return true }
+            catch { return false }
+        }
+        let cancelled = await cancellation.value
+        assert(cancelled)
+        print("Lyrics fetch checks passed: 503 retry, album fallback, duplicate/ambiguous versions, bounded outage, cancellation")
+    }
+
 }
 
 #if VISUAL_CHECKS
@@ -66,6 +115,10 @@ extension CompactLyricsChecks {
         let glyph = PortalGlyph(text: cue.text)
         assert(!glyph.points.isEmpty && glyph.points.count <= 320)
         let coverGlyph = PortalGlyph(image: cover)
+        let lastWidth = ("凡" as NSString).size(withAttributes: [.font: CompactLyricsLayout.font]).width
+        let endX = CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 1)
+        assert(abs(endX + glyph.size.width - lastWidth / 2 - 27) < 0.001, "Last character must finish centered")
+
         func pixels(_ phase: LyricPhase, _ rect: CGRect) -> Data {
             let renderer = ImageRenderer(content: PortalLyricsFrame(phase: phase, elapsed: 0, duration: 30,
                 sideWidth: 54, gap: 150, tint: .white, reduced: false, glyph: glyph,
@@ -105,6 +158,43 @@ extension CompactLyricsChecks {
         let image = renderer.cgImage!
         let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
         try! png.write(to: URL(fileURLWithPath: "/tmp/moon-lyrics-preview.png"))
+        let nextCue = LyricSegment(id: 2, start: 6, end: 12, text: "也曾像朋友一样和我诉说")
+        let nextGlyph = PortalGlyph(text: nextCue.text)
+        let transitionTimes = [5.999, 6.0, 6.1, 6.25, 6.4]
+        let entranceTimes = [0.05, 0.25, 0.5, 0.8, 1.0]
+        let transitions = HStack(alignment: .top, spacing: 20) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("句尾居中 → 旧句消散、新句显现").font(.system(size: 12))
+                ForEach(transitionTimes.indices, id: \.self) { i in
+                    let time = transitionTimes[i]
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(format: "%.2f 秒", time)).font(.system(size: 10)).foregroundStyle(.gray)
+                        PortalLyricsFrame(phase: .lyrics(i == 0 ? cue : nextCue), elapsed: time, duration: 30,
+                            sideWidth: 54, gap: 150, tint: .white, reduced: false,
+                            glyph: i == 0 ? glyph : nextGlyph, cover: coverGlyph, albumArt: cover,
+                            outgoing: i > 0 && i < 4 ? cue : nil, outgoingGlyph: glyph)
+                            .frame(width: 258, height: 26).background(.black)
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                Text("首秒 → 左到右传送门揭示内容").font(.system(size: 12))
+                ForEach(entranceTimes.indices, id: \.self) { i in
+                    let time = entranceTimes[i]
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(String(format: "%.2f 秒", time)).font(.system(size: 10)).foregroundStyle(.gray)
+                        PortalLyricsFrame(phase: .waves, elapsed: time, duration: 30,
+                            sideWidth: 54, gap: 150, tint: .white, reduced: false,
+                            glyph: nil, cover: coverGlyph, albumArt: cover, entrance: time)
+                            .frame(width: 258, height: 26).background(.black)
+                    }
+                }
+            }
+        }.padding(20).foregroundStyle(.white).background(Color(white: 0.04))
+        let transitionRenderer = ImageRenderer(content: transitions)
+        transitionRenderer.scale = 2
+        try! NSBitmapImageRep(cgImage: transitionRenderer.cgImage!).representation(using: .png, properties: [:])!
+            .write(to: URL(fileURLWithPath: "/tmp/lyrics-transition-preview.png"))
         var times: [Double] = []
         for index in 0..<120 {
             let ms: Double = autoreleasepool {
@@ -153,7 +243,19 @@ extension CompactLyricsChecks {
         clock.segments = []; clock.revision += 1; settle()
         let waves = frame(); settle(0.3)
         assert(frame() == waves && waves != first, "Paused fallback wave changed or retained lyrics")
-        print("Portal runtime checks passed: pause, scroll, forward/back seek, ending rewind, wave fallback")
+        clock.segments = [LyricSegment(id: 0, start: 0, end: 6, text: "歌颂这种平凡"),
+                          LyricSegment(id: 1, start: 6, end: 12, text: "也曾像朋友一样和我诉说")]
+        clock.position = 6.1; clock.date = Date(); clock.revision += 1; settle()
+        let transition = frame(); settle(0.3)
+        assert(frame() == transition, "Paused line dissolution advanced")
+        clock.position = 6.5; clock.date = Date(); settle()
+        assert(frame() != transition, "Old line did not dissolve")
+        clock.position = 0.3; clock.date = Date(); clock.revision += 1; settle()
+        let entry = frame(); settle(0.3)
+        assert(frame() == entry, "Paused entry portal advanced")
+        clock.position = 1; clock.date = Date(); settle()
+        assert(frame() != entry, "Entry did not reveal content")
+        print("Portal runtime checks passed: pause, seek, ending rewind, waves, line dissolve, entry reveal")
     }
 }
 @MainActor private final class TestClock: ObservableObject {

@@ -38,13 +38,66 @@ enum CompactLyrics {
         guard !normalized(track.title).isEmpty, !normalized(track.artist).isEmpty,
               track.duration.isFinite, track.duration > 0 else { return nil }
         let matches = candidates.filter {
-            normalized($0.trackName) == normalized(track.title)
-                && normalized($0.artistName) == normalized(track.artist)
-                && (normalized(track.album).isEmpty || normalized($0.albumName ?? "") == normalized(track.album))
+            searchKey($0.trackName) == searchKey(track.title)
+                && searchKey($0.artistName) == searchKey(track.artist)
                 && $0.duration.isFinite && abs($0.duration - track.duration) <= 2
                 && (!requireSynced || !parseLRC($0.syncedLyrics ?? "").filter { !$0.text.isEmpty }.isEmpty)
         }
-        return matches.count == 1 ? matches[0] : nil
+        let albumMatches = matches.filter { !track.album.isEmpty && searchKey($0.albumName ?? "") == searchKey(track.album) }
+        let pool = albumMatches.isEmpty ? matches : albumMatches
+        // Duplicate database records with the same lyric timeline are not ambiguous.
+        guard let first = pool.first else { return nil }
+        return pool.allSatisfy { parseLRC($0.syncedLyrics ?? "") == parseLRC(first.syncedLyrics ?? "")
+            && (requireSynced || $0.plainLyrics == first.plainLyrics) } ? first : nil
+    }
+
+    static func searchKey(_ value: String) -> String {
+        displayText(value, languages: ["zh-Hans"])
+            .folding(options: [.caseInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            .filter { !$0.isWhitespace && !$0.isPunctuation }
+    }
+
+    enum FetchError: Error { case http(Int), invalidResponse }
+
+    static func fetch(_ track: LyricTrack, requireSynced: Bool = true,
+                      transport: (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) },
+                      sleep: (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }) async throws -> LyricCandidate? {
+        guard !normalized(track.artist).isEmpty, !normalized(track.title).isEmpty,
+              track.duration.isFinite, track.duration > 0 else { return nil }
+        var failure: Error?
+        for stage in 0..<3 {
+            try Task.checkCancellation()
+            var url = URLComponents(string: "https://lrclib.net/api/" + (stage == 0 ? "get" : "search"))!
+            url.queryItems = [.init(name: "track_name", value: track.title), .init(name: "artist_name", value: track.artist)]
+            if stage < 2 && !track.album.isEmpty { url.queryItems?.append(.init(name: "album_name", value: track.album)) }
+            if stage == 0 { url.queryItems?.append(.init(name: "duration", value: String(track.duration))) }
+            var request = URLRequest(url: url.url!, timeoutInterval: 8)
+            request.setValue("InterestingNotch/1.0", forHTTPHeaderField: "User-Agent")
+            for attempt in 0..<3 {
+                do {
+                    try Task.checkCancellation()
+                    let (data, response) = try await transport(request)
+                    try Task.checkCancellation()
+                    guard let http = response as? HTTPURLResponse else { throw FetchError.invalidResponse }
+                    if http.statusCode == 404 { break }
+                    guard http.statusCode == 200 else { throw FetchError.http(http.statusCode) }
+                    let candidates = stage == 0 ? [try JSONDecoder().decode(LyricCandidate.self, from: data)]
+                        : try JSONDecoder().decode([LyricCandidate].self, from: data)
+                    if let match = match(candidates, track: track, requireSynced: requireSynced) { return match }
+                    break
+                } catch {
+                    try Task.checkCancellation()
+                    failure = error
+                    let retryable: Bool
+                    if case FetchError.http(let status) = error { retryable = status == 429 || status >= 500 }
+                    else { retryable = error is URLError }
+                    guard retryable && attempt < 2 else { break }
+                    try await sleep(UInt64(attempt + 1) * 1_000_000_000)
+                }
+            }
+        }
+        if let failure { throw failure }
+        return nil
     }
 
     private static let timeTag = try! NSRegularExpression(pattern: #"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]"#)
