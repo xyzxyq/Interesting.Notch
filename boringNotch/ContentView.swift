@@ -33,6 +33,7 @@ struct ContentView: View {
 
     @Namespace var albumArtNamespace
 
+    @Default(.enableCompactLyrics) var enableCompactLyrics
     @Default(.useMusicVisualizer) var useMusicVisualizer
 
     @Default(.showNotHumanFace) var showNotHumanFace
@@ -58,6 +59,15 @@ struct ContentView: View {
         )
     }
 
+    private var compactLyricsMode: Bool {
+        enableCompactLyrics && musicManager.bundleIdentifier == "com.apple.Music"
+    }
+
+    private var musicSideWidth: CGFloat {
+        let original = max(0, vm.effectiveClosedNotchHeight - 12)
+        return compactLyricsMode ? max(original, CompactLyricsLayout.slotWidth) : original
+    }
+
     private var computedChinWidth: CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
 
@@ -69,7 +79,7 @@ struct ContentView: View {
             && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
         {
-            chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
+            chinWidth += (2 * musicSideWidth + 20)
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
             && !vm.hideOnClosed
@@ -400,6 +410,7 @@ struct ContentView: View {
                     width: max(0, vm.effectiveClosedNotchHeight - 12),
                     height: max(0, vm.effectiveClosedNotchHeight - 12)
                 )
+                .frame(width: musicSideWidth, alignment: .trailing)
 
             Rectangle()
                 .fill(.black)
@@ -448,7 +459,45 @@ struct ContentView: View {
                             + -cornerRadiusInsets.closed.top
                 )
 
-            HStack {
+            Group {
+                if compactLyricsMode {
+                    CompactLyricsView(
+                        segments: musicManager.compactSegments,
+                        revision: musicManager.lyricsRevision,
+                        position: musicManager.elapsedTime,
+                        sampleDate: musicManager.timestampDate,
+                        rate: musicManager.playbackRate,
+                        isPlaying: musicManager.isPlaying,
+                        tint: Defaults[.coloredSpectrogram]
+                            ? Color(nsColor: musicManager.avgColor).ensureMinimumBrightness(factor: 0.6) : .white
+                    ) {
+                        musicVisualizer
+                            .frame(width: max(0, vm.effectiveClosedNotchHeight - 12))
+                    }
+                } else {
+                    musicVisualizer
+                }
+            }
+            .frame(
+                width: max(
+                    0,
+                    musicSideWidth + gestureProgress / 2
+                ),
+                height: max(
+                    0,
+                    vm.effectiveClosedNotchHeight - 12
+                ),
+                alignment: .center
+            )
+        }
+        .frame(
+            height: vm.effectiveClosedNotchHeight,
+            alignment: .center
+        )
+    }
+
+    @ViewBuilder
+    private var musicVisualizer: some View {
                 if useMusicVisualizer {
                     Rectangle()
                         .fill(
@@ -466,24 +515,6 @@ struct ContentView: View {
                     LottieAnimationContainer()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-            }
-            .frame(
-                width: max(
-                    0,
-                    vm.effectiveClosedNotchHeight - 12
-                        + gestureProgress / 2
-                ),
-                height: max(
-                    0,
-                    vm.effectiveClosedNotchHeight - 12
-                ),
-                alignment: .center
-            )
-        }
-        .frame(
-            height: vm.effectiveClosedNotchHeight,
-            alignment: .center
-        )
     }
 
     @ViewBuilder

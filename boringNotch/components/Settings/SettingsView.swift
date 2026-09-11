@@ -644,6 +644,14 @@ struct Media: View {
                     "Show music live activity",
                     isOn: $coordinator.musicLiveActivityEnabled.animation()
                 )
+                Defaults.Toggle(key: .enableCompactLyrics) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Compact lyrics for Apple Music")
+                        Text("Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
                 Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in

@@ -30,6 +30,13 @@ import Foundation
         assert(CompactLyrics.timeline([], duration: 10).isEmpty)
         assert(CompactLyrics.split("， ！").isEmpty)
         assert(CompactLyrics.nextBoundary(after: 30, in: segments) == nil)
+        let track = LyricTrack(bundleID: "com.apple.Music", title: "Song", artist: "Singer", album: "Album", duration: 180)
+        let good = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 181, plainLyrics: "Hello", syncedLyrics: "[00:01]Hello")
+        let live = LyricCandidate(trackName: "Song Live", artistName: "Singer", albumName: "Album", duration: 180, plainLyrics: nil, syncedLyrics: "[00:01]Hello")
+        let wrongDuration = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 183, plainLyrics: nil, syncedLyrics: "[00:01]Hello")
+        assert(CompactLyrics.match([live, wrongDuration, good], track: track)?.duration == 181)
+        assert(CompactLyrics.match([good, good], track: track) == nil)
+        assert(CompactLyrics.match([good], track: .init(bundleID: "com.apple.Music", title: "Song", artist: "", album: "Album", duration: 180)) == nil)
         print("CompactLyrics checks passed")
     }
 }

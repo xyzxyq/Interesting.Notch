@@ -1,6 +1,39 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Compact lyrics for Apple Music": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compact lyrics for Apple Music"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music 右侧短语歌词"
+          }
+        }
+      }
+    },
+    "Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable.": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Up to three characters; timing is estimated from synced lines. Falls back to your visualizer when unavailable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每次最多三字；按逐行歌词估算词语时间，无同步歌词时显示原有动画。"
+          }
+        }
+      }
+    }
+,
     "" : {
       "localizations" : {
         "ar" : {

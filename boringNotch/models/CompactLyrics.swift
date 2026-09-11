@@ -13,7 +13,41 @@ struct LyricSegment: Equatable, Identifiable {
     let text: String
 }
 
+struct LyricTrack: Equatable {
+    let bundleID: String
+    let title: String
+    let artist: String
+    let album: String
+    let duration: Double
+}
+
+struct LyricCandidate: Decodable {
+    let trackName: String
+    let artistName: String
+    let albumName: String?
+    let duration: Double
+    let plainLyrics: String?
+    let syncedLyrics: String?
+}
+
 enum CompactLyrics {
+    static func normalized(_ text: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    static func match(_ candidates: [LyricCandidate], track: LyricTrack, requireSynced: Bool = true) -> LyricCandidate? {
+        guard !normalized(track.title).isEmpty, !normalized(track.artist).isEmpty,
+              track.duration.isFinite, track.duration > 0 else { return nil }
+        let matches = candidates.filter {
+            normalized($0.trackName) == normalized(track.title)
+                && normalized($0.artistName) == normalized(track.artist)
+                && (normalized(track.album).isEmpty || normalized($0.albumName ?? "") == normalized(track.album))
+                && $0.duration.isFinite && abs($0.duration - track.duration) <= 2
+                && (!requireSynced || !parseLRC($0.syncedLyrics ?? "").filter { !$0.text.isEmpty }.isEmpty)
+        }
+        return matches.count == 1 ? matches[0] : nil
+    }
+
     private static let timeTag = try! NSRegularExpression(pattern: #"\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]"#)
     private static let offsetTag = try! NSRegularExpression(pattern: #"\[offset:([+-]?\d+)\]"#, options: .caseInsensitive)
 
