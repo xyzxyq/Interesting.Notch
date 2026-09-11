@@ -259,17 +259,17 @@ struct PortalLyricsFrame: View, Animatable {
         var layer = context
         layer.clip(to: Path(rect))
         let color: Color = weather.kind == .clear
-            ? Color(red: 0.94, green: 0.87, blue: 0.65 + 0.17 * (1 - daylight - dusk))
+            ? Color(red: 1, green: 0.84, blue: 0.40 + 0.12 * (1 - daylight - dusk))
             : weather.kind == .wind ? Color(red: 0.83, green: 0.82 - 0.08 * dusk, blue: 0.70) : waveColor
-        let count = weather.kind == .rain ? 7 : weather.kind == .snow ? 5 : 4
+        let count = weather.kind == .rain ? 9 : weather.kind == .wind ? 5 : 7
         for i in 0..<count {
             let seed = Double(i) * 0.61803398875
-            let speed = weather.kind == .rain ? 0.65 : weather.kind == .wind ? 0.23 : 0.10
+            let speed = weather.kind == .rain ? 0.65 : weather.kind == .wind ? 0.23 : weather.kind == .clear ? 0.16 : 0.10
             let cycle = elapsed * speed + seed
             let p = cycle - floor(cycle)
             let x = rect.maxX - p * rect.width
             let waveY = rect.midY + sin(x / 15 + elapsed * 2.4) * 2 * (1 - ending)
-            let opacity = visibility * weatherPresence * sin(.pi * p) * (0.55 - 0.17 * dawn) * (1 - 0.65 * ending)
+            let opacity = visibility * weatherPresence * pow(sin(.pi * p), 0.65) * (0.85 - 0.10 * dawn) * (1 - 0.65 * ending)
             layer.opacity = opacity * pow(1 - dissolve, 2)
             var particleOrigin = CGPoint(x: x, y: waveY)
             switch weather.kind {
@@ -279,35 +279,35 @@ struct PortalLyricsFrame: View, Animatable {
                     let y = rect.minY + p / 0.8 * (waveY - rect.minY)
                     particleOrigin = CGPoint(x: dropX, y: y)
                     var rain = Path()
-                    rain.move(to: CGPoint(x: dropX + 0.8, y: y - 2.5))
+                    rain.move(to: CGPoint(x: dropX + 0.8, y: y - 3.8))
                     rain.addLine(to: CGPoint(x: dropX, y: y))
-                    layer.stroke(rain, with: .color(color), style: StrokeStyle(lineWidth: 0.65, lineCap: .round))
+                    layer.stroke(rain, with: .color(color), style: StrokeStyle(lineWidth: 0.85, lineCap: .round))
                 } else {
                     particleOrigin = CGPoint(x: dropX, y: waveY)
                     let r = (p - 0.8) * 16
                     layer.stroke(Path(ellipseIn: CGRect(x: dropX - r, y: waveY - 0.45, width: r * 2, height: 0.9)),
-                                 with: .color(color), lineWidth: 0.45)
+                                 with: .color(color), lineWidth: 0.6)
                 }
             case .snow:
                 let y = rect.minY + p * rect.height
                 let snowX = rect.minX + (seed - floor(seed)) * rect.width + sin(p * .pi * 2 + seed) * 2 - p * min(5, weather.wind)
                 particleOrigin = CGPoint(x: snowX, y: y)
-                if i == 0 {
+                if i < 2 {
                     var flake = Path()
                     for arm in 0..<3 {
                         let angle = Double(arm) * .pi / 3
-                        flake.move(to: CGPoint(x: snowX - cos(angle) * 1.6, y: y - sin(angle) * 1.6))
-                        flake.addLine(to: CGPoint(x: snowX + cos(angle) * 1.6, y: y + sin(angle) * 1.6))
+                        flake.move(to: CGPoint(x: snowX - cos(angle) * 2.1, y: y - sin(angle) * 2.1))
+                        flake.addLine(to: CGPoint(x: snowX + cos(angle) * 2.1, y: y + sin(angle) * 2.1))
                     }
-                    layer.stroke(flake, with: .color(color), lineWidth: 0.5)
-                } else { layer.fill(Path(ellipseIn: CGRect(x: snowX, y: y, width: 1.1, height: 1.1)), with: .color(color)) }
+                    layer.stroke(flake, with: .color(color), lineWidth: 0.65)
+                } else { layer.fill(Path(ellipseIn: CGRect(x: snowX, y: y, width: 1.7, height: 1.7)), with: .color(color)) }
             case .wind:
                 let y = waveY + sin(p * 4 + seed) * 3 * (1 - ending)
                 particleOrigin = CGPoint(x: x, y: y)
                 var wind = Path()
                 wind.move(to: CGPoint(x: x, y: y))
-                wind.addQuadCurve(to: CGPoint(x: x + 7, y: y - 0.5), control: CGPoint(x: x + 4, y: y - 1.5))
-                layer.stroke(wind, with: .color(color.opacity(0.5)), style: StrokeStyle(lineWidth: 0.55, lineCap: .round))
+                wind.addQuadCurve(to: CGPoint(x: x + 10, y: y - 0.5), control: CGPoint(x: x + 4, y: y - 1.5))
+                layer.stroke(wind, with: .color(color.opacity(0.75)), style: StrokeStyle(lineWidth: 0.75, lineCap: .round))
                 if i < 2 {
                     var leaf = layer
                     leaf.translateBy(x: x, y: y)
@@ -318,10 +318,26 @@ struct PortalLyricsFrame: View, Animatable {
                     shape.addQuadCurve(to: CGPoint(x: -2, y: 0), control: CGPoint(x: 0, y: 1.8))
                     leaf.fill(shape, with: .color(color))
                 }
-            case .clear, .cloudy:
-                let y = waveY + sin(p * 5 + seed) * (weather.kind == .clear ? 3 : 1.5) * (1 - ending) + dusk * p * 2
+            case .clear:
+                // Separate sunlight motes from the wave crest so they remain legible at notch scale.
+                let y = rect.midY + sin(p * 5 + seed * 7) * 6 * (1 - ending)
                 particleOrigin = CGPoint(x: x, y: y)
-                layer.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1.1, height: 1.1)), with: .color(color))
+                let radius = i % 3 == 0 ? 1.15 : 0.85
+                layer.fill(Path(ellipseIn: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)), with: .color(color))
+                var trail = Path()
+                trail.move(to: CGPoint(x: x + 1.5, y: y))
+                trail.addQuadCurve(to: CGPoint(x: x + 5, y: y + 0.8), control: CGPoint(x: x + 3, y: y + 0.2))
+                layer.stroke(trail, with: .color(color.opacity(0.35)), style: StrokeStyle(lineWidth: 0.7, lineCap: .round))
+                if i % 3 == 0 {
+                    var glint = Path()
+                    glint.move(to: CGPoint(x: x - 2.2, y: y)); glint.addLine(to: CGPoint(x: x + 2.2, y: y))
+                    glint.move(to: CGPoint(x: x, y: y - 2.2)); glint.addLine(to: CGPoint(x: x, y: y + 2.2))
+                    layer.stroke(glint, with: .color(color.opacity(0.55)), lineWidth: 0.5)
+                }
+            case .cloudy:
+                let y = waveY + sin(p * 5 + seed) * 3.5 * (1 - ending) + dusk * p * 2
+                particleOrigin = CGPoint(x: x, y: y)
+                layer.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1.7, height: 1.7)), with: .color(color))
             }
             // The same points disperse during the existing ending, without a second emitter.
             if dissolve > 0 {
