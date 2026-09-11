@@ -47,7 +47,12 @@ struct CompactLyricsView: View {
     var body: some View {
         // Keep local day/night selection live even when music is paused.
         TimelineView(.periodic(from: .now, by: 1)) { clock in
-        let daylight = CompactLyrics.isDaytime(at: clock.date) ? 1.0 : 0.0
+        let daylight: Double = {
+            #if DEBUG
+            if ProcessInfo.processInfo.arguments.contains("--preview-sun") { return 1 }
+            #endif
+            return CompactLyrics.isDaytime(at: clock.date) ? 1 : 0
+        }()
         TimelineView(.animation(minimumInterval: reduceMotion ? 0.25 : 1.0 / 60,
                                 paused: !isPlaying || finished)) { tick in
             let elapsed = max(0, isPlaying ? position + max(0, tick.date.timeIntervalSince(sampleDate)) * max(0, rate) : position)
