@@ -4,9 +4,12 @@ import SwiftUI
 enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
-    static func sunCollapse(elapsed: Double, duration: Double) -> Double {
+    static func celestialTransition(elapsed: Double, duration: Double) -> Double {
         guard duration > 0 else { return 0 }
-        let t = min(1, max(0, elapsed - (duration - 2.5)))
+        let end = max(0, duration - 1.2)
+        let start = max(0, end - 2.5)
+        guard end > start else { return 0 }
+        let t = min(1, max(0, (elapsed - start) / (end - start)))
         return t * t * (3 - 2 * t)
     }
     static func moonBoundary(progress: Double, angle: Double) -> Double {
@@ -231,7 +234,7 @@ struct PortalLyricsFrame: View, Animatable {
     private func sun(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
-        let collapse = CompactLyricsLayout.sunCollapse(elapsed: elapsed, duration: duration)
+        let collapse = CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration)
         var layer = context
         layer.clip(to: Path(lane))
         layer.opacity = visibility * pow(1 - dissolve, 2)
@@ -241,7 +244,7 @@ struct PortalLyricsFrame: View, Animatable {
                                          width: discRadius * 2, height: discRadius * 2))
         layer.fill(disc, with: .color(tint.opacity(1 - progress * (1 - collapse))))
         layer.stroke(disc, with: .color(tint), lineWidth: 0.8)
-        // Finish the one-second contraction before the existing particle dissolve begins.
+        // Finish the 2.5-second contraction before the existing particle dissolve begins.
         for ray in 0..<8 {
             let angle = Double(ray) * .pi / 4
             var path = Path()
@@ -263,7 +266,7 @@ struct PortalLyricsFrame: View, Animatable {
         let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let radius: CGFloat = 7
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
-        let star = duration > 0 ? min(1, max(0, elapsed - (duration - 2.5))) : 0
+        let star = CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration)
         var layer = context
         layer.clip(to: Path(lane))
         layer.opacity = visibility * (1 - star) * pow(1 - dissolve, 2)
