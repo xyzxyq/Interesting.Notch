@@ -15,6 +15,9 @@ import SwiftUI
         let utcMidnight = Date(timeIntervalSince1970: 0)
         calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
         assert(CompactLyrics.timeOfDay(at: utcMidnight, calendar: calendar) == .day, "Use local rather than UTC hour")
+        assert(CompactLyrics.titleKey("偏爱-《仙剑奇侠传3》电视剧插曲") == CompactLyrics.titleKey("偏爱"))
+        assert(CompactLyrics.titleKey("偏爱 (Live)") != CompactLyrics.titleKey("偏爱"))
+        assert(CompactLyrics.titleKey("偏爱 - Remix") != CompactLyrics.titleKey("偏爱"))
         let lines = CompactLyrics.parseLRC("[offset:-100]\n[00:01.5][00:03.500]回憶\n[00:05.50]")
         assert(lines.count == 3 && abs(lines[0].time - 1.4) < 0.00001 && lines[2].text.isEmpty)
         assert(CompactLyrics.displayText("回憶與愛", languages: ["zh-Hans-CN"]) == "回忆与爱")

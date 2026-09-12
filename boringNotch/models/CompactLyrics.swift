@@ -49,7 +49,7 @@ enum CompactLyrics {
         guard !normalized(track.title).isEmpty, !normalized(track.artist).isEmpty,
               track.duration.isFinite, track.duration > 0 else { return nil }
         let matches = candidates.filter {
-            searchKey($0.trackName) == searchKey(track.title)
+            titleKey($0.trackName) == titleKey(track.title)
                 && searchKey($0.artistName) == searchKey(track.artist)
                 && $0.duration.isFinite && abs($0.duration - track.duration) <= 2
                 && (!requireSynced || !parseLRC($0.syncedLyrics ?? "").filter { !$0.text.isEmpty }.isEmpty)
@@ -60,6 +60,14 @@ enum CompactLyrics {
         guard let first = pool.first else { return nil }
         return pool.allSatisfy { parseLRC($0.syncedLyrics ?? "") == parseLRC(first.syncedLyrics ?? "")
             && (requireSynced || $0.plainLyrics == first.plainLyrics) } ? first : nil
+    }
+
+    static func titleKey(_ value: String) -> String {
+        // Strip only explicit soundtrack-use labels; live/remix/version markers remain significant.
+        let title = displayText(value, languages: ["zh-Hans"])
+        let base = title.replacingOccurrences(of: #"\s*[-—–－]\s*《[^》]+》\s*(?:电视剧|电影|影视剧|网剧|动画片|动画)?\s*(?:插曲|主题曲|片头曲|片尾曲)\s*$"#,
+                                             with: "", options: .regularExpression)
+        return searchKey(base)
     }
 
     static func searchKey(_ value: String) -> String {
