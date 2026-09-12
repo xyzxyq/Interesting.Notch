@@ -463,6 +463,7 @@ struct Charge: View {
 //}
 
 struct HUD: View {
+    @ObservedObject private var interceptor = MediaKeyInterceptor.shared
     @EnvironmentObject var vm: BoringViewModel
     @Default(.inlineHUD) var inlineHUD
     @Default(.enableGradient) var enableGradient
@@ -491,6 +492,12 @@ struct HUD: View {
                     .disabled(!accessibilityAuthorized)
                 }
                 
+                if let failure = interceptor.failure, accessibilityAuthorized, hudReplacement {
+                    Text(failure).font(.caption).foregroundStyle(.secondary)
+                    Button("重新连接 HUD") {
+                        Task { await interceptor.start() }
+                    }
+                }
                 if !accessibilityAuthorized {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Accessibility access is required to replace the system HUD.")
@@ -576,12 +583,6 @@ struct HUD: View {
         .navigationTitle("HUDs")
         .task {
             accessibilityAuthorized = await XPCHelperClient.shared.isAccessibilityAuthorized()
-        }
-        .onAppear {
-            XPCHelperClient.shared.startMonitoringAccessibilityAuthorization()
-        }
-        .onDisappear {
-            XPCHelperClient.shared.stopMonitoringAccessibilityAuthorization()
         }
         .onReceive(NotificationCenter.default.publisher(for: .accessibilityAuthorizationChanged)) { notification in
             if let granted = notification.userInfo?["granted"] as? Bool {

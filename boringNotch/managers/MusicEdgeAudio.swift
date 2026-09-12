@@ -1,6 +1,7 @@
 import SwiftUI
 import ScreenCaptureKit
 import AVFoundation
+import CoreGraphics
 
 struct EdgeEnergy {
     private(set) var value = 0.0
@@ -23,6 +24,17 @@ struct EdgeEnergy {
     private var lastSample = Date.distantPast
     private var lastPublished = Date.distantPast
 
+    // Only this explicit settings action may show the system permission dialog.
+    func requestPermissionAndRetry() {
+        if !CGPreflightScreenCaptureAccess() { _ = CGRequestScreenCaptureAccess() }
+        let requested = key
+        key = nil
+        configure(bundleID: requested, active: requested != nil)
+        if !CGPreflightScreenCaptureAccess() {
+            status = "录音权限尚未生效；请在系统设置中重新授权当前版本并重启应用"
+        }
+    }
+
     func configure(bundleID: String?, active: Bool) {
         let next = active ? bundleID : nil
         guard next != key else { return }
@@ -34,6 +46,10 @@ struct EdgeEnergy {
         task = Task {
             if let old { try? await old.stopCapture() }
             guard let next, !Task.isCancelled else { return }
+            guard CGPreflightScreenCaptureAccess() else {
+                status = "当前版本未获录音权限，保持轻柔动效；可在此处授权并重试"
+                return
+            }
             do {
                 let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: false)
                 guard !Task.isCancelled, key == next else { return }
@@ -65,8 +81,11 @@ struct EdgeEnergy {
             } catch {
                 guard !Task.isCancelled, key == next else { return }
                 if let stream { try? await stream.stopCapture() }
+                guard !Task.isCancelled, key == next else { return }
                 stream = nil; energy = 0
-                status = "无法读取音频：请检查系统的屏幕与系统音频录制权限"
+                status = CGPreflightScreenCaptureAccess()
+                    ? "音频连接失败：\(error.localizedDescription)"
+                    : "当前版本录音权限已失效，保持轻柔动效；请重新授权"
             }
         }
     }

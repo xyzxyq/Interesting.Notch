@@ -127,13 +127,17 @@ class BoringViewCoordinator: ObservableObject {
             forName: Notification.Name.accessibilityAuthorizationChanged,
             object: nil,
             queue: .main
-        ) { _ in
+        ) { notification in
+            let granted = notification.userInfo?["granted"] as? Bool == true
             Task { @MainActor in
-                if Defaults[.hudReplacement] {
+                if granted && Defaults[.hudReplacement] {
                     await MediaKeyInterceptor.shared.start(promptIfNeeded: false)
+                } else if !granted {
+                    MediaKeyInterceptor.shared.stop()
                 }
             }
         }
+        XPCHelperClient.shared.startMonitoringAccessibilityAuthorization()
 
         // Observe changes to hudReplacement
         hudReplacementCancellable = Defaults.publisher(.hudReplacement)
@@ -146,7 +150,7 @@ class BoringViewCoordinator: ObservableObject {
 
                     if change.newValue {
                         self.hudEnableTask = Task { @MainActor in
-                            let granted = await XPCHelperClient.shared.ensureAccessibilityAuthorization(promptIfNeeded: true)
+                            let granted = await XPCHelperClient.shared.ensureAccessibilityAuthorization(promptIfNeeded: false)
                             if Task.isCancelled { return }
 
                             if granted {

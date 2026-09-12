@@ -318,6 +318,7 @@ struct MusicEdgeSettings: View {
             }
             Toggle("跟随音乐强弱", isOn: $reactive)
             if reactive {
+                Button("授权 / 重新连接音频") { audio.requestPermissionAndRetry() }
                 Text(audio.status).font(.caption).foregroundStyle(.secondary)
                 Text("首次使用需要系统的屏幕与系统音频录制权限。仅分析当前播放器音频强度，不保存录音；受保护内容可能无法响应。").font(.caption).foregroundStyle(.secondary)
             }
