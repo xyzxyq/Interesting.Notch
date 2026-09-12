@@ -12,6 +12,12 @@ enum CompactLyricsLayout {
         let t = min(1, max(0, (elapsed - start) / (end - start)))
         return t * t * (3 - 2 * t)
     }
+    static func celestialMotion(elapsed: Double, ending: Double, reduced: Bool) -> (turn: Double, lift: Double, light: Double) {
+        guard !reduced, elapsed.isFinite else { return (0, 0, 0) }
+        let remaining = 1 - min(1, max(0, ending))
+        return (elapsed * 0.10, sin(elapsed * 0.85) * 0.65 * remaining,
+                sin(elapsed * 1.1) * 0.06 * remaining)
+    }
     static func moonBoundary(progress: Double, angle: Double) -> Double {
         let p = min(1, max(0, progress))
         let arc = cos(angle)
@@ -362,9 +368,10 @@ struct PortalLyricsFrame: View, Animatable {
     }
 
     private func sun(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
-        let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
         let collapse = CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration)
+        let motion = CompactLyricsLayout.celestialMotion(elapsed: elapsed, ending: collapse, reduced: reduced)
+        let center = CGPoint(x: lane.maxX - 13, y: lane.midY + motion.lift * 0.4)
         var layer = context
         layer.clip(to: Path(lane))
         layer.opacity = visibility * pow(1 - dissolve, 2)
@@ -376,24 +383,25 @@ struct PortalLyricsFrame: View, Animatable {
         layer.stroke(disc, with: .color(tint), lineWidth: 0.8)
         // Finish the 2.5-second contraction before the existing particle dissolve begins.
         for ray in 0..<8 {
-            let angle = Double(ray) * .pi / 4
+            let angle = Double(ray) * .pi / 4 + motion.turn
             var path = Path()
             for step in 0...16 {
                 let t = Double(step) / 16
                 let radius = 1.5 * collapse + (5.8 + t * (4 - 2.5 * progress)) * (1 - collapse)
-                let bend = sin(t * 2 * .pi) * 0.85 * (1 - progress) * (1 - collapse)
+                let bend = sin(t * 2 * .pi - motion.turn * 10) * 0.85 * (1 - progress) * (1 - collapse)
                 let point = CGPoint(x: center.x + cos(angle) * radius - sin(angle) * bend,
                                     y: center.y + sin(angle) * radius + cos(angle) * bend)
                 if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
             }
-            layer.stroke(path, with: .color(tint.opacity(0.85 * (1 - collapse))),
+            layer.stroke(path, with: .color(tint.opacity((0.85 + motion.light) * (1 - collapse))),
                          style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round))
         }
         celestialDust(at: center, progress: dissolve, visibility: visibility, lane: lane, context: context)
     }
 
     private func sunset(in lane: CGRect, dissolve: Double, visibility: Double, context: GraphicsContext) {
-        let center = CGPoint(x: lane.maxX - 13, y: lane.midY + 4)
+        let motion = CompactLyricsLayout.celestialMotion(elapsed: elapsed, ending: CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration), reduced: reduced)
+        let center = CGPoint(x: lane.maxX - 13, y: lane.midY + 4 + motion.lift * 0.3)
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
         let transition = CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration)
         let tint = Color(red: 0.94, green: 0.80, blue: 0.66)
@@ -415,7 +423,7 @@ struct PortalLyricsFrame: View, Animatable {
             let angle = Double(ray) * .pi / 4 + .pi
             var path = Path()
             path.move(to: CGPoint(x: cos(angle) * 6, y: y + sin(angle) * 6))
-            let end = 6 + 2 * (1 - progress)
+            let end = 6 + (2 + motion.light * 5) * (1 - progress)
             path.addLine(to: CGPoint(x: cos(angle) * end, y: y + sin(angle) * end))
             sky.stroke(path, with: .color(tint.opacity(0.8)), style: StrokeStyle(lineWidth: 0.8, lineCap: .round))
         }
@@ -429,10 +437,11 @@ struct PortalLyricsFrame: View, Animatable {
     }
 
     private func moon(in lane: CGRect, dissolve: Double, visibility: Double, early: Bool = false, context: GraphicsContext) {
-        let center = CGPoint(x: lane.maxX - 13, y: lane.midY)
         let radius: CGFloat = 7
         let progress = duration > 0 ? min(1, max(0, elapsed / duration)) : 0
         let star = CompactLyricsLayout.celestialTransition(elapsed: elapsed, duration: duration)
+        let motion = CompactLyricsLayout.celestialMotion(elapsed: elapsed, ending: star, reduced: reduced)
+        let center = CGPoint(x: lane.maxX - 13, y: lane.midY + motion.lift)
         var layer = context
         layer.clip(to: Path(lane))
         layer.opacity = visibility * (1 - star) * pow(1 - dissolve, 2)
@@ -456,9 +465,17 @@ struct PortalLyricsFrame: View, Animatable {
         }
         shape.closeSubpath()
         layer.fill(shape, with: .radialGradient(
-            Gradient(colors: [Color(white: 0.95), Color(white: 0.67)]),
-            center: CGPoint(x: center.x - 3, y: center.y - 3), startRadius: 0, endRadius: radius * 1.8))
+            Gradient(colors: [Color(white: 0.93 + motion.light), Color(white: 0.67)]),
+            center: CGPoint(x: center.x - 3 + motion.lift, y: center.y - 3), startRadius: 0, endRadius: radius * 1.8))
         layer.stroke(disc, with: .color(.white.opacity(0.12)), lineWidth: 0.35)
+        if !reduced {
+            for mote in 0..<2 {
+                let angle = motion.turn * 2 + Double(mote) * .pi
+                let point = CGPoint(x: center.x + cos(angle) * 9, y: center.y + sin(angle) * 9)
+                let dot = Path(ellipseIn: CGRect(x: point.x - 0.55, y: point.y - 0.55, width: 1.1, height: 1.1))
+                layer.fill(dot, with: .color(.white.opacity(0.38 + motion.light)))
+            }
+        }
         layer.opacity = visibility * star * pow(1 - dissolve, 2)
         layer.draw(Text(Image(systemName: "star.fill"))
             .font(.system(size: 14, weight: .regular)).foregroundColor(Color(white: 0.9)), at: center)

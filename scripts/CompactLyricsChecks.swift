@@ -126,6 +126,12 @@ import SwiftUI
 #if VISUAL_CHECKS
 extension CompactLyricsChecks {
     static func visualChecks() {
+        let motion = CompactLyricsLayout.celestialMotion(elapsed: 1, ending: 0, reduced: false)
+        assert(motion.turn > 0 && abs(motion.lift) > 0 && abs(motion.light) > 0)
+        let still = CompactLyricsLayout.celestialMotion(elapsed: 1, ending: 0, reduced: true)
+        assert(still.turn == 0 && still.lift == 0 && still.light == 0)
+        let ending = CompactLyricsLayout.celestialMotion(elapsed: 1, ending: 1, reduced: false)
+        assert(ending.lift == 0 && ending.light == 0)
         assert(CompactLyricsLayout.celestialTransition(elapsed: 10, duration: 0) == 0)
         assert(CompactLyricsLayout.celestialTransition(elapsed: 96.3, duration: 100) == 0)
         assert(abs(CompactLyricsLayout.celestialTransition(elapsed: 97.55, duration: 100) - 0.5) < 0.00001)
