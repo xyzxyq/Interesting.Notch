@@ -194,7 +194,8 @@ struct CodexLiquidDrop: View, Animatable {
 struct CodexDropButton: View {
     var waiting: Bool
     var count: Int
-    var action: () -> Void
+    var action: (CGPoint) -> Void
+    @State private var anchorView = NSView(frame: .zero)
     @Binding var surface: CGFloat
     @ObservedObject private var motion = NotchMotionEnvironment.shared
     @State private var onScreen = false
@@ -209,7 +210,11 @@ struct CodexDropButton: View {
     @State private var mergeTask: Task<Void, Never>?
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            let local = NSPoint(x: anchorView.bounds.midX, y: anchorView.bounds.maxY - 51)
+            let anchor = anchorView.window?.convertPoint(toScreen: anchorView.convert(local, to: nil)) ?? NSEvent.mouseLocation
+            action(anchor)
+        } label: {
             TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: !onScreen || motion.suspended || idleSince == nil || reduced)) { clock in
                 let reminder = idleSince.map { CodexDropMotion.reminder(at: clock.date.timeIntervalSince($0)) }
                 let idleOffset = reduced ? 0 : reminder?.offset ?? 0
@@ -228,12 +233,13 @@ struct CodexDropButton: View {
             }
         }
         .buttonStyle(.plain)
+        .background(CodexDropAnchor(view: anchorView))
         .onAppear { onScreen = true }
         .onDisappear { onScreen = false; idleSince = nil; surface = 0; cancelMerging() }
         .onChange(of: count, initial: true) { _, value in
             if value < targetCount { cancelMerging() }
             targetCount = max(0, value)
-            if targetCount < mergedCount {
+            if targetCount > 0 && targetCount < mergedCount {
                 withAnimation(reduced ? nil : .easeInOut(duration: 0.3)) { mergedCount = targetCount }
             }
             startMerging()
@@ -270,14 +276,13 @@ struct CodexDropButton: View {
                     idleSince = .now
                     startMerging()
                 } else if visible {
-                    // Carry the visible hover position into suction without a snap.
-                    if let idleSince {
-                        progress += CodexDropMotion.reminder(at: Date.now.timeIntervalSince(idleSince)).offset / 61
-                    }
                     idleSince = nil
-                    symbolVisible = false
+                    surface = 0
                     try await move(CodexDropMotion.returning, reveal: false)
+                    try Task.checkCancellation()
                     visible = false
+                    symbolVisible = false
+                    progress = 0
                     mergedCount = 0
                 } else {
                     surface = 0
@@ -322,11 +327,19 @@ struct CodexDropButton: View {
                 surface = sample.surface
             }
             if reveal && progress > 0.86 { symbolVisible = true }
+            if !reveal { symbolVisible = progress > 0.86 }
             if elapsed >= duration { return }
             try await Task.sleep(for: .milliseconds(16))
         }
     }
 
+}
+
+// Read the actual drop position; click location varies across its hit area.
+private struct CodexDropAnchor: NSViewRepresentable {
+    let view: NSView
+    func makeNSView(context: Context) -> NSView { view }
+    func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
 // Shared keyframes make the two landing rebounds and the return sequence testable.
@@ -375,14 +388,12 @@ enum CodexDropMotion {
         .init(progress: 0.93, surface: 1.2, duration: 0.13),
         .init(progress: 1, surface: 0, duration: 0.17)
     ]
-    static let returning: [Frame] = [
-        .init(progress: 1.07, surface: 1, duration: 0.12),
-        .init(progress: 0.62, surface: 5, duration: 0.22),
-        .init(progress: 0, surface: 8, duration: 0.22),
-        .init(progress: 0, surface: 1, duration: 0.12),
-        .init(progress: 0, surface: 3, duration: 0.09),
-        .init(progress: 0, surface: 0, duration: 0.08)
-    ]
+    // Reverse both the destinations and segment durations of the birth animation.
+    static let returning: [Frame] = fall.indices.reversed().map { index in
+        let destination = index == 0 ? Frame(progress: 0, surface: 0, duration: 0) : fall[index - 1]
+        return Frame(progress: destination.progress, surface: destination.surface, duration: fall[index].duration)
+    }
+
 }
 
 /// Fixed housing; only the fuel surface moves, so the symbol stays crisp.
@@ -469,5 +480,46 @@ enum CodexMergeMotion {
         let radius = 7 * min(1, t / 0.10) * max(0, min(1, (0.75 - t) / 0.18))
         let impact = max(0, min(1, (t - 0.55) / 0.45))
         return (travel, radius, sin(impact * .pi * 2) * 0.10 * (1 - impact))
+    }
+}
+
+
+// Fragment the rendered content itself; bounded tile count and no idle timer.
+struct CodexDissolve: AnimatableModifier {
+    var progress: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+    func body(content: Content) -> some View {
+        if reduced {
+            content.opacity(1 - Double(progress))
+        } else if progress <= 0 {
+            content
+        } else {
+            content.hidden().overlay {
+                Canvas { context, size in
+                    guard let source = context.resolveSymbol(id: 0) else { return }
+                    let p = min(1, max(0, progress))
+                    let columns = 18, rows = 12
+                    let w = size.width / CGFloat(columns), h = size.height / CGFloat(rows)
+                    for row in 0..<rows {
+                        for column in 0..<columns {
+                            let seed = Double((row * 37 + column * 19) % 101) / 100
+                            var tile = context
+                            tile.opacity = pow(1 - Double(p), 1.5)
+                            tile.translateBy(x: CGFloat(sin(seed * 19)) * p * 24,
+                                             y: -p * CGFloat(12 + seed * 36))
+                            tile.clip(to: Path(CGRect(x: CGFloat(column) * w + p * w * 0.35,
+                                                     y: CGFloat(row) * h + p * h * 0.35,
+                                                     width: w * (1 - p * 0.7), height: h * (1 - p * 0.7))))
+                            tile.draw(source, at: CGPoint(x: size.width / 2, y: size.height / 2))
+                        }
+                    }
+                } symbols: { content.tag(0) }
+                .allowsHitTesting(false)
+            }
+        }
     }
 }

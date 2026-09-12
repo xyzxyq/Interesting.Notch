@@ -145,3 +145,87 @@ assert 'model' not in bridge.update_model(model, {'type': 'patches', 'patches': 
 assert bridge.update_model(model, {'type': 'patches', 'patches': [{'op': 'replace', 'path': ['latestThreadSettings'], 'value': {}}]}) == {}
 assert bridge.update_model(None, {'type': 'snapshot', 'conversationState': {'latestThreadSettings': {'model': 'bad\nname'}}}) == {}
 print('PASS: Plus weekly allowance and model snapshot/patch/removal/privacy projection')
+
+# Async questions do not set waitingOnUserInput; acknowledgement is a separate message.
+question = dict(type='agentMessage', id='q1', delivery='async', text='private question',
+                questions=[dict(title='private title', options=['private option'])])
+state = bridge.update_questions(None, dict(type='snapshot', conversationState=dict(
+    turns=[], turnHistory=dict(history=dict(entitiesByKey={'turn1': dict(items=[question])})))))
+assert bridge.has_pending_questions(state)
+assert bridge.task_state(dict(type='idle'), True) == 'waiting'
+assert bridge.pending_questions(state)[0]['title'] == 'private title'
+reply = dict(type='steeringUserMessage', status='pending', input=[dict(type='text', text=
+    '<send_user_message_question_reply>\n' + json.dumps([dict(
+        questionItemId='["request_user_input_async","q1",0]', question='private', answer='private')]) +
+    '\n</send_user_message_question_reply>')])
+path = ['turnHistory', 'history', 'entitiesByKey', 'turn1', 'items']
+state = bridge.update_questions(state, dict(type='patches', patches=[dict(op='add', path=path+[1], value=reply)]))
+assert bridge.has_pending_questions(state)  # Unaccepted steering is not an answer yet.
+state = bridge.update_questions(state, dict(type='patches', patches=[dict(op='replace', path=path+[1,'status'], value='accepted')]))
+assert not bridge.has_pending_questions(state)
+assert 'private option' in json.dumps(state) and '<send_user_message_question_reply>' not in json.dumps(state)
+state = bridge.update_questions(state, dict(type='patches', patches=[dict(op='remove', path=path+[1])]))
+assert bridge.has_pending_questions(state)
+state = bridge.update_questions(state, dict(type='patches', patches=[dict(op='remove', path=path+[0])]))
+assert not bridge.has_pending_questions(state)
+print('PASS: async question, idle pending state, accepted reply, removal and private-text exclusion')
+question['questions'].append(dict(title='second private question'))
+state = bridge.project_questions(dict(turns=[dict(items=[question])]))
+assert len(bridge.pending_question_ids(state)) == 2
+reply['status'] = 'accepted'
+state = bridge.update_questions(state, dict(type='patches', patches=[dict(
+    op='add', path=['turns', 0, 'items', 1], value=reply)]))
+assert len(bridge.pending_question_ids(state)) == 1
+print('PASS: answering one of two questions decrements reminder count by one')
+
+
+# Direct replies bind to an existing pending question; raw reply content never enters snapshots.
+bridge_state = bridge.Bridge(Path('/tmp'))
+bridge_state.connected = True
+bridge_state.last_contact = time.time()
+thread = '11111111-1111-1111-1111-111111111111'
+bridge_state.runtimes[('local', thread)] = dict(runtime=dict(type='active'), owner='owner',
+    receivedAt=time.time(), questions=bridge.project_questions(dict(turns=[dict(items=[question])])) )
+question_id = bridge.pending_question_ids(bridge_state.runtimes[('local', thread)]['questions'])[0]
+recorded = []
+original_rpc = bridge.ipc_request
+bridge.ipc_request = lambda *args: recorded.append(args) or dict(resultType='success')
+try:
+    result = bridge_state.answer(dict(hostId='local', taskId=thread, questionId=question_id, answer='test reply'))
+    assert result['accepted'] and recorded[0][1] == 'thread-follower-steer-turn'
+    assert 'test reply' in recorded[0][3]['input'][0]['text']
+    assert recorded[0][3]['restoreMessage']['context'] == {}
+    assert 'additionalContext' not in recorded[0][3]
+    assert 'test reply' not in json.dumps(bridge_state.snapshot())
+    try:
+        bridge_state.answer(dict(hostId='local', taskId=thread, questionId=question_id, answer='duplicate'))
+        raise AssertionError('duplicate accepted')
+    except ValueError: pass
+    try:
+        bridge_state.answer(dict(hostId='local', taskId=thread, questionId='stale', answer='bad'))
+        raise AssertionError('stale question accepted')
+    except ValueError: pass
+    bridge_state.submissions.clear()
+    bridge_state.runtimes[('local', thread)]['runtime'] = dict(type='idle')
+    bridge_state.answer(dict(hostId='local', taskId=thread, questionId=question_id, answer='idle test'))
+    assert recorded[-1][1] == 'thread-follower-start-turn'
+    assert recorded[-1][3]['turnStart']['context']['inheritThreadSettings']
+finally:
+    bridge.ipc_request = original_rpc
+print('PASS: bound direct reply, duplicate prevention, stale rejection and answer privacy')
+
+assert bridge.pending_questions(bridge.project_questions(dict(turns=[dict(items=[dict(type='agentMessage', id='null-options', delivery='async', questions=[dict(title='Input', options=None)])])])))[0]['options'] == []
+
+# Async reminders coexist with execution; blocking approvals do not.
+activity = bridge.Bridge(Path('/tmp'))
+activity.connected = True
+activity.last_contact = time.time()
+entry = dict(runtime=dict(type='active', activeFlags=[]), pendingQuestions=True, receivedAt=time.time())
+activity.runtimes[('local', thread)] = entry
+assert activity.snapshot()['tasks'][0]['state'] == 'waiting'
+assert activity.snapshot()['tasks'][0]['isRunning'] is True
+entry['runtime']['activeFlags'] = ['waitingOnApproval']
+assert activity.snapshot()['tasks'][0]['isRunning'] is False
+entry['runtime'] = dict(type='idle')
+assert activity.snapshot()['tasks'][0]['isRunning'] is False
+print('PASS: async reminders preserve running state; blocking and idle states stop rocket')

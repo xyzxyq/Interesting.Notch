@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CF1800000000000000000002 /* PaperPlanePointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1800000000000000000001 /* PaperPlanePointer.swift */; };
 		CF1100000000000000000004 /* CompactLyricsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1100000000000000000003 /* CompactLyricsView.swift */; };
 		CF1700000000000000000002 /* LyricsPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1700000000000000000001 /* LyricsPicker.swift */; };
 		CF1100000000000000000002 /* CompactLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1100000000000000000001 /* CompactLyrics.swift */; };
@@ -191,6 +192,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		CF1800000000000000000001 /* PaperPlanePointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperPlanePointer.swift; sourceTree = "<group>"; };
 		CF1100000000000000000003 /* CompactLyricsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactLyricsView.swift; sourceTree = "<group>"; };
 		CF1700000000000000000001 /* LyricsPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LyricsPicker.swift; sourceTree = "<group>"; };
 		CF1100000000000000000001 /* CompactLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactLyrics.swift; sourceTree = "<group>"; };
@@ -534,6 +536,7 @@
 				F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */,
 				112FB7342CCF16F70015238C /* NotchSpaceManager.swift */,
 				147163992C5D35FF0068B555 /* MusicManager.swift */,
+				CF1800000000000000000001 /* PaperPlanePointer.swift */,
 				CF1300000000000000000001 /* MusicEdgeAudio.swift */,
 				CF1400000000000000000001 /* CodexActivity.swift */,
 				CF1200000000000000000003 /* NotchWeatherManager.swift */,
@@ -988,6 +991,7 @@
 				14C08BC12C8E03AD000F8AA0 /* NSImage+Extensions.swift in Sources */,
 				149E0B9A2C737D40006418B1 /* WebcamView.swift in Sources */,
 				1471639A2C5D35FF0068B555 /* MusicManager.swift in Sources */,
+				CF1800000000000000000002 /* PaperPlanePointer.swift in Sources */,
 				CF1300000000000000000002 /* MusicEdgeAudio.swift in Sources */,
 				CF1200000000000000000004 /* NotchWeatherManager.swift in Sources */,
 				B1B112932C6A577E00093D8F /* MouseTracker.swift in Sources */,
@@ -1082,14 +1086,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 272;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1107,14 +1111,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 272;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1261,7 +1265,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 272;
+				CURRENT_PROJECT_VERSION = 300;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1274,7 +1278,7 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = boringNotch/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "interesting botch";
+				INFOPLIST_KEY_CFBundleDisplayName = "InterestingNotch Preview";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				INFOPLIST_KEY_LSBackgroundOnly = NO;
 				INFOPLIST_KEY_LSUIElement = YES;
@@ -1288,8 +1292,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
-				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
+				MARKETING_VERSION = 3.0;
+				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.preview;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -1315,7 +1319,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 272;
+				CURRENT_PROJECT_VERSION = 300;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1341,7 +1345,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 2.8.0;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

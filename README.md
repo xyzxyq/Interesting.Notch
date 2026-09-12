@@ -19,27 +19,27 @@
 
 ## 下载与安装
 
-当前版本：**2.8.0（build 272）** · [更新说明](docs/releases/2.8.0.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v2.8.0-interesting-botch.1)
+当前版本：**3.0 · Super Rocket（build 300）** · [更新说明](docs/releases/3.0.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0)
 
-1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v2.8.0-interesting-botch.1/interesting-botch-2.8.0-arm64.dmg)。
+1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0/interesting-botch-3.0-arm64.dmg)。
 2. 退出旧版，打开 DMG，将 `interesting botch.app` 拖入 Applications 后运行。
 3. 在设置 → 媒体中选择“自动跟随正在播放的应用”，开启“右侧滚动歌词”。
 
 安装包仅支持 Apple Silicon（M 系列芯片），最低部署目标 macOS 14，未提供 Intel 包。Release 同时提供 `SHA256SUMS.txt` 供校验。DMG 内附可选 Codex Bridge、安装说明及许可证。
 
-**本安装包使用本地开发证书签名，尚未经过 Apple Developer ID 公证。** 首次打开可能被 macOS 阻止，请在核对来源后使用系统提供的“仍要打开”入口。内部标识暂沿用上游，不建议与上游原版或开发版同时运行。
+**本安装包使用本地开发证书签名，尚未经过 Apple Developer ID 公证。** 首次打开可能被 macOS 阻止，请在核对来源后使用系统提供的“仍要打开”入口。内部标识暂沿用上游，不建议与上游原版同时运行；测试版使用独立的 Preview 标识。
 
 ## 本版本的主要改动
 
 | 功能 | 表现 |
 | --- | --- |
 | Codex 火箭状态 | 执行任务时将灵动岛呈现为火箭，尾焰与速度效果随思考强度变化。 |
-| 交互提醒水滴 | 等待用户交互时显示液态水滴与呼吸灯泡；多个提醒合并并增大，处理完成后面板自动关闭、水滴收回。 |
+| 交互提醒水滴 | 等待用户交互时显示水滴；展开后可直接选择异步问题的选项，或输入文字并回车回复。收到 Codex 确认后对应提醒粒子消散；支持收起和清空本地提醒。 |
 | 额度与模型信息 | 以燃油表现剩余额度；展开栏显示额度、模型名称及思考强度。Plus 优先展示 5 小时额度，Pro 及以上优先展示周额度。 |
 | 音乐与歌词 | 支持 Apple Music 与网易云的紧凑歌词，提供多源获取、本地缓存、候选预览和 LRC 导入；播放、暂停及退出播放器时衔接音乐布局。 |
 | 权限与稳定性 | HUD 使用主程序的辅助功能权限；音频响应在后台先检查权限，并提供显式授权与重连入口。 |
 
-Codex 信息由本机桥接脚本读取，显示内容取决于客户端可提供的状态与额度数据；客户端接口变化可能影响兼容性。
+Codex 信息由本机桥接脚本读取，包括待回答问题的题目和选项；回答通过受令牌保护的本机接口送回原任务。提交失败会保留提醒。收起保留未回答问题，清空只隐藏本地提醒，不代替回答或取消任务。需要完整核对的批准类请求仍在 Codex 中处理。客户端私有接口变化可能影响兼容性。
 
 ## 效果展示
 
@@ -63,6 +63,16 @@ Codex 信息由本机桥接脚本读取，显示内容取决于客户端可提�
 
 <p align="center"><img src="docs/assets/codex-fuel-levels.png" width="600" alt="不同剩余额度及暂无额度数据时的燃油图标预览"></p>
 
+## 纸飞机指针（实验性）
+
+在设置 → 外观 → 鼠标指针中开启“纸飞机指针”。普通箭头会换成黑色折纸轮廓，三个尖角采用圆滑过渡，搭配深色立体折面、细描边和机尖点击位置；大小滑块可在 75%–175% 之间调整；不修改文本光标、缩放指针或拖拽标记。功能默认关闭，无鼠标跟踪定时器，不需要新增权限。
+
+关闭功能、正常退出、锁屏及休眠时恢复原箭头。异常退出后，恢复记录保留在应用的 Application Support/InterestingNotch/Pointer/originals.plist；下次启动会先恢复，再按开关状态应用。恢复失败时设置中会显示错误和重试按钮。恢复只覆盖仍属于本功能的图像，以避免覆盖其他指针主题工具后续的更改。
+
+如果开启后只有 Dock 显示纸飞机，请检查系统设置 → 辅助功能 → 显示 → 指针中的自定义颜色。自定义颜色会绕过普通应用的箭头主题；新版在开启前检测此冲突，并提供前往系统设置的按钮。还原颜色会把系统指针改回黑色填充、白色描边；应用不会自动修改该系统设置。
+
+此功能使用动态加载的私有 WindowServer 指针接口，受 macOS 版本和应用自定义指针影响，不保证所有应用都使用该主题。macOS 26 的 Arrow 与 ArrowS 必须成组写入后统一校验；仅检查接口返回成功不足以证明生效。构建和独立校验命令见 [实现与验证记录](docs/superpowers/plans/2026-09-12-paper-plane-pointer.md)。
+
 ## 源码构建
 
 工程的最低部署目标为 **macOS 14**。源码构建沿用上游的工具要求：**macOS 15.6 或更新版本、Xcode 26 或更新版本**。不同系统版本的音频捕获和媒体能力可能存在差异。
@@ -78,7 +88,7 @@ Codex 信息由本机桥接脚本读取，显示内容取决于客户端可提�
    ```
 3. 在 Xcode 选择 `boringNotch` scheme，配置自己的签名身份后按 `⌘R` 构建运行。
 
-`interesting botch` 是当前项目展示名称。工程名、内部标识与部分开发构建名称暂时保留 `boringNotch` / `InterestingNotch Development`，以避免重命名影响已有设置和授权。项目图标采用蓝白笑脸与顶部黑色刘海的设计。
+`interesting botch` 是当前项目展示名称。工程名、内部标识与部分开发构建名称暂时保留 `boringNotch` / `InterestingNotch Preview`，以避免重命名影响已有设置和授权。项目图标采用蓝白笑脸与顶部黑色刘海的设计。
 
 如需查找本 fork 的发布包，请查看[本仓库 Releases](https://github.com/xyzxyq/Interesting.Notch/releases)，并核对对应提交及说明；不要使用上游下载链接来获取本 fork 的新增功能。
 
@@ -135,3 +145,5 @@ python3 scripts/codex-notch-bridge-install.py --uninstall
 - [NotchDrop](https://github.com/Lakr233/NotchDrop)：上游文件暂存功能的早期基础。
 - [@maxtron95](https://github.com/maxtron95)：上游原始图标设计。本 fork 当前使用另行制作的蓝白笑脸图标。
 - [@himanshhhhuv](https://github.com/himanshhhhuv)：上游网站设计。
+
+纸飞机指针支持 75%–175% 大小调节：拖动时预览，松手后应用并保存；点击“默认”恢复 100%。尺寸与点击热点同步缩放，不修改 macOS 的系统指针大小设置。

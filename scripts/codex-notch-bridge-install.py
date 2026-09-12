@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install/update or remove the current user's read-only Codex notch bridge."""
+"""Install/update or remove the current user's local Codex notch bridge."""
 import argparse
 from pathlib import Path
 import plistlib

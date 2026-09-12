@@ -1,16 +1,28 @@
 import AppKit
 import SwiftUI
 
+struct CodexQuestion: Decodable, Equatable {
+    let id: String
+    let title: String
+    let options: [String]
+}
+
 struct CodexTask: Decodable, Identifiable, Equatable {
     let id: String
     let title: String
     let state: String
     let detail: String?
+    var isRunning: Bool? = nil
+    var working: Bool { isRunning ?? (state == "running") }
     var reasoningEffort: String? = nil
     var hostId: String? = nil
     var model: String? = nil
     var modelProvider: String? = nil
-    var identity: String { "\(hostId ?? "local")/\(id)" }
+    var pendingQuestionIds: [String]? = nil
+    var questions: [CodexQuestion]? = nil
+    var question: CodexQuestion? { questions?.first { $0.id == requestId } }
+    var requestId: String? = nil
+    var identity: String { "\(hostId ?? "local")/\(id)" + (requestId.map { "/" + $0 } ?? "") }
     var waiting: Bool { state == "waiting" }
     var url: URL? {
         guard UUID(uuidString: id) != nil else { return nil }
@@ -40,6 +52,7 @@ struct CodexSnapshot: Decodable {
     let updatedAt: Double
     var fuel: CodexFuel? = nil
     var allowances: [CodexFuel]? = nil
+    var replyToken: String? = nil
     func fresh(at now: Date) -> Bool {
         updatedAt.isFinite && now.timeIntervalSince1970 - updatedAt < 35
             && updatedAt - now.timeIntervalSince1970 < 5
@@ -81,11 +94,19 @@ struct CodexTaskStability {
     private var lastSuccess = Date.distantPast
     private var previewTask: Task<Void, Never>?
     private var window: NSPanel?
-    var waiting: Bool { enabled && (preview == "waiting" || (preview == nil && tasks.contains(where: \.waiting))) }
-    var running: Bool { enabled && !waiting && (preview == "running" || (preview == nil && tasks.contains { $0.state == "running" })) }
+    private var replyToken: String?
+    @Published private(set) var submitting = Set<String>()
+    @Published private(set) var replyErrors: [String: String] = [:]
+    @Published private(set) var windowDissolve: CGFloat = 1
+    @Published private(set) var panelReady = false
+    @Published private var readReminders = Set(UserDefaults.standard.stringArray(forKey: "codexHiddenQuestionReminders") ?? [])
+    private var dismissTask: Task<Void, Never>?
+    private var panelTask: Task<Void, Never>?
+    var waiting: Bool { enabled && (preview == "waiting" || (preview == nil && !pending.isEmpty)) }
+    var running: Bool { enabled && (preview == "running" || (preview == nil && tasks.contains { $0.working })) }
     var effort: Int {
         if preview == "running" { return previewEffort }
-        return tasks.filter { $0.state == "running" }.compactMap {
+        return tasks.filter { $0.working }.compactMap {
             CodexThrust.levels.firstIndex(of: $0.reasoningEffort ?? "")
         }.max() ?? -1
     }
@@ -121,7 +142,30 @@ struct CodexTaskStability {
         fuel.map { "\(Int($0.remainingPercent.rounded()))%" } ?? "—"
     }
 
-    var pending: [CodexTask] { tasks.filter(\.waiting) }
+    static func reminders(in tasks: [CodexTask]) -> [CodexTask] {
+        tasks.filter(\.waiting).flatMap { task -> [CodexTask] in
+            let ids = Array(Set(task.pendingQuestionIds ?? [])).sorted()
+            if ids.isEmpty { return [task] }
+            return ids.map { id in
+                var reminder = task
+                reminder.requestId = id
+                return reminder
+            }
+        }
+    }
+    static func unread(_ reminders: [CodexTask], excluding read: Set<String>) -> [CodexTask] {
+        reminders.filter { !read.contains($0.identity) }
+    }
+    var pending: [CodexTask] { Self.unread(Self.reminders(in: tasks), excluding: readReminders) }
+    private func markRead(_ reminders: [CodexTask]) {
+        readReminders.formUnion(reminders.map(\.identity))
+        UserDefaults.standard.set(Array(readReminders).sorted(), forKey: "codexHiddenQuestionReminders")
+        dismissResolvedRequests()
+    }
+    func clearRequests() {
+        if preview != nil { demonstrate("running") }
+        else { markRead(pending) }
+    }
     var status: String {
         if !enabled { return "Codex 动效已关闭" }
         if preview != nil { return "视觉预览 · 20 秒后恢复实时状态" }
@@ -144,6 +188,7 @@ struct CodexTaskStability {
                         let snapshot = try JSONDecoder().decode(CodexSnapshot.self, from: data)
                         guard snapshot.connected, snapshot.fresh(at: .now) else { throw URLError(.cannotConnectToHost) }
                         self.lastSuccess = .now
+                        self.replyToken = snapshot.replyToken
                         let fuel = snapshot.fuel.flatMap { $0.valid(at: .now) ? $0 : nil }
                         if self.fuel != fuel { self.fuel = fuel }
                         let allowances = (snapshot.allowances ?? []).filter { $0.valid(at: .now) }.sorted { $0.windowMinutes < $1.windowMinutes }
@@ -182,8 +227,43 @@ struct CodexTaskStability {
     }
     func open(_ task: CodexTask) {
         guard preview == nil, let url = task.url else { return }
-        navigationError = NSWorkspace.shared.open(url) ? nil : "无法打开 Codex，请检查应用是否已安装。"
+        guard NSWorkspace.shared.open(url) else {
+            navigationError = "无法打开 Codex，请检查应用是否已安装。"
+            return
+        }
+        navigationError = nil
+
     }
+    func submit(_ answer: String, for task: CodexTask) {
+        let answer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !answer.isEmpty, answer.count <= 4000, let question = task.question,
+              let replyToken, !submitting.contains(task.identity) else { return }
+        submitting.insert(task.identity)
+        replyErrors[task.identity] = nil
+        Task { @MainActor in
+            do {
+                var request = URLRequest(url: URL(string: "http://127.0.0.1:19427/answer")!)
+                request.httpMethod = "POST"
+                request.timeoutInterval = 25
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue(replyToken, forHTTPHeaderField: "X-Notch-Token")
+                request.httpBody = try JSONSerialization.data(withJSONObject: [
+                    "hostId": task.hostId ?? "local", "taskId": task.id,
+                    "questionId": question.id, "answer": answer
+                ])
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else {
+                    let error = (try? JSONSerialization.jsonObject(with: data)) as? [String: String]
+                    throw NSError(domain: "CodexAnswer", code: 1, userInfo: [NSLocalizedDescriptionKey: error?["error"] ?? "回答提交失败，请重试。"])
+                }
+                // Keep the row until Codex publishes the acknowledged reply.
+            } catch {
+                replyErrors[task.identity] = error.localizedDescription
+                submitting.remove(task.identity)
+            }
+        }
+    }
+
     static func shouldDismissRequests(enabled: Bool, preview: String?, connected: Bool, pendingCount: Int) -> Bool {
         if !enabled { return true }
         if let preview { return preview != "waiting" }
@@ -191,17 +271,59 @@ struct CodexTaskStability {
         return connected && pendingCount == 0
     }
     private func dismissResolvedRequests() {
-        if Self.shouldDismissRequests(enabled: enabled, preview: preview, connected: connected, pendingCount: pending.count) {
-            window?.orderOut(nil)
+        let resolved = Self.shouldDismissRequests(enabled: enabled, preview: preview, connected: connected, pendingCount: pending.count)
+        guard resolved else {
+            if dismissTask != nil {
+                dismissTask?.cancel(); dismissTask = nil
+                windowDissolve = 0
+                panelReady = true
+            }
+            return
+        }
+        guard window?.isVisible == true, dismissTask == nil else { return }
+        panelTask?.cancel(); panelTask = nil
+        dismissTask = Task { @MainActor in
+            withAnimation(.easeOut(duration: 0.65)) { windowDissolve = 1 }
+            do {
+                try await Task.sleep(for: .milliseconds(700))
+                try Task.checkCancellation()
+                window?.orderOut(nil)
+                panelReady = false
+                dismissTask = nil
+            } catch { }
         }
     }
 
-    func showRequests() {
+    func closeRequests() {
+        guard panelReady else { return }
+        panelReady = false
+        panelTask?.cancel()
+        panelTask = Task { @MainActor in
+            windowDissolve = 1
+            do {
+                try await Task.sleep(for: .milliseconds(600))
+                try Task.checkCancellation()
+                window?.orderOut(nil)
+                panelTask = nil
+            } catch { }
+        }
+    }
+
+    func showRequests(anchor: CGPoint) {
         navigationError = nil
+        if window?.isVisible == true { closeRequests(); return }
+        guard panelTask == nil else { return }
+        dismissTask?.cancel(); dismissTask = nil; windowDissolve = 1
+        panelTask?.cancel(); panelTask = nil
+        panelReady = false
         if window == nil {
-            let panel = CodexRequestPanel(contentRect: NSRect(x: 0, y: 0, width: 380, height: 360),
-                                          styleMask: [.titled, .closable, .utilityWindow], backing: .buffered, defer: false)
+            let panel = CodexRequestPanel(contentRect: NSRect(x: 0, y: 0, width: 476, height: 456),
+                                          styleMask: [.borderless], backing: .buffered, defer: false)
+            panel.onCancel = { [weak self] in self?.closeRequests() }
             panel.title = "Codex · 需要你处理"
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
+            panel.hasShadow = false
             panel.isReleasedWhenClosed = false
             panel.level = .floating
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -209,28 +331,49 @@ struct CodexTaskStability {
             window = panel
         }
         guard let window else { return }
-        let screen = NSScreen.screens.first { NSMouseInRect(NSEvent.mouseLocation, $0.frame, false) } ?? NSScreen.main
+        let screen = NSScreen.screens.first { NSMouseInRect(anchor, $0.frame, false) } ?? NSScreen.main
         if let screen {
-            window.setFrameOrigin(NSPoint(x: screen.visibleFrame.midX - window.frame.width / 2,
-                                          y: screen.visibleFrame.maxY - window.frame.height - 85))
+            // Keep the expansion's top-center attached to the clicked droplet.
+            let x = min(screen.frame.maxX - window.frame.width, max(screen.frame.minX, anchor.x - window.frame.width / 2))
+            window.setFrameOrigin(NSPoint(x: x, y: anchor.y + 20 - window.frame.height))
         }
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        panelTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(32))
+                try Task.checkCancellation()
+                windowDissolve = 0
+                try await Task.sleep(for: .milliseconds(600))
+                try Task.checkCancellation()
+                panelReady = true
+                panelTask = nil
+            } catch { }
+        }
     }
 }
 
 private class CodexRequestPanel: NSPanel {
     override var canBecomeKey: Bool { true }
-    override func resignKey() { super.resignKey(); orderOut(nil) }
-    override func cancelOperation(_ sender: Any?) { orderOut(nil) }
+    var onCancel: (() -> Void)?
+    override func cancelOperation(_ sender: Any?) { onCancel?() }
 }
 
 private struct CodexRequests: View {
     @ObservedObject var activity: CodexActivity
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    @State private var rows: [CodexTask] = []
+    @State private var dissolving = Set<String>()
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("需要你处理", systemImage: "lightbulb")
-                .font(.title2.weight(.semibold))
+            HStack {
+                Label("需要你处理", systemImage: "lightbulb").font(.title2.weight(.semibold))
+                Spacer()
+                Button("收起", action: activity.closeRequests)
+                    .buttonStyle(.plain)
+            }
             Text(activity.status).font(.caption).foregroundStyle(.secondary)
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
@@ -241,23 +384,90 @@ private struct CodexRequests: View {
                         }
                         Button("追加一个预览请求") { activity.previewCount += 1 }
                         Button("预览恢复运行") { activity.demonstrate("running") }
-                    } else if activity.pending.isEmpty {
+                    } else if rows.isEmpty {
                         Text(activity.connected ? "待处理请求已在 Codex 中解决。" : "状态连接已断开，请在 Codex 中检查任务。")
                     } else {
-                        ForEach(activity.pending, id: \.identity) { task in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Codex 任务 · \(String(task.id.suffix(8)))").font(.headline)
-                                Text("此任务正在等待批准、确认或补充信息。请在原任务中核对完整请求并处理。")
-                                    .font(.callout).foregroundStyle(.secondary)
-                                Button("在 Codex 中查看并处理") { activity.open(task) }
-                            }
+                        ForEach(rows, id: \.identity) { task in
+                            CodexQuestionRow(activity: activity, task: task)
+                            .modifier(CodexDissolve(progress: dissolving.contains(task.identity) ? 1 : 0))
+                            .allowsHitTesting(!dissolving.contains(task.identity))
                             Divider()
                         }
                     }
                 }.frame(maxWidth: .infinity, alignment: .leading)
+                    // Native focus rings extend beyond the field's layout bounds.
+                    .padding(4)
+            }
+            HStack {
+                Text("收起保留问题；清空仅隐藏提醒").font(.caption2).foregroundStyle(.secondary)
+                Spacer()
+                Button("清空提醒", action: activity.clearRequests)
+                    .buttonStyle(.plain).foregroundStyle(.secondary).font(.caption)
             }
             if let error = activity.navigationError { Text(error).foregroundStyle(.red).font(.caption) }
-        }.padding(20).frame(width: 380, height: 360).preferredColorScheme(.dark)
+        }.padding(20).frame(width: 380, height: 360)
+        .background(Color(white: 0.09), in: RoundedRectangle(cornerRadius: 20))
+        .modifier(CodexDissolve(progress: activity.windowDissolve))
+        .animation(.easeInOut(duration: 0.55), value: activity.windowDissolve)
+        .allowsHitTesting(activity.panelReady && activity.windowDissolve == 0)
+        .padding(48)
+        .preferredColorScheme(.dark)
+        .task(id: activity.pending) {
+            let incoming = activity.pending
+            let ids = Set(incoming.map(\.identity))
+            let oldIDs = Set(rows.map(\.identity))
+            rows += incoming.filter { !oldIDs.contains($0.identity) }
+            withAnimation(.easeOut(duration: 0.65)) { dissolving = Set(rows.map(\.identity)).subtracting(ids) }
+            do {
+                try await Task.sleep(for: .milliseconds(650))
+                try Task.checkCancellation()
+                rows = incoming
+                dissolving = []
+            } catch { }
+        }
+    }
+}
+
+private struct CodexQuestionRow: View {
+    @ObservedObject var activity: CodexActivity
+    let task: CodexTask
+    @State private var draft = ""
+    @FocusState private var editing: Bool
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if let question = task.question {
+                Text(question.title).font(.headline).fixedSize(horizontal: false, vertical: true)
+                ForEach(Array(question.options.enumerated()), id: \.offset) { index, option in
+                    Button {
+                        if ["其他", "自行输入", "自定义", "other"].contains(where: { option.lowercased().contains($0) }) {
+                            editing = true
+                        } else { activity.submit(option, for: task) }
+                    } label: {
+                        Text(option).frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 5)
+                    }.buttonStyle(.bordered)
+                }
+                HStack(alignment: .bottom) {
+                    TextField("或自行输入，回车提交", text: $draft, axis: .vertical)
+                        .lineLimit(1...)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textFieldStyle(.roundedBorder).focused($editing)
+                        .onSubmit { activity.submit(draft, for: task) }
+                    Button("发送") { activity.submit(draft, for: task) }
+                        .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                if activity.submitting.contains(task.identity) {
+                    Label("正在提交，等待 Codex 确认…", systemImage: "clock").font(.caption)
+                }
+                if let error = activity.replyErrors[task.identity] {
+                    Text(error).foregroundStyle(.orange).font(.caption)
+                }
+            } else {
+                Text("此请求需要在 Codex 中核对完整内容。")
+                Button("在 Codex 中查看") { activity.open(task) }
+            }
+        }
+        .disabled(activity.submitting.contains(task.identity))
     }
 }
 

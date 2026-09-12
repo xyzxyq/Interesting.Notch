@@ -53,7 +53,7 @@ search_list = shlex.split(subprocess.check_output(['security', 'list-keychains',
 try:
     run('security', 'list-keychains', '-d', 'user', '-s', *search_list, str(keychain))
     run('codesign' , '--force', '--deep', '--sign', identity, '--keychain', str(keychain),
-        '--timestamp=none', sys.argv[1])
+        '--timestamp=none', '--preserve-metadata=entitlements,flags,runtime', sys.argv[1])
     run('codesign', '--verify', '--deep', '--strict', sys.argv[1])
 finally:
     run('security', 'list-keychains', '-d', 'user', '-s', *search_list)

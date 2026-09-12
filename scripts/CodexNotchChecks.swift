@@ -3,6 +3,12 @@ import AppKit
 
 @main @MainActor struct CodexNotchChecks {
     static func main() throws {
+        let activeQuestion = try JSONDecoder().decode(CodexTask.self, from: Data(#"{"id":"11111111-1111-1111-1111-111111111111","title":"test","state":"waiting","isRunning":true}"#.utf8))
+        assert(activeQuestion.waiting && activeQuestion.working)
+        var blockedQuestion = activeQuestion
+        blockedQuestion.isRunning = false
+        assert(blockedQuestion.waiting && !blockedQuestion.working)
+
         assert(CodexMergeMotion.scale(for: 1) == 1)
         assert(CodexMergeMotion.scale(for: 2) > CodexMergeMotion.scale(for: 1))
         assert(CodexMergeMotion.scale(for: 3) > CodexMergeMotion.scale(for: 2))
@@ -38,6 +44,16 @@ import AppKit
         assert(!CodexFuel(remainingPercent: 50, windowMinutes: 60, resetsAt: 1000, updatedAt: 100).valid(at: Date(timeIntervalSince1970: 110)))
         let id = "01a09362-3f79-7bf3-ba10-7a8bd1c1c2d7"
         let task = CodexTask(id: id, title: "Codex task", state: "waiting", detail: nil)
+        var multiQuestion = task
+        multiQuestion.pendingQuestionIds = ["question-a", "question-b"]
+        let reminders = CodexActivity.reminders(in: [multiQuestion])
+        assert(reminders.count == 2 && reminders[0].identity != reminders[1].identity)
+        let seen: Set<String> = [reminders[0].identity]
+        assert(CodexActivity.unread(reminders, excluding: seen).count == 1)
+        assert(CodexActivity.unread(reminders, excluding: Set(reminders.map(\.identity))).isEmpty)
+        assert(CodexActivity.unread(reminders, excluding: seen).first?.identity == reminders[1].identity)
+        multiQuestion.pendingQuestionIds = ["question-b"]
+        assert(CodexActivity.reminders(in: [multiQuestion]).count == 1)
         var stability = CodexTaskStability()
         let base = Date(timeIntervalSince1970: 100)
         assert(stability.update([task], at: base) == [task])
@@ -107,6 +123,13 @@ import AppKit
         assert(fall[rebounds[0]].progress < fall[rebounds[1]].progress)
         assert(fall.last!.progress == 1 && fall.last!.surface == 0)
         assert(CodexDropMotion.returning.last!.progress == 0 && CodexDropMotion.returning.last!.surface == 0)
+        let fallDuration = fall.reduce(0) { $0 + $1.duration }
+        for t in stride(from: 0.0, through: fallDuration, by: 0.01) {
+            let forward = CodexDropMotion.sample(fall, initial: .init(progress: 0, surface: 0, duration: 0), time: fallDuration - t)
+            let reverse = CodexDropMotion.sample(CodexDropMotion.returning, initial: .init(progress: 1, surface: 0, duration: 0), time: t)
+            assert(abs(forward.progress - reverse.progress) < 0.00001)
+            assert(abs(forward.surface - reverse.surface) < 0.00001)
+        }
         let origin = CodexDropMotion.Frame(progress: 0, surface: 0, duration: 0)
         var boundary = 0.0
         for frame in fall.dropLast() {

@@ -17,8 +17,11 @@ struct MusicPlayerView: View {
     let albumArtNamespace: Namespace.ID
 
     var body: some View {
-        HStack {
-            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace).padding(.all, 5)
+        HStack(spacing: 4) {
+            AlbumArtView(vm: vm, albumArtNamespace: albumArtNamespace)
+                .frame(width: MusicPlayerImageSizes.size.opened.width,
+                       height: MusicPlayerImageSizes.size.opened.height)
+                .padding(.all, 5)
             MusicControlsView().drawingGroup().compositingGroup()
         }
     }

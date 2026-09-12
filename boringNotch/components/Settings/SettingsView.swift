@@ -505,11 +505,13 @@ struct HUD: View {
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 12) {
-                            Button("Request Accessibility") {
+                            Button("打开辅助功能设置") {
                                 XPCHelperClient.shared.requestAccessibilityAuthorization()
                             }
                             .buttonStyle(.borderedProminent)
                         }
+                        Text("在系统设置中允许“\(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "InterestingNotch")”使用辅助功能，然后返回这里开启 HUD。")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(.top, 6)
                 }
@@ -1200,6 +1202,7 @@ struct Shelf: View {
 //}
 
 struct Appearance: View {
+    @ObservedObject private var pointer = PaperPlanePointerManager.shared
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Default(.mirrorShape) var mirrorShape
     @Default(.sliderColor) var sliderColor
@@ -1216,6 +1219,64 @@ struct Appearance: View {
     @State private var speed: CGFloat = 1.0
     var body: some View {
         Form {
+            Section {
+                HStack(spacing: 16) {
+                    HStack(spacing: 6) {
+                        ForEach([false, true], id: \.self) { dark in
+                            Image(nsImage: PaperPlaneArtwork.preview(magnification: pointer.magnification))
+                                .frame(width: 72, height: 72)
+                                .background(dark ? Color(white: 0.12) : Color(white: 0.95),
+                                            in: RoundedRectangle(cornerRadius: 12))
+                        }
+                    }
+                    .accessibilityLabel("黑色纸飞机指针在浅色与深色背景下的预览")
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("纸飞机指针", isOn: Binding(
+                            get: { pointer.enabled },
+                            set: { pointer.setEnabled($0) }
+                        ))
+                        .toggleStyle(.switch)
+                        Text("黑色折纸轮廓 · 细描边 · 轻阴影")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                HStack {
+                    Text("指针大小")
+                    Slider(value: Binding(
+                        get: { pointer.magnification },
+                        set: { pointer.setMagnification($0, apply: false) }
+                    ), in: 0.75...1.75, step: 0.05) { editing in
+                        if !editing { pointer.setMagnification(pointer.magnification) }
+                    }
+                    .accessibilityLabel("纸飞机指针大小")
+                    Text("\(Int((pointer.magnification * 100).rounded()))%")
+                        .monospacedDigit().frame(width: 44, alignment: .trailing)
+                    Button("默认") { pointer.setMagnification(1) }
+                }
+                Text(pointer.status)
+                    .font(.caption)
+                    .foregroundStyle(pointer.hasFailure ? Color.orange : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                if pointer.colorConflict {
+                    Button("打开系统指针颜色设置") { pointer.openPointerSettings() }
+                    Text("在“指针”区域点击“还原颜色”，然后回来重新开启。此操作会将系统指针颜色改回黑色填充、白色描边。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else if pointer.hasFailure {
+                    Button("重试恢复原指针") { pointer.setEnabled(false) }
+                }
+            } header: {
+                HStack {
+                    Text("鼠标指针")
+                    customBadge(text: "实验性")
+                }
+            } footer: {
+                Text("仅替换普通箭头。系统更新或应用自定义指针可能影响效果。")
+            }
+            .onAppear { pointer.checkColorCompatibility() }
+
             Section {
                 Toggle("Always show tabs", isOn: $coordinator.alwaysShowTabs)
                 Defaults.Toggle(key: .settingsIconInNotch) {

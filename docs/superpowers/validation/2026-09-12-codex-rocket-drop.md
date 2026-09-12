@@ -75,3 +75,65 @@ Rocket nose extension reduced from 0.8H to 0.45H; tail from 0.5H to 0.28H (combi
 User still perceived bulb lag and unused content-side margins. Moved bulb and ring from separate SwiftUI overlays into the drop's Canvas symbols/draw pass; body, ring and bulb now share the exact cy including hover offset. Removed independent symbol animation and whole-view hover offset. Breathing brightness remains a Canvas drawing opacity, so it cannot interpolate the glyph's position independently.
 
 Remapped rocket geometry inside the original layout rectangle, using the pre-existing horizontal padding for the nose and tail rather than extending outside it. Nozzle uses the same mapping. Bounding-box tests now require the rocket to occupy exactly the original rectangle width; physical center coverage and previous motion checks pass. Full build and MusicEdgeChecks pass. Static production preview inspected; real app screenshot confirms compact rocket and retained album/lyrics. App updated/restarted and mapped current dylib checked. No measured frame-rate claim.
+
+
+## Async question detection repair
+
+Live IPC showed async choice prompts as `agentMessage` items with `delivery=async`, while `threadRuntimeStatus.activeFlags` remained empty. Added a privacy-filtered projection of question IDs and acknowledged reply IDs from both `turns` and paged `turnHistory`, with incremental patch handling. Unanswered async questions now produce waiting status even when the turn is idle; only accepted steering replies clear them. No question or answer prose is retained in bridge state or exposed by HTTP.
+
+Verified Python regression checks for async snapshots, accepted/rejected acknowledgement state, removals and text exclusion, alongside existing IPC and quota checks. Updated the existing LaunchAgent. Live HTTP returned waiting for this task, app Settings showed two pending tasks, and native screenshot/AX inspection confirmed the actual lightbulb droplet with a count of 2 (no preview mode). Earlier unanswered questions remain pending until answered.
+
+
+## Per-question reminders and dissolve
+
+The request panel's action opens the original Codex task; it is not an answer submission. Implemented acknowledgement-based removal: bridge publishes unanswered question IDs and the app expands each into a separate reminder identity. Multiple questions in one task now decrement individually. Only confirmed replies resolve questions; opening a task does not.
+
+Added a bounded 216-tile content dissolve shared by rows, the borderless request panel, and the lightbulb droplet. Removed rows remain rendered during the 0.65-second dissolve; final panel closure waits for animation completion. Reduced Motion uses opacity instead. New arrivals cancel pending panel closure. Tests passed: Python IPC/async and two-to-one decrement, Swift Codex checks, `CodexDissolveChecks.swift` rendered coverage at 0/0.5/1, full Debug build and signing. Updated bridge and app; live AX showed three unanswered questions rather than two tasks. Live answer submission and full sequence still require user acceptance.
+
+Dissolve render check: extract `struct CodexDissolve` through end of `CodexNotchEffect.swift` into a temporary Swift file prefixed with `import SwiftUI`, then compile it together with `scripts/CodexDissolveChecks.swift` using `xcrun swiftc` and run the executable.
+
+
+## Click-to-read, anchored panel, and clear-all
+
+User explicitly chose local read acknowledgement: successfully opening a task marks only that reminder identity read; failed navigation retains it. Read identities are saved so polling/relaunch does not re-add cleared async questions. This clears local notifications only, never submits an answer or approval to Codex.
+
+The panel now expands down from the clicked droplet with a spring and fades the original droplet during expansion. Explicit 收起 reverses expansion without clearing reminders; 清空 marks all current reminders read and starts the shared particle dissolve. Escape also collapses. Losing key focus no longer dismisses the panel before a clicked row can dissolve. Reduced Motion disables expansion scaling.
+
+Verified full Debug build/signing, Swift reminder filtering checks, and live UI: three reminders -> collapse still three -> reopen and click one task -> two -> clear -> panel and droplet absent. Subsequent polling retained the cleared state. Installed at the existing Pointer Preview app path.
+
+
+## Direct async answers (supersedes click-to-read behavior)
+
+The user clarified that the panel must submit answers directly. The bridge now retains pending question titles/options (superseding earlier text-exclusion claims), accepts token-protected local POST replies, and routes them to the owning task through Codex IPC. Rows remain pending until Codex publishes an accepted acknowledgement; navigation no longer marks them read. Freeform input supports Return. Clear remains local notification dismissal; collapse preserves questions. Approval requests without async question data retain a Codex fallback.
+
+Python checks cover question projection, acknowledgement, duplicate and stale rejection, reply binding and answer-text exclusion. Debug build succeeded and the installed preview was updated. Live panel displayed question text/options/input. Collapse was verified by native UI: the panel disappeared and the waterdrop returned with all 3 remaining reminders. Live freeform Return submission subsequently passed: the dedicated neutral test answer arrived in the active Codex conversation, the remaining visible reminder disappeared, and the panel closed. Fixed missing restoreMessage.context and omitted unsupported array-valued additionalContext after inspecting actual IPC rejections. Added regression assertions. Separated collapse at the top from clear at the bottom after live defaults confirmed all reminders had been locally cleared.
+
+
+## Continuous droplet-to-panel contour
+
+Replaced separate drop/shell opacity handoff with a single opaque contour in the request panel. Cached corresponding perimeter samples morph the teardrop into the rounded panel; text and the bulb crossfade inside the silhouette. The original drop is hidden only while the panel owns presentation, then restored after collapse completion. A first-frame wait ensures the initial droplet is rendered before expansion. Debug build, signing verification, and image coverage checks at 0/0.25/0.5/1 passed. Installed preview updated; subjective continuity awaits the user test.
+
+
+## Particle transition replaces contour morph
+
+Per user request, removed contour morph and dual-window handoff logic. Opening dissolves the original droplet (0.4 s), then reverses the existing particle modifier to assemble the panel below it (0.55 s). Closing dissolves the panel first and then reassembles the droplet. Transitions disable panel actions and guard repeated clicks. Poll updates no longer overwrite an in-progress particle phase; actual question resolution still cancels the presentation sequence. Hidden panels remain fully dissolved to avoid a flash on reopening. Particle image checks, Codex checks, Debug build and signing passed.
+
+
+## Panel-only particles and reversed droplet birth
+
+Updated per latest request: panel opening assembles particles directly while the droplet stays visible; closing dissolves only the panel. Removed external drop dissolve state and the extra stage delays. When waiting ends, the droplet now runs the exact reversed birth keyframes and durations instead of particle dissolution. Regression samples at 10 ms intervals verify reverse position and surface values match forward samples at complementary timestamps (tolerance 0.00001). Swift checks, Debug build, signing and diff whitespace checks passed; updated installed preview.
+
+
+## Growing multiline answer field
+
+Reused native vertical-axis TextField with a one-line minimum and unconstrained vertical growth inside the existing scroll view. Send button aligns to the bottom. Debug build and signing passed; live screenshot confirmed three explicit lines expand the field. Return submitted all three lines intact to the original Codex question (confirmed by the delivered answer). Installed preview updated.
+
+
+## Execution independent of async reminders
+
+Root cause: pending async questions overrode runtime as waiting, and Swift also suppressed running whenever any reminder was pending. Added separate isRunning projection from raw runtime (active with no blocking approval/input flags), decoded with legacy fallback. Running presentation and effort now use that field independently of pending reminders. Regression checks cover active-with-questions, idle-with-questions, and blocking approval; Python and Swift checks plus Debug build/signing passed. Live bridge reported this task waiting+isRunning=true and another waiting+false. Installed preview's native screenshot showed rocket nose and orange exhaust during this real running turn with music present.
+
+
+## HUD accessibility entry
+
+Reproduced Request Accessibility with no visible change. Shared explicit permission request now opens System Settings Privacy_Accessibility when trust remains false, covering suppressed repeat TCC prompts. HUD labels the action and explains the next step. Debug build/signing/diff checks passed; installed app button opened the correct system permission pane. Live state: interesting botch.app toggle was already on, but the running app remained untrusted. Permission reauthorization and actual HUD interception remain unverified; no TCC toggles were changed by the agent.

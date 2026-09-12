@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Read-only bridge for Codex Desktop's private, versioned local IPC.
+"""Local bridge for Codex Desktop's private, versioned IPC.
 
-Only UUIDs, runtime status, effort and allowance summary leave the process. No transcript, title, command,
-model prompt, or approval reply is exposed. Codex upgrades can break this API;
-unknown stream versions fail closed. Install with codex-notch-bridge-install.py.
+Expose runtime/allowance summaries and pending async question titles/options on
+loopback. Token-protected replies bind to an existing question and are sent to
+its owning Codex task. Answer prose is not retained in state snapshots.
+Codex upgrades can break this API; unknown stream versions fail closed.
+Install with codex-notch-bridge-install.py.
 """
 import argparse
+import secrets
+import copy
 import math
 import select
 import subprocess
@@ -19,14 +23,132 @@ import struct
 import threading
 import time
 import uuid
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = 19427
 STREAM_VERSION = 11
 MAX_FRAME = 256 * 1024 * 1024
 
 
-def task_state(runtime):
+def question_reply_ids(text):
+    start, end = '<send_user_message_question_reply>', '</send_user_message_question_reply>'
+    if not isinstance(text, str) or not text.strip().startswith(start) or not text.strip().endswith(end):
+        return []
+    try:
+        replies = json.loads(text.strip()[len(start):-len(end)])
+        replies = replies if isinstance(replies, list) else [replies]
+        return [r['questionItemId'] for r in replies
+                if isinstance(r, dict) and isinstance(r.get('questionItemId'), str)]
+    except (ValueError, TypeError):
+        return []
+
+
+def project_questions(value, key=''):
+    """Retain only question identity and reply acknowledgement, never prose."""
+    if key == 'text':
+        return question_reply_ids(value)
+    if key == 'questions':
+        return [dict(title=q.get('title', '')[:4000], options=[o[:1000] for o in (q.get('options') or []) if isinstance(o, str)][:20])
+                for q in value if isinstance(q, dict) and isinstance(q.get('title'), str)] if isinstance(value, list) else []
+    if isinstance(value, list):
+        return [project_questions(item) for item in value]
+    if isinstance(value, dict):
+        keys = {'turns', 'turnHistory', 'history', 'entitiesByKey', 'items',
+                'type', 'id', 'delivery', 'questions', 'content', 'input', 'text', 'status'}
+        result = {k: project_questions(v, k) for k, v in value.items()
+                  if key == 'entitiesByKey' or k in keys}
+        if value.get('type') == 'agentMessage' and value.get('delivery') == 'async':
+            result['prompt'] = str(value.get('text', ''))[:4000]
+        return result
+    return value if key in ('type', 'id', 'delivery', 'status') else None
+
+
+def update_questions(previous, change):
+    if change.get('type') == 'snapshot':
+        return project_questions(change.get('conversationState', {}))
+    state = copy.deepcopy(previous or {})
+    for patch in change.get('patches', []):
+        path = patch.get('path', [])
+        if not path:
+            state = project_questions(patch.get('value', {}))
+            continue
+        if path[0] not in ('turns', 'turnHistory'):
+            continue
+        target = state
+        for part in path[:-1]:
+            if isinstance(target, list):
+                target = target[int(part)] if int(part) < len(target) else None
+            elif isinstance(target, dict):
+                target = target.get(part)
+            else:
+                target = None
+            if target is None:
+                break
+        if target is None:
+            continue  # A field discarded by the privacy projection.
+        key = path[-1]
+        value = project_questions(patch.get('value'), key)
+        if 'questions' in path:
+            raw = patch.get('value')
+            if isinstance(raw, str):
+                value = raw[:4000]
+            elif isinstance(raw, dict):
+                value = project_questions([raw], 'questions')[0]
+            elif isinstance(raw, list) and key == 'options':
+                value = [o[:1000] for o in raw if isinstance(o, str)][:20]
+        if isinstance(target, list):
+            index = int(key)
+            if patch['op'] == 'remove':
+                target.pop(index)
+            elif patch['op'] == 'add':
+                target.insert(index, value)
+            else:
+                target[index] = value
+        elif isinstance(target, dict):
+            if patch['op'] == 'remove':
+                target.pop(key, None)
+            elif ('questions' in path and key in ('title', 'options')) or key in project_questions({key: patch.get('value')}) or (len(path) > 1 and path[-2] == 'entitiesByKey'):
+                target[key] = value
+    return state
+
+
+def pending_questions(state):
+    questions, answered = {}, set()
+    def visit(value):
+        if isinstance(value, dict):
+            if value.get('type') == 'agentMessage' and value.get('delivery') == 'async':
+                count = len(value.get('questions') or [])
+                for i, question in enumerate(value.get('questions') or []):
+                    identifier = json.dumps(['request_user_input_async', value.get('id'), i], separators=(',', ':'))
+                    questions[identifier] = dict(id=identifier, title=question.get('title', ''), options=question.get('options', []))
+                if not count and value.get('id'):
+                    questions[value['id']] = dict(id=value['id'], title=value.get('prompt', ''), options=[])
+            if value.get('type') in ('userMessage', 'steeringUserMessage'):
+                if value['type'] != 'steeringUserMessage' or value.get('status') == 'accepted':
+                    for item in value.get('content', value.get('input', [])):
+                        if item.get('type') == 'text':
+                            answered.update(item.get('text') or [])
+            for child in value.values():
+                if isinstance(child, (dict, list)):
+                    visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+    visit(state)
+    return [questions[key] for key in sorted(questions.keys() - answered)]
+
+
+def pending_question_ids(state):
+    return [q['id'] for q in pending_questions(state)]
+
+
+def has_pending_questions(state):
+    return bool(pending_question_ids(state))
+
+
+def task_state(runtime, pending_questions=False):
+    if pending_questions:
+        return 'waiting'
     if not isinstance(runtime, dict) or runtime.get('type') != 'active':
         return None
     flags = runtime.get('activeFlags', [])
@@ -174,6 +296,8 @@ def read_fuel(home):
 class Bridge:
     def __init__(self, home):
         self.home = home
+        self.reply_token = secrets.token_urlsafe(32)
+        self.submissions = set()
         self.connected = False
         self.last_contact = 0
         self.runtimes = {}
@@ -188,18 +312,64 @@ class Bridge:
             fresh = self.connected and now - self.last_contact < 45
             # Refresh live snapshots periodically: even a silent long tool run
             # stays fresh, while a hung owner cannot leave a phantom rocket.
-            if any(task_state(entry['runtime']) and now - entry.get('receivedAt', now) >= 45
+            if any(task_state(entry['runtime'], entry.get('pendingQuestions', False)) and now - entry.get('receivedAt', now) >= 45
                    for entry in self.runtimes.values()):
                 fresh = False
             for (host, task_id), entry in self.runtimes.items():
-                state = task_state(entry['runtime'])
+                state = task_state(entry['runtime'], entry.get('pendingQuestions', False))
                 if state:
-                    tasks.append(dict(id=task_id, hostId=host, title='Codex task', state=state, reasoningEffort=entry.get('effort'),
+                    tasks.append(dict(id=task_id, hostId=host, title='Codex task', state=state,
+                                      isRunning=task_state(entry['runtime']) == 'running', reasoningEffort=entry.get('effort'),
                                       model=entry.get('model', {}).get('model'), modelProvider=entry.get('model', {}).get('modelProvider'),
+                                      pendingQuestionIds=pending_question_ids(entry.get('questions', {})),
+                                      questions=pending_questions(entry.get('questions', {})),
                                       detail='Needs your attention in Codex' if state == 'waiting' else 'Codex is working'))
-            return dict(connected=fresh, tasks=tasks if fresh else [], updatedAt=self.last_contact,
+            return dict(connected=fresh, tasks=tasks if fresh else [], updatedAt=self.last_contact, replyToken=self.reply_token,
                         allowances=[w for w in self.allowances if now - w['updatedAt'] < 150 and now < w['resetsAt']],
                         fuel=self.fuel if self.fuel and now - self.fuel['updatedAt'] < 150 and now < self.fuel['resetsAt'] else None)
+
+    def answer(self, data):
+        if not isinstance(data, dict):
+            raise ValueError('Invalid answer request')
+        host, task_id, question_id, answer = (data.get(k) for k in ('hostId', 'taskId', 'questionId', 'answer'))
+        if not all(isinstance(v, str) for v in (host, task_id, question_id, answer)) or not 0 < len(answer.strip()) <= 4000:
+            raise ValueError('请输入有效回答（最多 4000 字）。')
+        uuid.UUID(task_id)
+        key = (host, task_id, question_id)
+        with self.lock:
+            entry = self.runtimes.get((host, task_id))
+            if not self.connected or not entry or time.time() - entry['receivedAt'] > 35:
+                raise ValueError('Codex 连接已失效，请稍后重试。')
+            question = next((q for q in pending_questions(entry['questions']) if q['id'] == question_id), None)
+            if not question:
+                raise ValueError('该问题已处理或不再有效。')
+            if key in self.submissions:
+                raise ValueError('回答已发送或正在确认，请勿重复提交。')
+            self.submissions.add(key)
+            owner, active = entry['owner'], (entry.get('runtime') or {}).get('type') == 'active'
+        text = '<send_user_message_question_reply>\n' + json.dumps([dict(
+            questionItemId=question_id, question=question['title'], answer=answer.strip())], ensure_ascii=False) + '\n</send_user_message_question_reply>'
+        inputs = [dict(type='text', text=text, text_elements=[])]
+        if active:
+            method, version = 'thread-follower-steer-turn', 1
+            params = dict(conversationId=task_id, input=inputs, attachments=[], clientUserMessageId=str(uuid.uuid4()),
+                          restoreMessage=dict(id=str(uuid.uuid4()), text=text, context={}, createdAt=int(time.time()*1000)))
+        else:
+            method, version = 'thread-follower-start-turn', 2
+            params = dict(conversationId=task_id, turnStart=dict(request=dict(threadId=task_id, input=inputs),
+                          context=dict(inheritThreadSettings=True)))
+        try:
+            result = ipc_request(self.home, method, version, params, owner, host)
+        except (OSError, TimeoutError):
+            # Delivery may have happened: don't automatically send a duplicate.
+            raise ValueError('提交结果暂未确认，请等待 Codex 同步；为避免重复回答，已暂停再次提交。')
+        if result.get('resultType') != 'success':
+            if any(word in str(result.get('error', '')).lower() for word in ('timeout', 'disconnected')):
+                raise ValueError('提交结果暂未确认，请等待 Codex 同步，勿重复提交。')
+            with self.lock:
+                self.submissions.discard(key)
+            raise ValueError('Codex 未接受回答，请刷新后重试。')
+        return dict(accepted=True)
 
     def refresh_fuel(self):
         while True:
@@ -262,7 +432,7 @@ class Bridge:
                     send(dict(type='request', requestId='notch-init', method='initialize', version=0,
                               params=dict(clientType='interesting-notch')))
                     with self.lock:
-                        active_keys = [key for key, entry in self.runtimes.items() if task_state(entry['runtime'])]
+                        active_keys = [key for key, entry in self.runtimes.items() if task_state(entry['runtime'], entry.get('pendingQuestions', False))]
                     for key in active_keys:
                         follow(*key)
                     next_refresh = time.monotonic() + 15
@@ -311,10 +481,11 @@ class Bridge:
                                     self.runtimes.pop(key, None)
                                     follow(*key)
                                     continue
+                                questions = update_questions(entry.get('questions') if entry else None, change)
                                 runtime = update_runtime(entry['runtime'] if entry else None, change)
                                 effort = update_effort(entry.get('effort') if entry else None, change)
                                 model = update_model(entry.get('model') if entry else None, change)
-                                self.runtimes[key] = dict(runtime=runtime, effort=effort, model=model, revision=change['revision'], owner=message.get('sourceClientId'), receivedAt=time.time())
+                                self.runtimes[key] = dict(runtime=runtime, questions=questions, pendingQuestions=has_pending_questions(questions), effort=effort, model=model, revision=change['revision'], owner=message.get('sourceClientId'), receivedAt=time.time())
                                 self.last_contact = time.time()
                         elif method in ('ipc-connection-reset', 'client-status-changed'):
                             if method == 'ipc-connection-reset' or params.get('status') == 'disconnected':
@@ -322,6 +493,41 @@ class Bridge:
                                     self.runtimes = {k: v for k, v in self.runtimes.items() if method != 'ipc-connection-reset' and v['owner'] != params.get('clientId')}
                                 subscribed.clear()
                                 next_discovery = 0
+
+
+def ipc_request(home, method, version, params, owner, host):
+    with socket.socket(socket.AF_UNIX) as sock:
+        sock.settimeout(20)
+        sock.connect(str(home / 'ipc/ipc.sock'))
+        def send(message):
+            body = json.dumps(message).encode()
+            sock.sendall(struct.pack('<I', len(body)) + body)
+        def receive():
+            def exact(n):
+                data = b''
+                while len(data) < n:
+                    chunk = sock.recv(n - len(data))
+                    if not chunk: raise ConnectionError('IPC closed')
+                    data += chunk
+                return data
+            size = struct.unpack('<I', exact(4))[0]
+            if not 0 < size <= MAX_FRAME: raise ValueError('Invalid IPC frame')
+            return json.loads(exact(size))
+        send(dict(type='request', requestId='reply-init', method='initialize', version=0,
+                  params=dict(clientType='interesting-notch-reply')))
+        while True:
+            message = receive()
+            if message.get('requestId') == 'reply-init':
+                if message.get('resultType') != 'success': raise ConnectionError('IPC init failed')
+                break
+        request_id = str(uuid.uuid4())
+        send(dict(type='request', requestId=request_id, method=method, version=version + (host != 'local'), params=params,
+                  targetClientId=owner, timeoutMs=18000,
+                  **(dict(hostId=host) if host != 'local' else {})))
+        while True:
+            message = receive()
+            if message.get('type') == 'response' and message.get('requestId') == request_id:
+                return message
 
 
 def main():
@@ -345,9 +551,26 @@ def main():
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        def do_POST(self):
+            if self.path != '/answer' or self.headers.get('Origin') or self.headers.get('Host') != f'127.0.0.1:{args.port}' or self.headers.get('X-Notch-Token') != bridge.reply_token:
+                self.send_error(403)
+                return
+            try:
+                length = int(self.headers.get('Content-Length', '0'))
+                if not 0 < length <= 32768: raise ValueError('Invalid request size')
+                result = bridge.answer(json.loads(self.rfile.read(length)))
+                status = 200
+            except (ValueError, TypeError, KeyError) as error:
+                result, status = dict(error=str(error)), 409
+            body = json.dumps(result).encode()
+            self.send_response(status)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
         def log_message(self, *_):
             pass
-    server = HTTPServer(('127.0.0.1', args.port), Handler)
+    server = ThreadingHTTPServer(('127.0.0.1', args.port), Handler)
     threading.Thread(target=bridge.run, daemon=True).start()
     threading.Thread(target=bridge.refresh_fuel, daemon=True).start()
     server.serve_forever()

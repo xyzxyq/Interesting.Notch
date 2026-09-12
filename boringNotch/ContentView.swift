@@ -128,13 +128,13 @@ struct ContentView: View {
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
                     .frame(width: vm.notchState == .open ? vm.notchSize.width : nil)
                     .background { currentNotchShape.fill(.black) }
-                    .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
                         Rectangle()
                             .fill(.black)
                             .frame(height: 1)
                             .padding(.horizontal, topCornerRadius)
                     }
+                    .clipShape(currentNotchShape)
                     .overlay { MusicEdgeEffect(shape: currentNotchShape) }
                     .overlay { CodexSpeedLines(shape: currentNotchShape, effort: codex.effort, active: flameActive) }
                     .overlay { CodexFlame(active: flameActive, effort: codex.effort) }
@@ -398,6 +398,8 @@ struct ContentView: View {
                         ShelfView()
                     }
                 }
+                // The player can exceed its proposal; it must not widen the header above it.
+                .frame(minWidth: 0, maxWidth: .infinity)
                 .transition(
                     .scale(scale: 0.8, anchor: .top)
                     .combined(with: .opacity)
