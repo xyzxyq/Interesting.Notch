@@ -19,9 +19,9 @@
 
 ## 下载与安装
 
-当前版本：**3.0 · Super Rocket（build 300）** · [更新说明](docs/releases/3.0.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0)
+当前版本：**3.0.1 · Super Rocket（build 301）** · [更新说明](docs/releases/3.0.1.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.1)
 
-1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0/interesting-botch-3.0-arm64.dmg)。
+1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.1/interesting-botch-3.0.1-arm64.dmg)。
 2. 退出旧版，打开 DMG，将 `interesting botch.app` 拖入 Applications 后运行。
 3. 在设置 → 媒体中选择“自动跟随正在播放的应用”，开启“右侧滚动歌词”。
 

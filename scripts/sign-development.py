@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Sign local builds with one persistent, private identity (no system trust changes)."""
 import os
+import plistlib
 from pathlib import Path
 import secrets
 import shlex
@@ -54,6 +55,17 @@ try:
     run('security', 'list-keychains', '-d', 'user', '-s', *search_list, str(keychain))
     run('codesign' , '--force', '--deep', '--sign', identity, '--keychain', str(keychain),
         '--timestamp=none', '--preserve-metadata=entitlements,flags,runtime', sys.argv[1])
+    # Self-signed identities have no Apple Team ID, so library validation rejects
+    # even our bundled frameworks. Scope the exception to this local signer.
+    entitlements = plistlib.loads(subprocess.check_output(
+        ['codesign', '-d', '--entitlements', ':-', sys.argv[1]], stderr=subprocess.DEVNULL))
+    entitlements['com.apple.security.cs.disable-library-validation'] = True
+    with tempfile.TemporaryDirectory() as temp:
+        entitlement_file = Path(temp) / 'entitlements.plist'
+        entitlement_file.write_bytes(plistlib.dumps(entitlements))
+        run('codesign', '--force', '--sign', identity, '--keychain', str(keychain),
+            '--timestamp=none', '--preserve-metadata=flags,runtime',
+            '--entitlements', str(entitlement_file), sys.argv[1])
     run('codesign', '--verify', '--deep', '--strict', sys.argv[1])
 finally:
     run('security', 'list-keychains', '-d', 'user', '-s', *search_list)
