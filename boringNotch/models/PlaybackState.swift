@@ -28,9 +28,22 @@ struct PlaybackState {
     var artwork: Data?
     var volume: Double = 0.5
     var isFavorite: Bool = false
+    var isAudioFallback: Bool = false
 }
 
 extension PlaybackState {
+    /// Dedicated music clients get lyrics and music effects. Other MediaRemote
+    /// sources retain the basic artwork/icon and playback visualizer.
+    var isMusicSource: Bool {
+        switch bundleIdentifier {
+        case "com.apple.Music", "com.tencent.QQMusic", "com.netease.163music",
+             "com.spotify.client", "com.github.th-ch.youtube-music":
+            return true
+        default:
+            return false
+        }
+    }
+
     /// Keep the position and its reference date together, including transport-only diffs.
     func clockUpdate(elapsed: Double?, timestamp: String?, diff: Bool,
                      playing: Bool?, rate: Double?, now: Date = Date()) -> (position: Double, date: Date) {
@@ -69,6 +82,7 @@ extension PlaybackState: Equatable {
             && lhs.repeatMode == rhs.repeatMode
             && lhs.artwork == rhs.artwork
             && lhs.isFavorite == rhs.isFavorite
+            && lhs.isAudioFallback == rhs.isAudioFallback
     }
 }
 
@@ -125,6 +139,33 @@ extension PlaybackState {
 }
 
 extension PlaybackState {
+    /// Keep real MediaRemote metadata separate from audio-only video presence.
+    func withVideoAudioFallback(activeSources: [String], runningSources: Set<String>,
+                               previous: PlaybackState) -> PlaybackState {
+        guard !isPlaying else { return self }
+        let source = activeSources.contains(previous.bundleIdentifier)
+            ? previous.bundleIdentifier : activeSources.sorted().first
+        if let source {
+            var state = PlaybackState(bundleIdentifier: source)
+            state.title = ""
+            state.artist = ""
+            state.album = ""
+            state.isPlaying = true
+            state.playbackRate = 0
+            state.isAudioFallback = true
+            return state
+        }
+        if previous.isAudioFallback {
+            guard runningSources.contains(previous.bundleIdentifier) else {
+                return previous.endingPlayback()
+            }
+            var paused = previous
+            paused.isPlaying = false
+            return paused
+        }
+        return self
+    }
+
     func endingPlayback(now: Date = Date()) -> PlaybackState {
         var ended = self
         let clock = clockUpdate(elapsed: nil, timestamp: nil, diff: true, playing: false, rate: 0, now: now)
@@ -133,6 +174,7 @@ extension PlaybackState {
         ended.isPlaying = false
         ended.playbackRate = 0
         ended.bundleIdentifier = ""
+        ended.isAudioFallback = false
         return ended
     }
 }

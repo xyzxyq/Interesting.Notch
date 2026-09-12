@@ -8,6 +8,7 @@
 import AppKit
 import Combine
 import Foundation
+import CoreAudio
 
 final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     func updatePlaybackInfo() async {
@@ -70,6 +71,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var streamTask: Task<Void, Never>?
     private var terminationObserver: AnyCancellable?
     private var terminatedSources = Set<String>()
+    private var remotePlaybackState = PlaybackState(bundleIdentifier: "")
+    private var videoAudioObserver: AnyCancellable?
 
     // MARK: - Initialization
     init?() {
@@ -106,9 +109,18 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                       let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
                       let source = app.bundleIdentifier else { return }
                 self.terminatedSources.insert(source)
+                if self.remotePlaybackState.bundleIdentifier == source {
+                    self.remotePlaybackState = self.remotePlaybackState.endingPlayback()
+                }
                 if self.playbackState.bundleIdentifier == source {
                     self.playbackState = self.playbackState.endingPlayback()
                 }
+            }
+        // ponytail: one low-frequency poll; process IO notifications are not
+        // reliable on every macOS release. Replace with listeners when reliable.
+        videoAudioObserver = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect().sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshVideoAudio() }
             }
         Task { await setupNowPlayingObserver() }
     }
@@ -134,26 +146,32 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     // MARK: - Protocol Implementation
     func play() async {
+        guard !playbackState.isAudioFallback else { return }
         MRMediaRemoteSendCommandFunction(0, nil)
     }
 
     func pause() async {
+        guard !playbackState.isAudioFallback else { return }
         MRMediaRemoteSendCommandFunction(1, nil)
     }
 
     func togglePlay() async {
+        guard !playbackState.isAudioFallback else { return }
         MRMediaRemoteSendCommandFunction(2, nil)
     }
 
     func nextTrack() async {
+        guard !playbackState.isAudioFallback else { return }
         MRMediaRemoteSendCommandFunction(4, nil)
     }
 
     func previousTrack() async {
+        guard !playbackState.isAudioFallback else { return }
         MRMediaRemoteSendCommandFunction(5, nil)
     }
 
     func seek(to time: Double) async {
+        guard !playbackState.isAudioFallback else { return }
         MRMediaRemoteSetElapsedTimeFunction(time)
     }
 
@@ -162,12 +180,14 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     }
     
     func toggleShuffle() async {
+        guard !playbackState.isAudioFallback else { return }
         // MRMediaRemoteSendCommandFunction(6, nil)
         MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
         playbackState.isShuffled.toggle()
     }
     
     func toggleRepeat() async {
+        guard !playbackState.isAudioFallback else { return }
         // MRMediaRemoteSendCommandFunction(7, nil)
         let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
         playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
@@ -242,13 +262,32 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     // MARK: - Update Methods
     @MainActor
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
-        let next = playbackState.applying(update)
+        let next = remotePlaybackState.applying(update)
         if terminatedSources.contains(next.bundleIdentifier) {
             // Ignore late MediaRemote events from an exited app, but allow relaunch.
             guard !NSRunningApplication.runningApplications(withBundleIdentifier: next.bundleIdentifier).isEmpty else { return }
             terminatedSources.remove(next.bundleIdentifier)
         }
-        self.playbackState = next
+        remotePlaybackState = next
+        refreshVideoAudio(forceNative: true)
+    }
+
+    @MainActor
+    private func refreshVideoAudio(forceNative: Bool = false) {
+        let videos = VideoAudioActivity.snapshot()
+        let next = remotePlaybackState.withVideoAudioFallback(
+            activeSources: videos.filter { $0.value }.map(\.key),
+            runningSources: Set(videos.keys), previous: playbackState)
+        // Native controls may have optimistic local updates. Polling audio must
+        // not overwrite them with an unchanged MediaRemote snapshot.
+        guard forceNative || next.isAudioFallback || playbackState.isAudioFallback else { return }
+        if next.bundleIdentifier != playbackState.bundleIdentifier || next.isPlaying != playbackState.isPlaying {
+            NSLog("Media source: %@ playing=%d audioFallback=%d", next.bundleIdentifier, next.isPlaying, next.isAudioFallback)
+        }
+        if next != playbackState || next.lastUpdated != playbackState.lastUpdated
+            || next.playbackRate != playbackState.playbackRate || next.volume != playbackState.volume {
+            playbackState = next
+        }
     }
     
      private func fetchFavoriteStateIfSupported() async {
@@ -352,5 +391,40 @@ actor JSONLinesPipeHandler {
         } catch {
             print("Error closing pipe handler: \(error)")
         }
+    }
+}
+
+// MARK: - Audio-only video presence
+// No audio recording or tap: only query whether a video app's main process has output IO.
+enum VideoAudioActivity {
+    @MainActor static func snapshot() -> [String: Bool] {
+        guard #available(macOS 14.2, *) else { return [:] }
+        var sources: [String: Bool] = [:]
+        for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
+            guard let id = app.bundleIdentifier, let url = app.bundleURL,
+                  Bundle(url: url)?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String == "public.app-category.video",
+                  !PlaybackState(bundleIdentifier: id).isMusicSource else { continue }
+            // Helpers may keep output IO open while paused (verified with Youku).
+            // Only the actual application's process can activate this fallback.
+            sources[id] = isOutputRunning(pid: app.processIdentifier)
+        }
+        return sources
+    }
+
+    @available(macOS 14.2, *)
+    static func isOutputRunning(pid: pid_t) -> Bool {
+        var pid = pid
+        var processID = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyTranslatePIDToProcessObject,
+                                                mScope: kAudioObjectPropertyScopeGlobal,
+                                                mElement: kAudioObjectPropertyElementMain)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address,
+                                         UInt32(MemoryLayout<pid_t>.size), &pid, &size, &processID) == noErr,
+              processID != kAudioObjectUnknown else { return false }
+        address.mSelector = kAudioProcessPropertyIsRunningOutput
+        var running: UInt32 = 0
+        size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(processID, &address, 0, nil, &size, &running) == noErr && running != 0
     }
 }

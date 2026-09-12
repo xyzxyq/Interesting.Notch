@@ -33,6 +33,7 @@ class MusicManager: ObservableObject {
     @Published var artistName: String = "Me"
     @Published var albumArt: NSImage = defaultImage
     @Published var isPlaying = false
+    @Published private(set) var isMusicSource = false
     @Published var album: String = "Self Love"
     @Published var isPlayerIdle: Bool = true
     @Published var animations: BoringAnimations = .init()
@@ -203,8 +204,8 @@ class MusicManager: ObservableObject {
     @MainActor
     private func updateFromPlaybackState(_ state: PlaybackState) {
         if state.bundleIdentifier.isEmpty {
-            // Source disappearance is not a pause. Keep the last render data for
-            // SwiftUI's outgoing view, while ending activity immediately.
+            // Source disappearance ends activity; video sources still use the
+            // upstream app-artwork and visualizer presentation.
             debounceIdleTask?.cancel()
             lyricsTask?.cancel()
             lyricsGeneration &+= 1
@@ -214,10 +215,12 @@ class MusicManager: ObservableObject {
             timestampDate = Date()
             playbackRate = 0
             isPlaying = false
+            isMusicSource = false
             isPlayerIdle = true
             lyricsStatus = "Lyrics idle"
             return
         }
+        isMusicSource = state.isMusicSource
         // Check for playback state changes (playing/paused)
         if state.isPlaying != self.isPlaying {
             NSLog("Playback state changed: \(state.isPlaying ? "Playing" : "Paused")")
@@ -243,9 +246,14 @@ class MusicManager: ObservableObject {
 
         // Handle artwork and visual transitions for changed content
         if hasContentChange {
-            self.triggerFlipAnimation()
+            if state.isMusicSource { self.triggerFlipAnimation() }
 
-            if artworkChanged, let artwork = state.artwork {
+            if !state.isMusicSource {
+                if bundleChanged || !usingAppIconForArtwork {
+                    usingAppIconForArtwork = true
+                    updateAlbumArt(newAlbumArt: AppIconAsNSImage(for: state.bundleIdentifier) ?? defaultImage)
+                }
+            } else if artworkChanged, let artwork = state.artwork {
                 self.updateArtwork(artwork)
             } else if state.artwork == nil {
                 // Try to use app icon if no artwork but track changed
@@ -256,7 +264,7 @@ class MusicManager: ObservableObject {
             }
             self.artworkData = state.artwork
 
-            if artworkChanged || state.artwork == nil {
+            if artworkChanged || state.artwork == nil || !state.isMusicSource {
                 // Update last artwork change values
                 self.lastArtworkTitle = state.title
                 self.lastArtworkArtist = state.artist
@@ -394,7 +402,7 @@ class MusicManager: ObservableObject {
     @MainActor
     private func refreshLyrics(force: Bool = false, useCache: Bool = true) {
         let compact = Defaults[.enableCompactLyrics]
-        let demand = (Defaults[.enableLyrics] ? 1 : 0) + (compact ? 2 : 0)
+        let demand = isMusicSource ? (Defaults[.enableLyrics] ? 1 : 0) + (compact ? 2 : 0) : 0
         let track = LyricTrack(bundleID: bundleIdentifier ?? "", title: songTitle,
                                artist: artistName, album: album, duration: songDuration)
         let sameTrack = lyricsTrack.map {
@@ -557,8 +565,9 @@ class MusicManager: ObservableObject {
 
             if let artworkImage = NSImage(data: artworkData) {
                 DispatchQueue.main.async { [weak self] in
-                    self?.usingAppIconForArtwork = false
-                    self?.updateAlbumArt(newAlbumArt: artworkImage)
+                    guard let self, self.isMusicSource, self.artworkData == artworkData else { return }
+                    self.usingAppIconForArtwork = false
+                    self.updateAlbumArt(newAlbumArt: artworkImage)
                 }
             }
         }
@@ -614,7 +623,7 @@ class MusicManager: ObservableObject {
     }
 
     private func updateSneakPeek() {
-        if isPlaying && Defaults[.enableSneakPeek] {
+        if isMusicSource && isPlaying && Defaults[.enableSneakPeek] {
             if Defaults[.sneakPeekStyles] == .standard {
                 coordinator.toggleSneakPeek(status: true, type: .music)
             } else {

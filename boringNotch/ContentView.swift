@@ -74,7 +74,7 @@ struct ContentView: View {
     }
 
     private var compactLyricsMode: Bool {
-        enableCompactLyrics
+        musicManager.isMusicSource && enableCompactLyrics
     }
 
     private var musicSideWidth: CGFloat {

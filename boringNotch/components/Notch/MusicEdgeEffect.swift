@@ -273,19 +273,20 @@ struct MusicEdgeEffect: View, Animatable {
     @ObservedObject private var motion = NotchMotionEnvironment.shared
     @State private var onScreen = false
     @State private var phase = MusicEdgePhase()
-    private var captureKey: String { "\(style != "off" && reactive && music.isPlaying && !reduced && !motion.suspended)-\(music.bundleIdentifier ?? "")" }
+    private var musicPlaying: Bool { music.isMusicSource && music.isPlaying }
+    private var captureKey: String { "\(style != "off" && reactive && musicPlaying && !reduced && !motion.suspended)-\(music.bundleIdentifier ?? "")" }
     var body: some View {
-        let playback = MusicEdgePlayback(style: style, alwaysOn: alwaysOn, playing: music.isPlaying, energy: reactive ? audio.energy : 0)
+        let playback = MusicEdgePlayback(style: style, alwaysOn: alwaysOn, playing: musicPlaying, energy: reactive ? audio.energy : 0)
         let paused = !onScreen || motion.suspended || !playback.visible || reduced
         TimelineView(.animation(minimumInterval: playback.ambient || motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: paused)) { clock in
-            let elapsed = music.elapsedTime + (music.isPlaying ? max(0, clock.date.timeIntervalSince(music.timestampDate)) * max(0, music.playbackRate) : 0)
+            let elapsed = music.elapsedTime + (musicPlaying ? max(0, clock.date.timeIntervalSince(music.timestampDate)) * max(0, music.playbackRate) : 0)
             let ending = CompactLyrics.dissolve(at: elapsed, duration: music.songDuration)
             let period = CompactLyrics.timeOfDay(at: clock.date)
             let tint: Color = period == .dusk ? Color(red: 0.95, green: 0.80, blue: 0.67) : period == .day ? Color(red: 0.97, green: 0.94, blue: 0.86) : Color(white: period == .dawn ? 0.70 : 0.88)
-            MusicEdgeFrame(shape: shape, style: style, strength: playback.ambient ? strength * 0.75 : strength, energy: music.isPlaying && reactive ? audio.energy : 0,
+            MusicEdgeFrame(shape: shape, style: style, strength: playback.ambient ? strength * 0.75 : strength, energy: musicPlaying && reactive ? audio.energy : 0,
                            phase: phase.value(at: clock.date), color: tint, reduced: reduced, sky: sky)
-                .opacity(!playback.visible ? 0 : alwaysOn && style.hasPrefix("water") ? 0.75 + (music.isPlaying ? 0.25 * (1-ending) : 0) : (1-ending) * min(1, max(0, elapsed / 2)))
-                .animation(.easeInOut(duration: 0.8), value: music.isPlaying)
+                .opacity(!playback.visible ? 0 : alwaysOn && style.hasPrefix("water") ? 0.75 + (musicPlaying ? 0.25 * (1-ending) : 0) : (1-ending) * min(1, max(0, elapsed / 2)))
+                .animation(.easeInOut(duration: 0.8), value: musicPlaying)
                 .animation(.easeInOut(duration: 0.8), value: alwaysOn)
         }
         .onAppear { onScreen = true }
@@ -294,7 +295,7 @@ struct MusicEdgeEffect: View, Animatable {
         .onChange(of: playback.speed) { _, value in phase.update(target: value, paused: paused, at: .now) }
         .padding(-24 - 48 * shape.rocket)
         .allowsHitTesting(false)
-        .task(id: captureKey) { audio.configure(bundleID: music.bundleIdentifier, active: style != "off" && reactive && music.isPlaying && !reduced && !motion.suspended) }
+        .task(id: captureKey) { audio.configure(bundleID: music.bundleIdentifier, active: style != "off" && reactive && musicPlaying && !reduced && !motion.suspended) }
     }
 }
 
