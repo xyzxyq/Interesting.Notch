@@ -41,6 +41,28 @@
 
 Codex 信息由本机桥接脚本读取，显示内容取决于客户端可提供的状态与额度数据；客户端接口变化可能影响兼容性。
 
+## 效果展示
+
+以下图片由项目自身的 SwiftUI 视图渲染，展示不同状态的静态采样；不是桌面实拍或连续动画录屏。实际颜色、尺寸和动效会随设置与屏幕变化。
+
+### 火箭与交互提醒
+
+普通刘海随 Codex 执行状态过渡为黑色火箭；“高”及以上增加速度参照线，Ultra 使用更大的尾焰。需要用户确认时，火箭收回并显示可点击的灯泡水滴。
+
+<p align="center"><img src="docs/assets/codex-rocket-states.png" width="800" alt="普通刘海、火箭过渡、高强度及 Ultra 火箭，以及灯泡水滴的形态预览"></p>
+
+### 多个提醒合并
+
+新水滴落下后与原水滴融合，合并后的水滴增大。点击水滴可查看多个待处理提示；处理完毕后，面板自动关闭，水滴回到灵动岛。
+
+<p align="center"><img src="docs/assets/codex-droplet-merge.png" width="800" alt="从零秒到零点八五秒，新水滴落下并融入已有水滴，最终体积增大的五帧过程"></p>
+
+### 额度变成燃油
+
+燃油图标表示剩余 Codex 额度，接近耗尽时改变颜色。播放音乐和不播放音乐时均可显示；它表示额度，不是实际 token 输出速率。
+
+<p align="center"><img src="docs/assets/codex-fuel-levels.png" width="600" alt="不同剩余额度及暂无额度数据时的燃油图标预览"></p>
+
 ## 源码构建
 
 工程的最低部署目标为 **macOS 14**。源码构建沿用上游的工具要求：**macOS 15.6 或更新版本、Xcode 26 或更新版本**。不同系统版本的音频捕获和媒体能力可能存在差异。
@@ -113,4 +135,3 @@ python3 scripts/codex-notch-bridge-install.py --uninstall
 - [NotchDrop](https://github.com/Lakr233/NotchDrop)：上游文件暂存功能的早期基础。
 - [@maxtron95](https://github.com/maxtron95)：上游原始图标设计。本 fork 当前使用另行制作的蓝白笑脸图标。
 - [@himanshhhhuv](https://github.com/himanshhhhuv)：上游网站设计。
-
