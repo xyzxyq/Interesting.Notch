@@ -383,7 +383,7 @@ class MusicManager: ObservableObject {
                                artist: artistName, album: album, duration: songDuration)
         let sameTrack = lyricsTrack.map {
             $0.bundleID == track.bundleID && $0.title == track.title && $0.artist == track.artist
-                && $0.album == track.album && abs($0.duration - track.duration) < 1
+                && $0.album == track.album && $0.isReady == track.isReady && abs($0.duration - track.duration) < 1
         } ?? false
         guard force || demand != lyricsDemand || !sameTrack else { return }
         // A metadata change invalidates every publication from earlier requests.
@@ -392,6 +392,10 @@ class MusicManager: ObservableObject {
         lyricsDemand = demand
         lyricsTrack = track
         guard demand != 0, !track.bundleID.isEmpty, !track.title.isEmpty else { return }
+        guard track.isReady else {
+            lyricsStatus = "等待歌曲名称、歌手和时长信息"
+            return
+        }
         isFetchingLyrics = true
         lyricsStatus = "Loading lyrics…"
         let generation = lyricsGeneration
@@ -423,7 +427,7 @@ class MusicManager: ObservableObject {
                     self.lyricsStatus = lines.isEmpty ? "Plain lyrics available" : "Synced lyrics ready"
                     NSLog("Lyrics loaded: %d lines", lines.count)
                 } else {
-                    self.lyricsStatus = "No matching synced lyrics"
+                    self.lyricsStatus = "未找到匹配的同步歌词"
                     NSLog("Lyrics: no matching timeline")
                 }
             } catch {
@@ -440,6 +444,11 @@ class MusicManager: ObservableObject {
                 self.refreshLyrics(force: true)
             }
         }
+    }
+
+    @MainActor
+    func retryLyrics() {
+        refreshLyrics(force: true)
     }
 
     private static func nativeLyrics(for track: LyricTrack) async -> String {

@@ -1,0 +1,9 @@
+# Codex fuel allowance
+
+Approved design implemented in the existing status bridge, activity model and closed-notch artwork slots. Plus selects the 300-minute window; pro/prolite and recognized organization plans select the 10080-minute window when present. Only the main Codex bucket is used; purchased credits and Spark remain separate. Unknown plans, missing windows, expired resets and invalid values display unavailable.
+
+Bridge runs a bounded read-only bundled app-server account/rateLimits/read request every 60 seconds, without starting a model turn or consuming reset credits. Each subprocess is terminated/reaped; a failed refresh clears fuel, and 150-second freshness is checked by both bridge and client. Only remaining percent, window duration, reset time and observation time leave the bridge.
+
+Fuel replaces artwork in ordinary music and Canvas compact lyrics modes. A separate closed running-state fallback supplies the same slot/gap geometry when music is absent/disabled. Existing waiting droplet and expanded music controls remain. A native SF Symbols fuel pump stays still inside a rounded housing, while only the fill surface subtly moves; Reduce Motion freezes it. Grey-white above 20%, amber below 20%, soft red below 10%. Native help/accessibility provide percentage and reset date.
+
+Python framing/state and quota regression checks passed, including primary/secondary inversion, malformed values, unknown plans, expiry and Spark isolation. Swift freshness/geometry/motion checks passed. Full Debug build and diff whitespace checks passed. Static icon rendering inspected at 85%, 13%, 5% and unavailable. Installed ad-hoc signed development app and verified current process dylib UUID equals build. Native running app screenshot confirmed fuel in the compact album slot alongside the sun and music content; accessibility reports actual weekly remaining 12% and reset date. No measured animation FPS claim.

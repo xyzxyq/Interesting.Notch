@@ -1,0 +1,369 @@
+import SwiftUI
+
+enum CodexThrust {
+    static let levels = ["low", "medium", "high", "xhigh", "max", "ultra"]
+    static let labels = ["轻度", "中度", "高", "极高", "最高", "Ultra"]
+    static func length(_ level: Int) -> Double { [0.55, 0.7, 0.85, 1.05, 1.4, 2.0][min(5, max(0, level))] }
+    static func speed(_ level: Int) -> Double { [0.65, 0.8, 1, 1.3, 1.9, 3.0][min(5, max(0, level))] }
+    static func wakePoint(_ progress: Double, lane: Int, side: Double, rect: CGRect) -> CGPoint {
+        let p = min(1, max(0, progress))
+        let x = p * (rect.width + 40)
+        let spread = (rect.height / 2 + 5 + Double(lane) * 3) * sqrt(1 - exp(-x / 10))
+            + p * Double(lane) * 1.5
+        return CGPoint(x: rect.minX + x, y: rect.midY + side * spread)
+    }
+
+}
+
+struct CodexFlame: View {
+    var active: Bool
+    var effort: Int = -1
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    var body: some View {
+        TimelineView(.animation(paused: !active || reduced)) { timeline in
+            Canvas { context, size in
+                let h = size.height
+                let time = reduced ? 0 : timeline.date.timeIntervalSinceReferenceDate * (effort < 0 ? 1 : CodexThrust.speed(effort))
+                let pulse = reduced ? 0.0 : sin(time * 7) * 0.09 + sin(time * 13) * 0.04
+                let bodyWidth = size.width - 80
+                let nozzle = NotchShape.rocketCoordinate(bodyWidth + h * 0.182, width: bodyWidth, height: h)
+                for layer in 0..<3 {
+                    let scale = [1.0, 0.75, 0.44][layer]
+                    let length = h * (reduced ? 0.45 : (effort < 0 ? 0.85 : CodexThrust.length(effort)) + pulse) * scale
+                    let radius = h * (effort == 5 ? 0.30 : 0.23) * scale
+                    let cy = h * 0.5
+                    var flame = Path()
+                    flame.move(to: CGPoint(x: nozzle, y: cy - radius))
+                    flame.addCurve(to: CGPoint(x: nozzle + length, y: cy + sin(time * 9) * radius * 0.2),
+                                   control1: CGPoint(x: nozzle + length * 0.35, y: cy - radius * 1.2),
+                                   control2: CGPoint(x: nozzle + length * 0.75, y: cy - radius * 0.25))
+                    flame.addCurve(to: CGPoint(x: nozzle, y: cy + radius),
+                                   control1: CGPoint(x: nozzle + length * 0.6, y: cy + radius * 0.45),
+                                   control2: CGPoint(x: nozzle + length * 0.3, y: cy + radius * 1.2))
+                    flame.closeSubpath()
+                    let boost = Double(max(0, min(5, effort) - 1)) / 4
+                    let colors: [Color] = [Color.orange.opacity(0.45 + boost * 0.4),
+                                           Color(red: 1, green: 0.5 + boost * 0.35, blue: boost * 0.3),
+                                           Color(red: 1, green: 0.94 + boost * 0.06, blue: 0.72 + boost * 0.28)]
+                    if layer == 0 && boost > 0 {
+                        var glow = context
+                        glow.addFilter(.blur(radius: 2 + boost * 3))
+                        glow.fill(flame, with: .color(.orange.opacity(0.25 + boost * 0.3)))
+                    }
+                    context.fill(flame, with: .linearGradient(Gradient(colors: [colors[layer], colors[layer].opacity(0.2 + boost * 0.35)]),
+                                                            startPoint: CGPoint(x: nozzle, y: cy), endPoint: CGPoint(x: nozzle + length, y: cy)))
+                }
+            }
+            .padding(.trailing, -80)
+        }
+        .opacity(active ? 1 : 0)
+        .animation(.easeOut(duration: reduced ? 0.15 : 0.25), value: active)
+        .allowsHitTesting(false)
+    }
+}
+
+struct CodexSpeedLines: View {
+    let shape: NotchShape
+    let effort: Int
+    let active: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    var body: some View {
+        TimelineView(.animation(paused: !active || effort < 2 || reduced)) { clock in
+            Canvas { context, size in
+                guard active, effort >= 2, !reduced else { return }
+                let rect = CGRect(origin: .zero, size: size).insetBy(dx: 48, dy: 48)
+                let outline = shape.path(in: rect)
+                let time = clock.date.timeIntervalSinceReferenceDate
+                let speed = CodexThrust.speed(effort)
+                let boost = Double(effort - 2) / 3
+                var mask = Path(CGRect(origin: .zero, size: size))
+                mask.addPath(outline)
+                context.clip(to: mask, style: FillStyle(eoFill: true))
+                // No stroke or glow can appear in front of the physical nose.
+                context.clip(to: Path(CGRect(x: rect.minX, y: 0, width: size.width - rect.minX, height: size.height)))
+                let lanes = effort == 5 ? 3 : 2
+                for i in 0..<(lanes * 2) {
+                    let lane = i % lanes
+                    let side = (i / lanes) % 2 == 0 ? -1.0 : 1.0
+                    let end = (time * speed * 0.30 + Double(i) * 0.61803398875).truncatingRemainder(dividingBy: 1)
+                    let start = max(0, end - (16 + boost * 12) / (rect.width + 40))
+                    let fade = pow(sin(.pi * end), 2)
+                    var line = Path()
+                    for step in 0...12 {
+                        let point = CodexThrust.wakePoint(start + (end - start) * Double(step) / 12, lane: lane, side: side, rect: rect)
+                        if step == 0 { line.move(to: point) } else { line.addLine(to: point) }
+                    }
+                    let tail = CodexThrust.wakePoint(start, lane: lane, side: side, rect: rect)
+                    let head = CodexThrust.wakePoint(end, lane: lane, side: side, rect: rect)
+                    let ink = GraphicsContext.Shading.linearGradient(Gradient(colors: [.black.opacity(0), .black.opacity(fade * (0.45 + boost * 0.2))]), startPoint: tail, endPoint: head)
+                    context.stroke(line, with: ink, style: StrokeStyle(lineWidth: 0.75 + boost * 0.25, lineCap: .round))
+                }
+            }
+        }.padding(-48).allowsHitTesting(false)
+    }
+}
+
+struct CodexLiquidDrop: View, Animatable {
+    var progress: CGFloat
+    var reduced = false
+    var symbolOpacity: Double? = nil
+    var reminderBrightness: Double = 1
+    var hoverOffset: CGFloat = 0
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+    var body: some View {
+        let t = min(1, max(0, progress))
+        let cy = -10 + max(0, progress) * 61 + hoverOffset
+        Canvas { context, _ in
+                if t < 0.78 && !reduced {
+                    let neck = max(1, 13 * (1 - t / 0.78))
+                    var bridge = Path()
+                    bridge.move(to: CGPoint(x: 9, y: 0))
+                    bridge.addCurve(to: CGPoint(x: 32 - neck, y: cy),
+                                    control1: CGPoint(x: 30, y: 0), control2: CGPoint(x: 32 - neck, y: cy * 0.6))
+                    bridge.addLine(to: CGPoint(x: 32 + neck, y: cy))
+                    bridge.addCurve(to: CGPoint(x: 55, y: 0),
+                                    control1: CGPoint(x: 32 + neck, y: cy * 0.6), control2: CGPoint(x: 34, y: 0))
+                    bridge.closeSubpath()
+                    var neckContext = context
+                    neckContext.opacity = min(1, max(0, (0.78 - t) / 0.18))
+                    neckContext.fill(bridge, with: .color(.black))
+                }
+                let radius: CGFloat = 16 * min(1, t * 1.8)
+                let compression = reduced ? 0 : max(0, progress - 1) * 4
+                let stretch = reduced ? 0 : sin(.pi * min(1, t / 0.78)) * 0.12
+                let rx = radius * (1 + compression) / (1 + stretch)
+                let ry = radius * (1 + stretch) / (1 + compression)
+                var drop = Path()
+                drop.move(to: CGPoint(x: 32, y: cy - ry - 3))
+                drop.addCurve(to: CGPoint(x: 32, y: cy + ry),
+                              control1: CGPoint(x: 32 + rx * 1.6, y: cy - ry * 0.1),
+                              control2: CGPoint(x: 32 + rx, y: cy + ry))
+                drop.addCurve(to: CGPoint(x: 32, y: cy - ry - 3),
+                              control1: CGPoint(x: 32 - rx, y: cy + ry),
+                              control2: CGPoint(x: 32 - rx * 1.6, y: cy - ry * 0.1))
+                context.fill(drop, with: .color(.black))
+                context.stroke(drop, with: .linearGradient(Gradient(colors: [.white.opacity(0.45), .white.opacity(0.04)]),
+                                                          startPoint: CGPoint(x: 20, y: cy - 16), endPoint: CGPoint(x: 40, y: cy + 16)), lineWidth: 0.7)
+                let alpha = (symbolOpacity ?? max(0, (t - 0.72) / 0.28)) * reminderBrightness
+                var light = context
+                light.opacity = alpha
+                let ring = Path(ellipseIn: CGRect(x: 20.5, y: cy - 11.5, width: 23, height: 23))
+                light.stroke(ring, with: .color(Color(red: 1, green: 0.9, blue: 0.65).opacity(0.55)), lineWidth: 0.7)
+                if let bulb = context.resolveSymbol(id: "bulb") {
+                    light.draw(bulb, at: CGPoint(x: 32, y: cy))
+                }
+        } symbols: {
+            Image(systemName: "lightbulb")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color(red: 1, green: 0.9, blue: 0.65))
+                .tag("bulb")
+        }
+        .frame(width: 64, height: 82)
+    }
+
+}
+
+struct CodexDropButton: View {
+    var waiting: Bool
+    var count: Int
+    var action: () -> Void
+    @Binding var surface: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    @State private var progress: CGFloat = 0
+    @State private var visible = false
+    @State private var symbolVisible = false
+    @State private var idleSince: Date?
+    var body: some View {
+        Button(action: action) {
+            TimelineView(.animation(paused: idleSince == nil || reduced)) { clock in
+                let reminder = idleSince.map { CodexDropMotion.reminder(at: clock.date.timeIntervalSince($0)) }
+                let idleOffset = reduced ? 0 : reminder?.offset ?? 0
+                let brightness = reduced ? 1 : reminder?.brightness ?? 1
+                CodexLiquidDrop(progress: progress, reduced: reduced, symbolOpacity: symbolVisible ? 1 : 0, reminderBrightness: brightness, hoverOffset: idleOffset)
+                .overlay(alignment: .bottomTrailing) {
+                    if count > 1 {
+                        Text("\(count)").font(.system(size: 9, weight: .bold)).padding(3)
+                            .background(.orange, in: Circle()).padding(.trailing, 8).padding(.bottom, 8)
+                    }
+                }
+                .contentShape(Rectangle())
+            }
+        }
+        .buttonStyle(.plain)
+        .opacity(visible ? 1 : 0)
+        .allowsHitTesting(waiting && visible)
+        .accessibilityLabel("Codex 需要你处理")
+        .accessibilityHint("打开待处理任务窗口")
+        .accessibilityHidden(!visible)
+        .help("查看 Codex 的待处理请求")
+        .task(id: "\(waiting)-\(reduced)") {
+            do {
+                if reduced {
+                    idleSince = nil
+                    surface = 0
+                    symbolVisible = waiting
+                    progress = waiting ? 1 : 0
+                    withAnimation(.easeInOut(duration: 0.15)) { visible = waiting }
+                } else if waiting {
+                    if !visible { try await Task.sleep(for: .milliseconds(550)) }
+                    try Task.checkCancellation()
+                    visible = true
+                    try await move(CodexDropMotion.fall, reveal: true)
+                    idleSince = .now
+                } else if visible {
+                    // Carry the visible hover position into suction without a snap.
+                    if let idleSince {
+                        progress += CodexDropMotion.reminder(at: Date.now.timeIntervalSince(idleSince)).offset / 61
+                    }
+                    idleSince = nil
+                    symbolVisible = false
+                    try await move(CodexDropMotion.returning, reveal: false)
+                    visible = false
+                } else {
+                    surface = 0
+                }
+            } catch { /* A new state continues from the current presentation values. */ }
+        }
+    }
+
+    private func move(_ frames: [CodexDropMotion.Frame], reveal: Bool) async throws {
+        let initial = CodexDropMotion.Frame(progress: progress, surface: surface, duration: 0)
+        let started = ProcessInfo.processInfo.systemUptime
+        let duration = frames.reduce(0) { $0 + $1.duration }
+        while true {
+            try Task.checkCancellation()
+            let elapsed = min(duration, ProcessInfo.processInfo.systemUptime - started)
+            let sample = CodexDropMotion.sample(frames, initial: initial, time: elapsed)
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                progress = sample.progress
+                surface = sample.surface
+            }
+            if reveal && progress > 0.86 { symbolVisible = true }
+            if elapsed >= duration { return }
+            try await Task.sleep(for: .milliseconds(16))
+        }
+    }
+
+}
+
+// Shared keyframes make the two landing rebounds and the return sequence testable.
+enum CodexDropMotion {
+    static func reminder(at elapsed: Double) -> (offset: CGFloat, brightness: Double) {
+        let t = max(0, elapsed)
+        return (-1.5 * (1 - cos(t * 2 * .pi / 3.6)),
+                0.72 + 0.28 * cos(t * 2 * .pi / 2.8))
+    }
+
+    struct Frame {
+        let progress: CGFloat
+        let surface: CGFloat
+        let duration: Double
+    }
+    // Continuous monotone Hermite interpolation preserves velocity across descent
+    // nodes; only actual bounce extrema settle to zero velocity.
+    static func sample(_ frames: [Frame], initial: Frame, time: Double) -> Frame {
+        let nodes = [initial] + frames
+        let times = frames.reduce(into: [0.0]) { $0.append($0.last! + $1.duration) }
+        guard let segment = (1..<times.count).first(where: { time < times[$0] }) else { return nodes.last! }
+        let i = segment - 1
+        let h = times[i + 1] - times[i]
+        let u = min(1, max(0, (time - times[i]) / h))
+        func interpolate(_ value: (Frame) -> CGFloat) -> CGFloat {
+            func slope(_ j: Int) -> Double {
+                guard j > 0, j < nodes.count - 1 else { return 0 }
+                let a = Double(value(nodes[j]) - value(nodes[j - 1])) / (times[j] - times[j - 1])
+                let b = Double(value(nodes[j + 1]) - value(nodes[j])) / (times[j + 1] - times[j])
+                return a * b > 0 ? 2 * a * b / (a + b) : 0
+            }
+            return CGFloat((2*u*u*u - 3*u*u + 1) * Double(value(nodes[i]))
+                + (u*u*u - 2*u*u + u) * h * slope(i)
+                + (-2*u*u*u + 3*u*u) * Double(value(nodes[i + 1]))
+                + (u*u*u - u*u) * h * slope(i + 1))
+        }
+        return Frame(progress: interpolate { $0.progress }, surface: interpolate { $0.surface }, duration: 0)
+    }
+    static let fall: [Frame] = [
+        .init(progress: 0.38, surface: 8, duration: 0.24),
+        .init(progress: 0.76, surface: 4, duration: 0.18),
+        .init(progress: 1.06, surface: 0, duration: 0.18),
+        .init(progress: 0.79, surface: 3.5, duration: 0.17),
+        .init(progress: 1.025, surface: 0, duration: 0.17),
+        .init(progress: 0.93, surface: 1.2, duration: 0.13),
+        .init(progress: 1, surface: 0, duration: 0.17)
+    ]
+    static let returning: [Frame] = [
+        .init(progress: 1.07, surface: 1, duration: 0.12),
+        .init(progress: 0.62, surface: 5, duration: 0.22),
+        .init(progress: 0, surface: 8, duration: 0.22),
+        .init(progress: 0, surface: 1, duration: 0.12),
+        .init(progress: 0, surface: 3, duration: 0.09),
+        .init(progress: 0, surface: 0, duration: 0.08)
+    ]
+}
+
+/// Fixed housing; only the fuel surface moves, so the symbol stays crisp.
+struct CodexFuelGauge: View {
+    let fuel: CodexFuel?
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    private var tint: Color {
+        guard let fuel else { return .gray }
+        return fuel.remainingPercent < 10 ? Color(red: 1, green: 0.48, blue: 0.43)
+            : fuel.remainingPercent < 20 ? Color(red: 1, green: 0.76, blue: 0.35)
+            : Color(white: 0.85)
+    }
+    var body: some View {
+        TimelineView(.animation(paused: reduced || fuel == nil)) { tick in
+            CodexFuelFrame(level: (fuel?.remainingPercent ?? 0) / 100,
+                           phase: reduced ? 0 : tick.date.timeIntervalSinceReferenceDate,
+                           tint: tint, available: fuel != nil)
+                .animation(reduced ? nil : .easeInOut(duration: 0.8), value: fuel?.remainingPercent)
+        }
+        .help(fuel?.description ?? "Codex · 额度暂不可用")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(fuel?.description ?? "Codex · 额度暂不可用")
+    }
+}
+
+private struct CodexFuelFrame: View, Animatable {
+    var level: Double
+    let phase: Double
+    let tint: Color
+    let available: Bool
+    var animatableData: Double {
+        get { level }
+        set { level = newValue }
+    }
+    var body: some View {
+        Canvas { context, size in
+            let box = CGRect(x: size.width * 0.16, y: 1,
+                             width: size.width * 0.68, height: max(0, size.height - 2))
+            let shell = Path(roundedRect: box, cornerRadius: 4)
+            context.fill(shell, with: .color(Color(white: 0.12)))
+            if available && level > 0 {
+                let inset = box.insetBy(dx: 1.5, dy: 1.5)
+                let surface = inset.maxY - inset.height * min(1, max(0, level))
+                var liquid = Path()
+                liquid.move(to: CGPoint(x: inset.minX, y: surface))
+                liquid.addCurve(to: CGPoint(x: inset.maxX, y: surface),
+                                control1: CGPoint(x: inset.minX + inset.width / 3, y: surface + sin(phase * 1.4) * 0.65),
+                                control2: CGPoint(x: inset.maxX - inset.width / 3, y: surface - sin(phase * 1.4) * 0.65))
+                liquid.addLine(to: CGPoint(x: inset.maxX, y: inset.maxY))
+                liquid.addLine(to: CGPoint(x: inset.minX, y: inset.maxY))
+                liquid.closeSubpath()
+                var fill = context
+                fill.clip(to: Path(roundedRect: inset, cornerRadius: 2.5))
+                fill.fill(liquid, with: .color(tint.opacity(0.8)))
+            }
+            context.stroke(shell, with: .color(tint.opacity(available ? 0.85 : 0.5)), lineWidth: 1)
+            var symbol = context.resolve(Image(systemName: available ? "fuelpump.fill" : "questionmark"))
+            symbol.shading = .color(.white.opacity(0.95))
+            context.draw(symbol,
+                         in: CGRect(x: size.width / 2 - 4.5, y: size.height / 2 - 4.5, width: 9, height: 9))
+        }
+    }
+}

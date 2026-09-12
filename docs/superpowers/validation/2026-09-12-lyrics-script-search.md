@@ -1,0 +1,9 @@
+# Search-side Chinese script recovery
+
+Reported track: 人间 by 王菲, native UI duration 4:45, observed at 3:37. Normal lrclib search with simplified title and artist returned an empty array. Traditional 人間 + 王菲 returned timed candidates, including exact album 王菲 and duration 285. The old code normalized scripts only during candidate matching; every request repeated the unconverted simplified metadata. No candidate could reach that matcher.
+
+Added unique original/simplified/traditional query variants for title, artist and album. Each retains the existing exact/get, album search and album-free search sequence. Returned candidates still match against the original identity, script-normalized title/artist, album preference, duration tolerance and ambiguity rules. Transport failures exit before spelling variants, so an outage does not multiply retries. No source substitution, proxy change or relaxed version matching.
+
+Regression: injected traditional-only API response reproduces a failing assertion before the fix and passes afterward. Existing cancellation, bounded retry, album fallback, ambiguous/duplicate candidate, script normalization, playback clock, timing, offsets and ending checks passed. Production fetch against the real service recovered 人間, 285 seconds, 81 parsed time marks and 57 timeline segments. Full Debug build and whitespace checks passed.
+
+Signed updated development app installed with prior bundle backed up and restarted. Actual playback advanced to 关键词; app log recorded Lyrics loaded: 64 lines. Native accessibility observed successive lyric sentences and native screenshot showed the running rocket with lyric text to the right, confirming fetch-to-render operation. No guarantee is made for songs without synchronized lyrics in the provider database; that remains a source-coverage limit.

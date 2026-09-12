@@ -11,112 +11,76 @@ import SwiftUI
 struct NotchShape: Shape {
     private var topCornerRadius: CGFloat
     private var bottomCornerRadius: CGFloat
+    var liquid: CGFloat
+    var rocket: CGFloat
 
     init(
         topCornerRadius: CGFloat? = nil,
-        bottomCornerRadius: CGFloat? = nil
+        bottomCornerRadius: CGFloat? = nil,
+        rocket: CGFloat = 0,
+        liquid: CGFloat = 0
     ) {
         self.topCornerRadius = topCornerRadius ?? 6
         self.bottomCornerRadius = bottomCornerRadius ?? 14
+        self.rocket = rocket
+        self.liquid = liquid
     }
 
-    var animatableData: AnimatablePair<CGFloat, CGFloat> {
-        get {
-            .init(
-                topCornerRadius,
-                bottomCornerRadius
-            )
-        }
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { .init(.init(topCornerRadius, bottomCornerRadius), .init(rocket, liquid)) }
         set {
-            topCornerRadius = newValue.first
-            bottomCornerRadius = newValue.second
+            topCornerRadius = newValue.first.first
+            bottomCornerRadius = newValue.first.second
+            rocket = newValue.second.first
+            liquid = newValue.second.second
         }
+    }
+
+    static func rocketCoordinate(_ x: CGFloat, width: CGFloat, height: CGFloat) -> CGFloat {
+        let head = height * 0.45, tail = height * 0.28
+        return (x + head) * width / max(1, width + head + tail)
     }
 
     func path(in rect: CGRect) -> Path {
+        let w = rect.width, h = rect.height
+        let r = topCornerRadius, b = bottomCornerRadius
+        let t = min(1, max(0, rocket))
+        let head = h * 0.45, tail = h * 0.28
+        func point(_ x: CGFloat, _ y: CGFloat, _ rx: CGFloat, _ ry: CGFloat) -> CGPoint {
+            let insideX = Self.rocketCoordinate(rx, width: w, height: h)
+            return CGPoint(x: rect.minX + x + (insideX - x) * t,
+                           y: rect.minY + y + (ry - y) * t)
+        }
         var path = Path()
-
-        path.move(
-            to: CGPoint(
-                x: rect.minX,
-                y: rect.minY
-            )
-        )
-
-        path.addQuadCurve(
-            to: CGPoint(
-                x: rect.minX + topCornerRadius,
-                y: rect.minY + topCornerRadius
-            ),
-            control: CGPoint(
-                x: rect.minX + topCornerRadius,
-                y: rect.minY
-            )
-        )
-
-        path.addLine(
-            to: CGPoint(
-                x: rect.minX + topCornerRadius,
-                y: rect.maxY - bottomCornerRadius
-            )
-        )
-
-        path.addQuadCurve(
-            to: CGPoint(
-                x: rect.minX + topCornerRadius + bottomCornerRadius,
-                y: rect.maxY
-            ),
-            control: CGPoint(
-                x: rect.minX + topCornerRadius,
-                y: rect.maxY
-            )
-        )
-
-        path.addLine(
-            to: CGPoint(
-                x: rect.maxX - topCornerRadius - bottomCornerRadius,
-                y: rect.maxY
-            )
-        )
-
-        path.addQuadCurve(
-            to: CGPoint(
-                x: rect.maxX - topCornerRadius,
-                y: rect.maxY - bottomCornerRadius
-            ),
-            control: CGPoint(
-                x: rect.maxX - topCornerRadius,
-                y: rect.maxY
-            )
-        )
-
-        path.addLine(
-            to: CGPoint(
-                x: rect.maxX - topCornerRadius,
-                y: rect.minY + topCornerRadius
-            )
-        )
-
-        path.addQuadCurve(
-            to: CGPoint(
-                x: rect.maxX,
-                y: rect.minY
-            ),
-            control: CGPoint(
-                x: rect.maxX - topCornerRadius,
-                y: rect.minY
-            )
-        )
-
-        path.addLine(
-            to: CGPoint(
-                x: rect.minX,
-                y: rect.minY
-            )
-        )
-
+        path.move(to: point(0, 0, 0, 0))
+        path.addCurve(to: point(r, r, -head, h * 0.5),
+                      control1: point(r * 2 / 3, 0, -head * 0.25, h * 0.18),
+                      control2: point(r, r / 3, -head, h * 0.46))
+        path.addLine(to: point(r, h - b, -head, h * 0.5))
+        path.addCurve(to: point(r + b, h, 0, h),
+                      control1: point(r, h - b / 3, -head, h * 0.54),
+                      control2: point(r + b / 3, h, -head * 0.25, h * 0.82))
+        let depth = max(0, liquid) * (1 - t)
+        let span = min(60, max(0, (w - 2 * (r + b)) / 3))
+        path.addLine(to: point(w / 2 - span, h, w / 2 - span, h))
+        path.addCurve(to: CGPoint(x: rect.midX, y: rect.maxY + depth),
+                      control1: CGPoint(x: rect.midX - span * 0.55, y: rect.maxY),
+                      control2: CGPoint(x: rect.midX - span * 0.35, y: rect.maxY + depth))
+        path.addCurve(to: point(w / 2 + span, h, w / 2 + span, h),
+                      control1: CGPoint(x: rect.midX + span * 0.35, y: rect.maxY + depth),
+                      control2: CGPoint(x: rect.midX + span * 0.55, y: rect.maxY))
+        path.addLine(to: point(w - r - b, h, w - h * 0.2, h))
+        path.addQuadCurve(to: point(w - r, h - b, w + tail, h),
+                          control: point(w - r, h, w + tail, h))
+        path.addLine(to: point(w - r, h - b, w + tail * 0.65, h * 0.7))
+        path.addLine(to: point(w - r, r, w + tail * 0.65, h * 0.3))
+        path.addLine(to: point(w - r, r, w + tail, 0))
+        path.addQuadCurve(to: point(w, 0, w - h * 0.2, 0),
+                          control: point(w - r, 0, w + tail, 0))
+        path.closeSubpath()
         return path
     }
+
 }
 
 #Preview {

@@ -43,7 +43,11 @@ extension PlaybackState {
         }
         if let elapsed, elapsed.isFinite { return (max(0, elapsed), date ?? now) }
         guard diff else { return (0, date ?? now) }
-        if let date { return (currentTime, date) }
+        if let date {
+            guard date >= lastUpdated else { return (currentTime, lastUpdated) }
+            let advance = isPlaying ? date.timeIntervalSince(lastUpdated) * max(0, playbackRate) : 0
+            return (max(0, currentTime + advance), date)
+        }
         if (playing != nil && playing != isPlaying) || (rate != nil && rate != playbackRate) {
             let advance = isPlaying ? max(0, now.timeIntervalSince(lastUpdated)) * max(0, playbackRate) : 0
             return (max(0, currentTime + advance), now)

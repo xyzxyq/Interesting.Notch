@@ -29,6 +29,12 @@ struct ContentView: View {
 
     @State private var gestureProgress: CGFloat = .zero
 
+    @ObservedObject private var codex = CodexActivity.shared
+    @Environment(\.accessibilityReduceMotion) private var reducedMotion
+    @State private var liquidDepth: CGFloat = 0
+    @State private var rocketProgress: CGFloat = 0
+    @State private var flameActive = false
+
     @State private var haptics: Bool = false
 
     @Namespace var albumArtNamespace
@@ -56,7 +62,9 @@ struct ContentView: View {
             topCornerRadius: topCornerRadius,
             bottomCornerRadius: ((vm.notchState == .open) && Defaults[.cornerRadiusScaling])
                 ? cornerRadiusInsets.opened.bottom
-                : cornerRadiusInsets.closed.bottom
+                : cornerRadiusInsets.closed.bottom,
+            rocket: vm.notchState == .closed ? rocketProgress : 0,
+            liquid: vm.notchState == .closed ? liquidDepth : 0
         )
     }
 
@@ -81,6 +89,8 @@ struct ContentView: View {
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
         {
             chinWidth += (2 * musicSideWidth + 20)
+        } else if codex.running && vm.notchState == .closed && !vm.hideOnClosed {
+            chinWidth += 2 * musicSideWidth + 20
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
             && !vm.hideOnClosed
@@ -111,7 +121,8 @@ struct ContentView: View {
                         : cornerRadiusInsets.closed.bottom
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
-                    .background(.black)
+                    .frame(width: vm.notchState == .open ? vm.notchSize.width : nil)
+                    .background { currentNotchShape.fill(.black) }
                     .clipShape(currentNotchShape)
                     .overlay(alignment: .top) {
                         Rectangle()
@@ -120,6 +131,8 @@ struct ContentView: View {
                             .padding(.horizontal, topCornerRadius)
                     }
                     .overlay { MusicEdgeEffect(shape: currentNotchShape) }
+                    .overlay { CodexSpeedLines(shape: currentNotchShape, effort: codex.effort, active: flameActive) }
+                    .overlay { CodexFlame(active: flameActive, effort: codex.effort) }
                     .shadow(
                         color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
                             ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
@@ -207,6 +220,12 @@ struct ContentView: View {
                         //                    }
                         //                    .keyboardShortcut("E", modifiers: .command)
                     }
+                    .overlay(alignment: .bottom) {
+                        CodexDropButton(waiting: codex.waiting && vm.notchState == .closed && !vm.hideOnClosed,
+                                        count: codex.preview == nil ? codex.pending.count : 1,
+                                        action: codex.showRequests, surface: $liquidDepth)
+                            .offset(y: 82)
+                    }
                 if vm.chinHeight > 0 {
                     Rectangle()
                         .fill(Color.black.opacity(0.01))
@@ -226,6 +245,20 @@ struct ContentView: View {
         .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
+        .task(id: codex.running && vm.notchState == .closed && !vm.hideOnClosed) {
+            let active = codex.running && vm.notchState == .closed && !vm.hideOnClosed
+            flameActive = false
+            if active {
+                try? await Task.sleep(for: .milliseconds(reducedMotion ? 0 : 850))
+                guard !Task.isCancelled else { return }
+            }
+            withAnimation(.easeInOut(duration: reducedMotion ? 0.15 : 0.5)) { rocketProgress = active ? 1 : 0 }
+            if active {
+                try? await Task.sleep(for: .milliseconds(reducedMotion ? 150 : 500))
+                guard !Task.isCancelled else { return }
+                flameActive = true
+            }
+        }
         .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
             anyDropDebounceTask?.cancel()
 
@@ -302,6 +335,12 @@ struct ContentView: View {
                       } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
                           MusicLiveActivity()
                               .frame(alignment: .center)
+                      } else if codex.running && vm.notchState == .closed && !vm.hideOnClosed {
+                          HStack(spacing: 0) {
+                              fuelSlot
+                              Color.clear.frame(width: fuelGap)
+                              Color.clear.frame(width: musicSideWidth)
+                          }.frame(height: vm.effectiveClosedNotchHeight)
                       } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
                           BoringFaceAnimation()
                        } else if vm.notchState == .open {
@@ -410,11 +449,17 @@ struct ContentView: View {
                 albumArt: musicManager.albumArt, sideWidth: musicSideWidth,
                 gap: max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top + 16),
                 height: max(0, vm.effectiveClosedNotchHeight - 12),
-                lyricOffset: compactLyricsOffset
+                lyricOffset: compactLyricsOffset, hidesArtwork: codex.running
             )
+            .overlay(alignment: .leading) {
+                if codex.running { fuelSlot }
+            }
             .frame(height: vm.effectiveClosedNotchHeight)
         } else {
         HStack {
+            if codex.running {
+                fuelSlot
+            } else {
             Image(nsImage: musicManager.albumArt)
                 .resizable()
                 .clipped()
@@ -428,6 +473,7 @@ struct ContentView: View {
                     height: max(0, vm.effectiveClosedNotchHeight - 12)
                 )
                 .frame(width: musicSideWidth, alignment: .trailing)
+            }
 
             Rectangle()
                 .fill(.black)
@@ -494,6 +540,18 @@ struct ContentView: View {
             alignment: .center
         )
         }
+    }
+
+    private var fuelGap: CGFloat {
+        max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top + 16)
+    }
+
+    private var fuelSlot: some View {
+        CodexFuelGauge(fuel: codex.fuel)
+            .frame(width: compactLyricsMode ? 22 : max(0, vm.effectiveClosedNotchHeight - 12),
+                   height: compactLyricsMode ? 22 : max(0, vm.effectiveClosedNotchHeight - 12))
+            .padding(.leading, compactLyricsMode ? 2 : 0)
+            .frame(width: musicSideWidth, alignment: compactLyricsMode ? .leading : .trailing)
     }
 
     @ViewBuilder

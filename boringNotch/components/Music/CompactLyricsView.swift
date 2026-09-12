@@ -52,11 +52,11 @@ struct CompactLyricsView: View {
     let gap: CGFloat
     let height: CGFloat
     var lyricOffset: Double = 0
+    var hidesArtwork = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var glyph: PortalGlyph?
     @State private var cover: PortalGlyph?
     @State private var outgoingGlyph: PortalGlyph?
-    @State private var finished = false
     @ObservedObject private var weather = NotchWeatherManager.shared
     @State private var shownWeather: NotchWeatherSnapshot?
     @State private var previousWeather: NotchWeatherSnapshot?
@@ -72,7 +72,7 @@ struct CompactLyricsView: View {
             return CompactLyrics.timeOfDay(at: clock.date)
         }()
         TimelineView(.animation(minimumInterval: reduceMotion ? 0.25 : 1.0 / 60,
-                                paused: !isPlaying || finished)) { tick in
+                                paused: !isPlaying || (duration > 0 && position >= duration - 0.2))) { tick in
             let elapsed = max(0, isPlaying ? position + max(0, tick.date.timeIntervalSince(sampleDate)) * max(0, rate) : position)
             let lyricTime = max(0, elapsed + lyricOffset)
             let phase = elapsed >= duration - 0.2 && duration > 0 ? LyricPhase.finished : CompactLyrics.phase(at: min(lyricTime, max(0, duration - 0.201)), cues: segments, duration: duration)
@@ -81,7 +81,7 @@ struct CompactLyricsView: View {
             PortalLyricsFrame(phase: phase, elapsed: elapsed, duration: duration,
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
                               glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
-                              outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
+                              hidesArtwork: hidesArtwork, outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
                               entrance: min(1, max(0, elapsed / 2)),
                               daylight: period == .day ? 1 : 0, dawn: period == .dawn ? 1 : 0, dusk: period == .dusk ? 1 : 0,
                               weather: shownWeather, previousWeather: previousWeather, weatherBlend: weatherBlend,
@@ -95,7 +95,6 @@ struct CompactLyricsView: View {
                 .task(id: outgoing?.text) {
                     outgoingGlyph = outgoing.map { PortalGlyph(text: $0.text) }
                 }
-                .onChange(of: phase) { _, phase in finished = phase == .finished }
         }
         }
         .frame(width: sideWidth * 2 + gap, height: height)
@@ -112,8 +111,6 @@ struct CompactLyricsView: View {
             withAnimation(.easeInOut(duration: 1)) { weatherBlend = 1 }
         }
         .task(id: ObjectIdentifier(albumArt)) { cover = PortalGlyph(image: albumArt) }
-        .onChange(of: revision) { _, _ in finished = false }
-        .onChange(of: sampleDate) { _, _ in finished = false }
     }
 }
 
@@ -131,6 +128,7 @@ struct PortalLyricsFrame: View, Animatable {
     let albumArt: NSImage
 
     var lyricTime: Double? = nil
+    var hidesArtwork = false
     var outgoing: LyricSegment? = nil
     var outgoingGlyph: PortalGlyph? = nil
     var entrance: Double = 1
@@ -163,7 +161,7 @@ struct PortalLyricsFrame: View, Animatable {
             if reduced { context.opacity = reveal }
             else { context.clip(to: Path(CGRect(x: 0, y: 0, width: edge, height: size.height))) }
             let dissolve = CompactLyrics.dissolve(at: elapsed, duration: duration)
-            artwork(in: left, dissolve: dissolve, context: context)
+            if !hidesArtwork { artwork(in: left, dissolve: dissolve, context: context) }
             let night = max(0, 1 - daylight - dawn - dusk)
             if night > 0 { moon(in: left, dissolve: dissolve, visibility: night, context: context) }
             if dawn > 0 { moon(in: left, dissolve: dissolve, visibility: dawn, early: true, context: context) }

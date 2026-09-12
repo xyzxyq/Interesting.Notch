@@ -149,6 +149,8 @@
 		B1F747F92EC7E94000F841DB /* LottieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1F747F82EC7E94000F841DB /* LottieView.swift */; };
 		B1FEB4992C7686630066EBBC /* PanGesture.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FEB4982C7686630066EBBC /* PanGesture.swift */; };
 		F38DE6482D8243E7008B5C6D /* BatteryActivityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */; };
+		CF1400000000000000000002 /* CodexActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1400000000000000000001 /* CodexActivity.swift */; };
+		CF1400000000000000000004 /* CodexNotchEffect.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1400000000000000000003 /* CodexNotchEffect.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -321,6 +323,8 @@
 		B1F747F82EC7E94000F841DB /* LottieView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LottieView.swift; sourceTree = "<group>"; };
 		B1FEB4982C7686630066EBBC /* PanGesture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanGesture.swift; sourceTree = "<group>"; };
 		F38DE6472D8243E2008B5C6D /* BatteryActivityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryActivityManager.swift; sourceTree = "<group>"; };
+		CF1400000000000000000001 /* CodexActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexActivity.swift; sourceTree = "<group>"; };
+		CF1400000000000000000003 /* CodexNotchEffect.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexNotchEffect.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -527,6 +531,7 @@
 				112FB7342CCF16F70015238C /* NotchSpaceManager.swift */,
 				147163992C5D35FF0068B555 /* MusicManager.swift */,
 				CF1300000000000000000001 /* MusicEdgeAudio.swift */,
+				CF1400000000000000000001 /* CodexActivity.swift */,
 				CF1200000000000000000003 /* NotchWeatherManager.swift */,
 				149E0B962C737D00006418B1 /* WebcamManager.swift */,
 				14C08BB52C8DE42D000F8AA0 /* CalendarManager.swift */,
@@ -724,6 +729,7 @@
 				1194E8862EA6DDA7009C82D6 /* BoringNotchSkyLightWindow.swift */,
 				1160F8D72DD98230006FBB94 /* NotchShape.swift */,
 				CF1300000000000000000003 /* MusicEdgeEffect.swift */,
+				CF1400000000000000000003 /* CodexNotchEffect.swift */,
 				9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */,
 				14D570C52C5F38210011E668 /* BoringHeader.swift */,
 				14D570D12C5F6C6A0011E668 /* BoringExtrasMenu.swift */,
@@ -969,6 +975,8 @@
 				1113ABCE2E80E27000EC13B2 /* ShelfActionService.swift in Sources */,
 				1160F8D82DD98230006FBB94 /* NotchShape.swift in Sources */,
 				CF1300000000000000000004 /* MusicEdgeEffect.swift in Sources */,
+				CF1400000000000000000004 /* CodexNotchEffect.swift in Sources */,
+				CF1400000000000000000002 /* CodexActivity.swift in Sources */,
 				5917FD112E57891600E87F1C /* MediaKeyInterceptor.swift in Sources */,
 				14C08BC12C8E03AD000F8AA0 /* NSImage+Extensions.swift in Sources */,
 				149E0B9A2C737D40006418B1 /* WebcamView.swift in Sources */,

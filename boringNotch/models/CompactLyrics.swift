@@ -18,6 +18,11 @@ struct LyricTrack: Equatable {
     let artist: String
     let album: String
     let duration: Double
+    var isReady: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !artist.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && duration.isFinite && duration > 0
+    }
 }
 
 struct LyricCandidate: Decodable {
@@ -52,7 +57,8 @@ enum CompactLyrics {
             titleKey($0.trackName) == titleKey(track.title)
                 && searchKey($0.artistName) == searchKey(track.artist)
                 && $0.duration.isFinite && abs($0.duration - track.duration) <= 2
-                && (!requireSynced || !parseLRC($0.syncedLyrics ?? "").filter { !$0.text.isEmpty }.isEmpty)
+                && ((!requireSynced && !normalized($0.plainLyrics ?? "").isEmpty)
+                    || !timeline(parseLRC($0.syncedLyrics ?? ""), duration: track.duration).isEmpty)
         }
         let albumMatches = matches.filter { !track.album.isEmpty && searchKey($0.albumName ?? "") == searchKey(track.album) }
         let pool = albumMatches.isEmpty ? matches : albumMatches
@@ -81,38 +87,58 @@ enum CompactLyrics {
     static func retryDelay(for error: Error) -> UInt64? {
         if let urlError = error as? URLError, urlError.code != .cancelled { return 60_000_000_000 }
         if case FetchError.http(let code) = error, code == 429 || code >= 500 { return 60_000_000_000 }
+        if case FetchError.invalidResponse = error { return 60_000_000_000 }
+        if error is DecodingError { return 60_000_000_000 }
         return nil
     }
 
     static func fetch(_ track: LyricTrack, requireSynced: Bool = true,
                       transport: (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) },
                       sleep: (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }) async throws -> LyricCandidate? {
-        guard !normalized(track.artist).isEmpty, !normalized(track.title).isEmpty,
-              track.duration.isFinite, track.duration > 0 else { return nil }
+        guard track.isReady else { return nil }
+        // Search indexes do not normalize Chinese scripts, unlike our result matcher.
+        var queries = [track]
+        for language in ["zh-Hans", "zh-Hant"] {
+            let variant = LyricTrack(bundleID: track.bundleID,
+                                     title: displayText(track.title, languages: [language]),
+                                     artist: displayText(track.artist, languages: [language]),
+                                     album: displayText(track.album, languages: [language]), duration: track.duration)
+            if !queries.contains(variant) { queries.append(variant) }
+        }
         var failure: Error?
+        for query in queries {
+        var reachedService = false
         for stage in 0..<3 {
             try Task.checkCancellation()
             var url = URLComponents(string: "https://lrclib.net/api/" + (stage == 0 ? "get" : "search"))!
-            url.queryItems = [.init(name: "track_name", value: track.title), .init(name: "artist_name", value: track.artist)]
-            if stage < 2 && !track.album.isEmpty { url.queryItems?.append(.init(name: "album_name", value: track.album)) }
+            url.queryItems = [.init(name: "track_name", value: query.title), .init(name: "artist_name", value: query.artist)]
+            if stage < 2 && !query.album.isEmpty { url.queryItems?.append(.init(name: "album_name", value: query.album)) }
             if stage == 0 { url.queryItems?.append(.init(name: "duration", value: String(track.duration))) }
             var request = URLRequest(url: url.url!, timeoutInterval: 8)
             request.setValue("InterestingNotch/1.0", forHTTPHeaderField: "User-Agent")
+            var requestFailure: Error?
             for attempt in 0..<3 {
                 do {
                     try Task.checkCancellation()
                     let (data, response) = try await transport(request)
                     try Task.checkCancellation()
                     guard let http = response as? HTTPURLResponse else { throw FetchError.invalidResponse }
-                    if http.statusCode == 404 { break }
+                    if http.statusCode == 404 {
+                        requestFailure = nil
+                        reachedService = true
+                        break
+                    }
                     guard http.statusCode == 200 else { throw FetchError.http(http.statusCode) }
                     let candidates = stage == 0 ? [try JSONDecoder().decode(LyricCandidate.self, from: data)]
                         : try JSONDecoder().decode([LyricCandidate].self, from: data)
+                    requestFailure = nil
+                    reachedService = true
                     if let match = match(candidates, track: track, requireSynced: requireSynced) { return match }
                     break
                 } catch {
                     try Task.checkCancellation()
-                    failure = error
+                    if (error as? URLError)?.code == .cancelled { throw error }
+                    requestFailure = error
                     let retryable: Bool
                     if case FetchError.http(let status) = error { retryable = status == 429 || status >= 500 }
                     else { retryable = error is URLError }
@@ -120,6 +146,10 @@ enum CompactLyrics {
                     try await sleep(UInt64(attempt + 1) * 1_000_000_000)
                 }
             }
+            if let requestFailure { failure = requestFailure }
+        }
+        // Changing spelling cannot fix an unavailable service; keep outage retries bounded.
+        if !reachedService, let failure { throw failure }
         }
         if let failure { throw failure }
         return nil

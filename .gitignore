@@ -56,3 +56,6 @@ build/
 
 # Isolated development worktrees
 .worktrees/
+
+# macOS AppleDouble metadata
+._*

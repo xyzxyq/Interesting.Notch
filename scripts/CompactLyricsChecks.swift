@@ -56,10 +56,19 @@ import SwiftUI
         assert(plain.date.timeIntervalSince1970 == 120)
         assert(CompactLyrics.phase(at: 19.5 + 0.5, cues: long, duration: 30) == .lyrics(long[1]))
         assert(CompactLyrics.phase(at: 20.5 - 1, cues: long, duration: 30) == .lyrics(long[0]))
+        state.isPlaying = true
+        let timestampOnly = state.clockUpdate(elapsed: nil, timestamp: "1970-01-01T00:02:00Z", diff: true, playing: nil, rate: nil)
+        assert(timestampOnly.position == 30 && timestampOnly.date.timeIntervalSince1970 == 120, "Timestamp-only updates must advance the old clock anchor")
+        let oldTimestamp = state.clockUpdate(elapsed: nil, timestamp: "1970-01-01T00:01:30Z", diff: true, playing: nil, rate: nil)
+        assert(oldTimestamp.position == state.currentTime && oldTimestamp.date == state.lastUpdated)
         let unchanged = state.clockUpdate(elapsed: nil, timestamp: nil, diff: true, playing: nil, rate: nil)
         assert(unchanged.position == state.currentTime && unchanged.date == state.lastUpdated)
         let track = LyricTrack(bundleID: "com.apple.Music", title: "Song", artist: "Singer", album: "Album", duration: 180)
         let good = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 181, plainLyrics: "Hello", syncedLyrics: "[00:01]Hello")
+        let outside = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 180, plainLyrics: nil, syncedLyrics: "[03:05]Outside the recording")
+        assert(CompactLyrics.match([outside], track: track) == nil, "Timed lyrics need at least one displayable segment")
+        let empty = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 180, plainLyrics: "  ", syncedLyrics: nil)
+        assert(CompactLyrics.match([empty], track: track, requireSynced: false) == nil, "An empty payload is not plain lyrics")
         assert(CompactLyrics.match([good], track: track) != nil)
         assert(CompactLyrics.match([good, good], track: track) != nil)
         let other = LyricCandidate(trackName: "Song", artistName: "Singer", albumName: "Album", duration: 180, plainLyrics: nil, syncedLyrics: "[00:10]Other")
@@ -85,6 +94,20 @@ import SwiftUI
         func response(_ request: URLRequest, _ code: Int, _ data: Data = Data()) -> (Data, URLResponse) {
             (data, HTTPURLResponse(url: request.url!, statusCode: code, httpVersion: nil, headerFields: nil)!)
         }
+        let chineseTrack = LyricTrack(bundleID: "com.apple.Music", title: "人间", artist: "王菲", album: "王菲", duration: 285)
+        let traditionalPayload: [String: Any] = ["trackName": "人間", "artistName": "王菲", "albumName": "王菲", "duration": 285,
+                                                 "syncedLyrics": "[00:01]测试"]
+        var initialFailure = true
+        let traditional = try! await CompactLyrics.fetch(chineseTrack, transport: { request in
+            if initialFailure { initialFailure = false; return response(request, 503) }
+            let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+            let isTraditional = items.contains { $0.name == "track_name" && $0.value == "人間" }
+            if request.url!.path.hasSuffix("/get") {
+                return isTraditional ? response(request, 200, try JSONSerialization.data(withJSONObject: traditionalPayload)) : response(request, 404)
+            }
+            return response(request, 200, try JSONSerialization.data(withJSONObject: isTraditional ? [traditionalPayload] : []))
+        }, sleep: { _ in })
+        assert(traditional != nil, "Recovered transient errors must not block traditional search fallback")
         var calls = 0
         let recovered = try! await CompactLyrics.fetch(track, transport: { request in
             calls += 1
@@ -118,6 +141,23 @@ import SwiftUI
         }
         let cancelled = await cancellation.value
         assert(cancelled)
+        var cancelledCalls = 0
+        do {
+            _ = try await CompactLyrics.fetch(track, transport: { _ in
+                cancelledCalls += 1
+                throw URLError(.cancelled)
+            }, sleep: { _ in assertionFailure("Cancelled requests must not retry") })
+            assertionFailure("Cancelled transport must throw")
+        } catch { assert(cancelledCalls == 1) }
+        var invalidTrack = track
+        invalidTrack = LyricTrack(bundleID: track.bundleID, title: track.title, artist: " ", album: track.album, duration: 0)
+        assert(!invalidTrack.isReady)
+        let invalidResult = try! await CompactLyrics.fetch(invalidTrack, transport: { _ in
+            assertionFailure("Incomplete metadata must not contact the provider")
+            throw URLError(.badURL)
+        })
+        assert(invalidResult == nil)
+        assert(CompactLyrics.retryDelay(for: CompactLyrics.FetchError.invalidResponse) != nil)
         print("Lyrics fetch checks passed: 503 retry, album fallback, duplicate/ambiguous versions, bounded outage, cancellation")
     }
 

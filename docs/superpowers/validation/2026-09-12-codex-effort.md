@@ -1,0 +1,21 @@
+# Compact expansion and effort-driven rocket
+
+- Actual expanded content is constrained to `vm.notchSize.width` (580 pt). Previously, the flexible layout filled the much wider transparent effect window; changing the sizing constant alone did not constrain it. Calendar stays 215 pt; song metadata/slider region absorbs the reduction. Native expanded screenshot verified cover, title, artist, seek slider, three playback controls and calendar remain visible.
+- Rocket nose uses mirrored cubic curves, with shallow sides and a small rounded tip. Previous upper quad/lower straight segment caused asymmetry. Default notch geometry retains mathematically equivalent cubic conversions of its original quadratic corners. Physical-center coverage and nose symmetry checks pass.
+- Installed Codex IPC snapshot was inspected read-only, printing only field names and relevant effort values. Verified `latestThreadSettings.effort = medium`; exposed optional `reasoningEffort` through existing bridge with an allowlist of low/medium/high/xhigh/max/ultra. Snapshot, replacement and removal patches tested. No prompt/title/token content added to output.
+- Swift selects the highest known effort among running tasks. Waiting state still overrides running. Unknown effort uses neutral flame without speed lines. Configured effort is not actual token throughput or compute telemetry.
+- Six increasing flame lengths/speeds; high and above enable left-to-right reference lines below the rocket (top screen edge cannot show external decoration). Ultra length 1.65H versus high 0.85H; animation rate 2.3x versus high 1x; reference lines 48 pt versus 14 pt, more lines, with faster travel. Reduce Motion omits reference lines and freezes flame motion.
+- Settings → Media → Preview rocket reveals a six-level preview picker; preview is separate from actual Codex model configuration and expires after 20 seconds. Live settings showed medium, and the preview picker was exercised through Ultra. High/Ultra production views rendered for static QA; no measured FPS or throughput claim.
+- Python bridge regression tests, Swift state/motion/geometry/effort checks, MusicEdgeChecks and full Debug build passed. Bridge LaunchAgent updated independently of the session. Development application updated and restarted with prior app bundles preserved.
+
+## Nose-origin acceleration wake
+
+Replaced horizontal lanes below the body with mirrored streamline segments originating at the exact nose tip. The shared wakePoint function guarantees x never precedes the tip and travel advances rightward; lanes curve outward around the shell. Exterior clipping hides internal portions, and an additional nose-plane clip prevents stroke caps/glow from appearing ahead of the tip. Upper portions naturally meet the physical top-of-screen boundary. Geometry checks cover both sides, all five lanes, origin and monotonic travel.
+
+High and above gain a narrow cyan shell edge and a moving white highlight clipped to the shell. Increasing effort raises flame brightness toward a white-gold core and adds soft exterior glow. Max/Ultra wake segments glow, with Ultra using five lanes per side and longer segments; Ultra flame base length increases to 2H and temporal rate to 3 relative to high. Body/content stay fixed. Reduce Motion omits wake and hull sweep and freezes flame.
+
+Full Debug build, existing Swift checks plus wake-origin/monotonicity checks, and static high/Ultra production render passed. Updated app signed, previous bundle backed up, and new process launched. Preview: 2026-09-12-codex-wake.png (static production rendering, not a recorded desktop animation).
+
+## Black wake refinement
+
+Removed the cyan hull sweep and all speed-streak glow. Replaced long luminous segments with short black strokes (roughly 16–28 pt), four at high and six at Ultra, with sinusoidal fade-in/out and tighter outward spread. Nose-origin geometry, warm flame and existing music ripple colors remain. Full Debug build, Swift checks and git diff --check passed; static production rendering inspected in 2026-09-12-codex-black-wake.png. This is not a live animation/FPS measurement. Installed signed development bundle, preserved previous bundle, restarted and verified the new process maps the current app debug dylib.

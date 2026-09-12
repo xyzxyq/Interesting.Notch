@@ -89,7 +89,7 @@ struct MusicEdgeFrame: View {
     var sky = true
     var body: some View {
         Canvas { context, size in
-            let rect = CGRect(origin: .zero, size: size).insetBy(dx: 24, dy: 24)
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: 24 + 48 * shape.rocket, dy: 24 + 48 * shape.rocket)
             guard rect.width > 0, rect.height > 0 else { return }
             let outline = shape.path(in: rect)
             var mask = Path(CGRect(origin: .zero, size: size)); mask.addPath(outline)
@@ -237,8 +237,12 @@ struct MusicEdgeFrame: View {
 }
 
 #if !EDGE_CHECKS
-struct MusicEdgeEffect: View {
-    let shape: NotchShape
+struct MusicEdgeEffect: View, Animatable {
+    var shape: NotchShape
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { shape.animatableData }
+        set { shape.animatableData = newValue }
+    }
     @ObservedObject private var music = MusicManager.shared
     @ObservedObject private var audio = MusicEdgeAudio.shared
     @AppStorage("musicEdgeStyle") private var style = "off"
@@ -270,7 +274,7 @@ struct MusicEdgeEffect: View {
                     previous = date
                 }
         }
-        .padding(-24)
+        .padding(-24 - 48 * shape.rocket)
         .allowsHitTesting(false)
         .task(id: captureKey) { audio.configure(bundleID: music.bundleIdentifier, active: style != "off" && reactive && music.isPlaying && !reduced) }
     }
