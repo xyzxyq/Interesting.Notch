@@ -72,6 +72,11 @@ import SwiftUI
         print("Moon lyrics checks passed: Chinese script, timestamp intervals, clock anchors, offsets, endings, matching")
     }
     static func networkChecks(_ track: LyricTrack) async {
+        assert(CompactLyrics.retryDelay(for: URLError(.secureConnectionFailed)) == 60_000_000_000)
+        assert(CompactLyrics.retryDelay(for: CompactLyrics.FetchError.http(503)) != nil)
+        assert(CompactLyrics.retryDelay(for: URLError(.cancelled)) == nil)
+        assert(CompactLyrics.retryDelay(for: CancellationError()) == nil)
+        assert(CompactLyrics.retryDelay(for: CompactLyrics.FetchError.http(404)) == nil)
         let payload: [String: Any] = ["trackName": "Song", "artistName": "Singer", "albumName": "Reissue", "duration": 180,
                                       "syncedLyrics": "[00:01]Hello"]
         func response(_ request: URLRequest, _ code: Int, _ data: Data = Data()) -> (Data, URLResponse) {

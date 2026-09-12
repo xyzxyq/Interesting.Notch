@@ -70,6 +70,12 @@ enum CompactLyrics {
 
     enum FetchError: Error { case http(Int), invalidResponse }
 
+    static func retryDelay(for error: Error) -> UInt64? {
+        if let urlError = error as? URLError, urlError.code != .cancelled { return 60_000_000_000 }
+        if case FetchError.http(let code) = error, code == 429 || code >= 500 { return 60_000_000_000 }
+        return nil
+    }
+
     static func fetch(_ track: LyricTrack, requireSynced: Bool = true,
                       transport: (URLRequest) async throws -> (Data, URLResponse) = { try await URLSession.shared.data(for: $0) },
                       sleep: (UInt64) async throws -> Void = { try await Task.sleep(nanoseconds: $0) }) async throws -> LyricCandidate? {

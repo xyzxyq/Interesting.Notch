@@ -1,0 +1,7 @@
+# Lyrics outage diagnosis and recovery — 2026-09-12
+
+Live diagnostics: compact lyrics was enabled and Apple Music returned an active track with a valid position/duration. A URLSession request to the configured lrclib.net API reproduced NSURLErrorDomain -1200, TLS handshake failure (-9816). curl direct and through the configured local HTTP proxy also failed the TLS handshake. Thus no candidate payload was available for checking song coverage. This does not establish whether the upstream service or network route is responsible. Global proxy/security settings were not changed.
+
+Code defect: after a failed bounded fetch sequence, refreshLyrics treated the same track as already handled and never scheduled another fetch. Added a 60-second delayed refresh for transport errors, 429 and 5xx; generation/cancellation guards prevent stale retries after toggle/track changes. Waiting for retry clears the fetching flag and displays a connection-failure message. Cancellation,404 and malformed responses do not schedule repeated background attempts. No manual retry control added.
+
+Validation: CompactLyricsChecks passed retry policy for TLS/503/cancellation/404 plus existing bounded fetch retry, fallback, ambiguity, cancellation, timeline and matching checks. Full Debug xcodebuild succeeded; git diff --check and ad-hoc signature verification passed. Replaced stable installed bundle and restarted. Live lyric display remains unverified because the API connection was still failing at the last probe; this patch repairs recovery, not the external TLS failure.

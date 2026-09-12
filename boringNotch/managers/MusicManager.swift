@@ -428,8 +428,16 @@ class MusicManager: ObservableObject {
                 }
             } catch {
                 guard !Task.isCancelled, generation == self.lyricsGeneration else { return }
-                self.lyricsStatus = "Lyrics request failed"
+                self.isFetchingLyrics = false
                 NSLog("Lyrics request failed: %@", String(describing: error))
+                guard let delay = CompactLyrics.retryDelay(for: error) else {
+                    self.lyricsStatus = "Lyrics request failed"
+                    return
+                }
+                self.lyricsStatus = "歌词服务连接失败，60 秒后自动重试"
+                do { try await Task.sleep(nanoseconds: delay) } catch { return }
+                guard !Task.isCancelled, generation == self.lyricsGeneration else { return }
+                self.refreshLyrics(force: true)
             }
         }
     }
