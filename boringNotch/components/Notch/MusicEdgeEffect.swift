@@ -67,6 +67,17 @@ struct WaterWave {
     ]
 }
 
+struct MusicEdgePlayback {
+    let ambient: Bool
+    let visible: Bool
+    let speed: Double
+    init(style: String, alwaysOn: Bool, playing: Bool, energy: Double) {
+        ambient = alwaysOn && style.hasPrefix("water") && !playing
+        visible = style != "off" && (playing || ambient)
+        speed = ambient ? 0.12 : (style.hasPrefix("water") ? 0.4 : 0.65) + min(1, max(0, energy)) * 1.8
+    }
+}
+
 struct MusicEdgeFrame: View {
     let shape: NotchShape
     let style: String
@@ -234,22 +245,28 @@ struct MusicEdgeEffect: View {
     @AppStorage("musicEdgeStrength") private var strength = 1.0
     @AppStorage("musicEdgeReactive") private var reactive = true
     @AppStorage("musicEdgeSky") private var sky = true
+    @AppStorage("musicEdgeAlwaysOn") private var alwaysOn = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     @State private var phase = 0.0
     @State private var previous = Date.now
+    @State private var motionSpeed = 0.4
     private var captureKey: String { "\(style != "off" && reactive && music.isPlaying && !reduced)-\(music.bundleIdentifier ?? "")" }
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !music.isPlaying || style == "off" || reduced)) { clock in
+        let playback = MusicEdgePlayback(style: style, alwaysOn: alwaysOn, playing: music.isPlaying, energy: reactive ? audio.energy : 0)
+        TimelineView(.animation(minimumInterval: playback.ambient ? 1.0 / 30 : 1.0 / 60, paused: !playback.visible || reduced)) { clock in
             let elapsed = music.elapsedTime + (music.isPlaying ? max(0, clock.date.timeIntervalSince(music.timestampDate)) * max(0, music.playbackRate) : 0)
             let ending = CompactLyrics.dissolve(at: elapsed, duration: music.songDuration)
             let period = CompactLyrics.timeOfDay(at: clock.date)
             let tint: Color = period == .dusk ? Color(red: 0.95, green: 0.80, blue: 0.67) : period == .day ? Color(red: 0.97, green: 0.94, blue: 0.86) : Color(white: period == .dawn ? 0.70 : 0.88)
-            MusicEdgeFrame(shape: shape, style: style, strength: strength, energy: reactive ? audio.energy : 0,
+            MusicEdgeFrame(shape: shape, style: style, strength: playback.ambient ? strength * 0.75 : strength, energy: music.isPlaying && reactive ? audio.energy : 0,
                            phase: phase, color: tint, reduced: reduced, sky: sky)
-                .opacity(style == "off" || !music.isPlaying ? 0 : (1-ending) * min(1, max(0, elapsed / 2)))
-                .animation(.easeOut(duration: 0.4), value: music.isPlaying)
+                .opacity(!playback.visible ? 0 : alwaysOn && style.hasPrefix("water") ? 0.75 + (music.isPlaying ? 0.25 * (1-ending) : 0) : (1-ending) * min(1, max(0, elapsed / 2)))
+                .animation(.easeInOut(duration: 0.8), value: music.isPlaying)
+                .animation(.easeInOut(duration: 0.8), value: alwaysOn)
                 .onChange(of: clock.date) { _, date in
-                    phase += min(0.1, max(0, date.timeIntervalSince(previous))) * ((style.hasPrefix("water") ? 0.4 : 0.65) + (reactive ? audio.energy : 0) * 1.8)
+                    let dt = min(0.1, max(0, date.timeIntervalSince(previous)))
+                    motionSpeed += (playback.speed - motionSpeed) * (1 - exp(-dt / 0.7))
+                    phase += dt * motionSpeed
                     previous = date
                 }
         }
@@ -264,6 +281,7 @@ struct MusicEdgeSettings: View {
     @AppStorage("musicEdgeStrength") private var strength = 1.0
     @AppStorage("musicEdgeReactive") private var reactive = true
     @AppStorage("musicEdgeSky") private var sky = true
+    @AppStorage("musicEdgeAlwaysOn") private var alwaysOn = false
     @ObservedObject private var audio = MusicEdgeAudio.shared
     var body: some View {
         Picker("音乐边缘动效", selection: Binding(
@@ -277,6 +295,10 @@ struct MusicEdgeSettings: View {
             Text("流星").tag("meteor"); Text("光雾").tag("mist")
         }
         if style.hasPrefix("water") {
+            Toggle("水波常驻显示", isOn: $alwaysOn)
+            if alwaysOn {
+                Text("未播放音乐时，以更慢、更轻柔的节奏持续显示。").font(.caption).foregroundStyle(.secondary)
+            }
             Picker("水波颜色", selection: $style) {
                 Text("黑色").tag("water")
                 Text("白色").tag("waterWhite")

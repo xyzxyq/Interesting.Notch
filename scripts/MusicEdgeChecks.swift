@@ -3,6 +3,14 @@ import AppKit
 
 @main @MainActor struct MusicEdgeChecks {
     static func main() throws {
+        for style in ["water", "waterWhite", "waterColor"] {
+            let idle = MusicEdgePlayback(style: style, alwaysOn: true, playing: false, energy: 1)
+            let playing = MusicEdgePlayback(style: style, alwaysOn: true, playing: true, energy: 0)
+            assert(idle.visible && idle.ambient && idle.speed < playing.speed)
+            assert(!MusicEdgePlayback(style: style, alwaysOn: false, playing: false, energy: 0).visible)
+        }
+        assert(!MusicEdgePlayback(style: "off", alwaysOn: true, playing: true, energy: 1).visible)
+        assert(!MusicEdgePlayback(style: "dust", alwaysOn: true, playing: false, energy: 0).visible)
         var meter = EdgeEnergy()
         let quiet = meter.update(rms: 0.001, dt: 0.1)
         let loud = meter.update(rms: 0.3, dt: 0.1)

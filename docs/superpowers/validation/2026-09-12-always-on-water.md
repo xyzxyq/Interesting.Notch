@@ -1,0 +1,5 @@
+# Always-on water — 2026-09-12
+
+Added 水波常驻显示 (musicEdgeAlwaysOn, default false) for black/white/color water. Idle water stays visible at 0.75 opacity and 0.75 strength, zero audio energy, and phase speed0.12 versus ordinary playing baseline0.4. Speed eases toward its target over0.7seconds and playback appearance changes ease over0.8seconds without resetting wave phase. Persistent water retains a visible baseline through track endings. Idle timeline runs at30fps; playing retains60fps; Reduce Motion remains static. Capture activation still requires music.isPlaying, so ambient rendering does not enable audio capture. Other styles preserve playback-only visibility.
+
+Validation: MusicEdgeChecks passed visibility and speed assertions for all three water variants, disabled setting, off style and non-water exclusion, plus existing rendering/palette/reduced-motion assertions. Full Debug xcodebuild, git diff --check and ad-hoc codesign verification passed. Stable installed application replaced and restarted; the user's playback was not interrupted for a manual pause/resume demonstration. Enable the new switch in Media → 水波 to use the feature.
