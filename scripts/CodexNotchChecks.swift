@@ -3,6 +3,28 @@ import AppKit
 
 @main @MainActor struct CodexNotchChecks {
     static func main() throws {
+        assert(CodexMergeMotion.scale(for: 1) == 1)
+        assert(CodexMergeMotion.scale(for: 2) > CodexMergeMotion.scale(for: 1))
+        assert(CodexMergeMotion.scale(for: 3) > CodexMergeMotion.scale(for: 2))
+        assert(CodexMergeMotion.scale(for: 100) <= 1.7)
+        assert(CodexMergeMotion.absorbed(at: 0) == 0)
+        assert(CodexMergeMotion.absorbed(at: CodexMergeMotion.duration) == 1)
+        assert(CodexMergeMotion.sample(at: 0).radius == 0)
+        assert(CodexMergeMotion.sample(at: CodexMergeMotion.duration).radius == 0)
+        assert(abs(CodexMergeMotion.sample(at: CodexMergeMotion.duration).pulse) < 0.0001)
+        var lastTravel: CGFloat = 0
+        for t in stride(from: 0.0, through: CodexMergeMotion.duration, by: 0.01) {
+            let merge = CodexMergeMotion.sample(at: t)
+            assert(merge.travel >= lastTravel && merge.travel <= 1)
+            assert(merge.radius >= 0 && merge.radius <= 7 && abs(merge.pulse) <= 0.1)
+            lastTravel = merge.travel
+        }
+        assert(CodexActivity.shouldDismissRequests(enabled: true, preview: nil, connected: true, pendingCount: 0))
+        assert(!CodexActivity.shouldDismissRequests(enabled: true, preview: nil, connected: true, pendingCount: 1))
+        assert(!CodexActivity.shouldDismissRequests(enabled: true, preview: nil, connected: false, pendingCount: 0))
+        assert(!CodexActivity.shouldDismissRequests(enabled: true, preview: "waiting", connected: true, pendingCount: 0))
+        assert(CodexActivity.shouldDismissRequests(enabled: true, preview: "running", connected: false, pendingCount: 0))
+        assert(CodexActivity.shouldDismissRequests(enabled: false, preview: nil, connected: false, pendingCount: 1))
         assert(CodexActivity.modelLabel("gpt-5.6-luna", effort: "medium") == "5.6-Luna mid")
         assert(CodexActivity.modelLabel("gpt-5.6-terra", effort: "medium") == "5.6-Terra mid")
         assert(CodexActivity.modelLabel("gpt-5.6-sol", effort: "high") == "5.6-Sol high")
@@ -16,6 +38,28 @@ import AppKit
         assert(!CodexFuel(remainingPercent: 50, windowMinutes: 60, resetsAt: 1000, updatedAt: 100).valid(at: Date(timeIntervalSince1970: 110)))
         let id = "01a09362-3f79-7bf3-ba10-7a8bd1c1c2d7"
         let task = CodexTask(id: id, title: "Codex task", state: "waiting", detail: nil)
+        var stability = CodexTaskStability()
+        let base = Date(timeIntervalSince1970: 100)
+        assert(stability.update([task], at: base) == [task])
+        assert(stability.update([], at: base.addingTimeInterval(1)) == [task])
+        let resumed = CodexTask(id: id, title: "Codex task", state: "running", detail: nil)
+        assert(stability.update([resumed], at: base.addingTimeInterval(1.5)) == [task])
+        assert(stability.update([resumed], at: base.addingTimeInterval(2)) == [resumed])
+        assert(stability.update([], at: base.addingTimeInterval(4)) == [])
+        assert(stability.update([resumed, task], at: base.addingTimeInterval(5)) == [task])
+        stability.reset()
+        assert(stability.update([], at: base.addingTimeInterval(5.1)) == [])
+        var phase = MusicEdgePhase()
+        phase.update(target: 0.4, paused: false, at: base)
+        assert(abs(phase.value(at: base.addingTimeInterval(2)) - 0.8) < 0.0001)
+        phase.update(target: 1, paused: false, at: base.addingTimeInterval(2))
+        assert(abs(phase.value(at: base.addingTimeInterval(2)) - 0.8) < 0.0001)
+        phase.update(target: 1, paused: true, at: base.addingTimeInterval(3))
+        let frozen = phase.value(at: base.addingTimeInterval(3))
+        assert(phase.value(at: base.addingTimeInterval(300)) == frozen)
+        phase.update(target: 1, paused: false, at: base.addingTimeInterval(300))
+        assert(phase.value(at: base.addingTimeInterval(300)) == frozen)
+        assert(abs(CodexDropMotion.reminder(at: 120).offset) < 0.001)
         assert(task.waiting && task.url?.absoluteString == "codex://threads/\(id)")
         assert(CodexTask(id: "../settings?x=1", title: "", state: "running", detail: nil).url == nil)
         assert(CodexThrust.levels.count == 6)
@@ -108,6 +152,20 @@ import AppKit
                 for y in stride(from: 32.0, through: 59.0, by: 3) { assert(path.contains(CGPoint(x: x, y: y))) }
             }
         }
+        let mergeFrames = HStack(spacing: 30) {
+            ForEach([0.0, 0.25, 0.45, 0.6, 0.85], id: \.self) { time in
+                VStack(spacing: 0) {
+                    NotchShape().fill(.black).frame(width: 100, height: 25)
+                    CodexLiquidDrop(progress: 1, mergeElapsed: time, volumeScale: CodexMergeMotion.scale(for: 1 + CodexMergeMotion.absorbed(at: time)))
+                    Text(String(format: "%.2f s", time)).font(.caption)
+                }
+            }
+        }.padding(24).background(Color.gray)
+        let mergeRenderer = ImageRenderer(content: mergeFrames)
+        mergeRenderer.scale = 2
+        guard let mergeImage = mergeRenderer.cgImage else { fatalError("merge render failed") }
+        try NSBitmapImageRep(cgImage: mergeImage).representation(using: .png, properties: [:])!
+            .write(to: URL(fileURLWithPath: "/tmp/codex-merge-preview.png"))
         let view = VStack(spacing: 48) {
             specimen(progress: 0, label: "普通刘海 · 音乐水波")
             specimen(progress: 0.5, label: "轮廓过渡 · 50%")

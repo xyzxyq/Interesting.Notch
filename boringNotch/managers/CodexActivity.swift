@@ -46,17 +46,39 @@ struct CodexSnapshot: Decodable {
     }
 }
 
+// Brief missing/running samples must not dismiss a pending request immediately.
+struct CodexTaskStability {
+    private var retained: [String: (task: CodexTask, seen: Date)] = [:]
+    mutating func update(_ incoming: [CodexTask], at now: Date) -> [CodexTask] {
+        var result = Dictionary(incoming.map { ($0.identity, $0) }, uniquingKeysWith: { first, next in next.waiting ? next : first })
+        for (id, entry) in retained {
+            let age = now.timeIntervalSince(entry.seen)
+            if age >= 0 && age < 2 && (result[id] == nil || (entry.task.waiting && result[id]?.waiting == false)) {
+                result[id] = entry.task
+            }
+        }
+        for task in incoming {
+            if result[task.identity] == task { retained[task.identity] = (task, now) }
+        }
+        retained = retained.filter { result[$0.key] != nil }
+        return result.values.sorted { $0.identity < $1.identity }
+    }
+    mutating func reset() { retained.removeAll() }
+}
+
 @MainActor final class CodexActivity: ObservableObject {
     static let shared = CodexActivity()
     @Published var enabled = UserDefaults.standard.object(forKey: "codexRocketEnabled") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(enabled, forKey: "codexRocketEnabled"); if !enabled { tasks = []; preview = nil } }
+        didSet { UserDefaults.standard.set(enabled, forKey: "codexRocketEnabled"); if !enabled { tasks = []; preview = nil; stability.reset() }; dismissResolvedRequests() }
     }
-    @Published private(set) var tasks: [CodexTask] = []
-    @Published private(set) var connected = false
+    @Published private(set) var tasks: [CodexTask] = [] { didSet { dismissResolvedRequests() } }
+    @Published private(set) var connected = false { didSet { dismissResolvedRequests() } }
     @Published private(set) var fuel: CodexFuel?
     @Published private(set) var allowances: [CodexFuel] = []
-    @Published private(set) var preview: String?
+    @Published private(set) var preview: String? { didSet { dismissResolvedRequests() } }
     @Published var navigationError: String?
+    private var stability = CodexTaskStability()
+    private var lastSuccess = Date.distantPast
     private var previewTask: Task<Void, Never>?
     private var window: NSPanel?
     var waiting: Bool { enabled && (preview == "waiting" || (preview == nil && tasks.contains(where: \.waiting))) }
@@ -68,6 +90,7 @@ struct CodexSnapshot: Decodable {
         }.max() ?? -1
     }
     @Published var previewEffort = 2
+    @Published var previewCount = 1
     static func headerTask(in tasks: [CodexTask]) -> CodexTask? {
         tasks.sorted {
             if $0.waiting != $1.waiting { return $0.waiting }
@@ -120,18 +143,24 @@ struct CodexSnapshot: Decodable {
                         guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 256_000 else { throw URLError(.badServerResponse) }
                         let snapshot = try JSONDecoder().decode(CodexSnapshot.self, from: data)
                         guard snapshot.connected, snapshot.fresh(at: .now) else { throw URLError(.cannotConnectToHost) }
-                        self.connected = true
+                        self.lastSuccess = .now
                         let fuel = snapshot.fuel.flatMap { $0.valid(at: .now) ? $0 : nil }
                         if self.fuel != fuel { self.fuel = fuel }
                         let allowances = (snapshot.allowances ?? []).filter { $0.valid(at: .now) }.sorted { $0.windowMinutes < $1.windowMinutes }
                         if self.allowances != allowances { self.allowances = allowances }
                         let tasks = snapshot.tasks.filter { UUID(uuidString: $0.id) != nil && ["running", "waiting"].contains($0.state) }
-                        if self.tasks != tasks { self.tasks = tasks }
+                        let stable = self.stability.update(tasks, at: .now)
+                        if self.tasks != stable { self.tasks = stable }
+                        if !self.connected { self.connected = true }
                     } catch {
-                        self.connected = false
-                        self.fuel = nil
-                        self.allowances = []
-                        if !self.tasks.isEmpty { self.tasks = [] }
+                        if self.connected { self.connected = false }
+                        // Retain the presentation for short transport failures; never indefinitely.
+                        if Date.now.timeIntervalSince(self.lastSuccess) >= 5 {
+                            if self.fuel != nil { self.fuel = nil }
+                            if !self.allowances.isEmpty { self.allowances = [] }
+                            if !self.tasks.isEmpty { self.tasks = [] }
+                            self.stability.reset()
+                        }
                     }
                 }
                 try? await Task.sleep(for: .seconds(1))
@@ -140,6 +169,7 @@ struct CodexSnapshot: Decodable {
     }
     func demonstrate(_ state: String?) {
         previewTask?.cancel()
+        if state == "waiting" { previewCount = 1 }
         preview = state
         if state != nil {
             enabled = true
@@ -154,6 +184,18 @@ struct CodexSnapshot: Decodable {
         guard preview == nil, let url = task.url else { return }
         navigationError = NSWorkspace.shared.open(url) ? nil : "无法打开 Codex，请检查应用是否已安装。"
     }
+    static func shouldDismissRequests(enabled: Bool, preview: String?, connected: Bool, pendingCount: Int) -> Bool {
+        if !enabled { return true }
+        if let preview { return preview != "waiting" }
+        // A disconnected bridge cannot confirm that the user resolved a request.
+        return connected && pendingCount == 0
+    }
+    private func dismissResolvedRequests() {
+        if Self.shouldDismissRequests(enabled: enabled, preview: preview, connected: connected, pendingCount: pending.count) {
+            window?.orderOut(nil)
+        }
+    }
+
     func showRequests() {
         navigationError = nil
         if window == nil {
@@ -194,6 +236,10 @@ private struct CodexRequests: View {
                 VStack(alignment: .leading, spacing: 14) {
                     if activity.preview != nil {
                         Text("这是水滴交互预览，不会提交任何批准或选择。")
+                        ForEach(0..<activity.previewCount, id: \.self) { index in
+                            Text("待处理提示 \(index + 1)")
+                        }
+                        Button("追加一个预览请求") { activity.previewCount += 1 }
                         Button("预览恢复运行") { activity.demonstrate("running") }
                     } else if activity.pending.isEmpty {
                         Text(activity.connected ? "待处理请求已在 Codex 中解决。" : "状态连接已断开，请在 Codex 中检查任务。")

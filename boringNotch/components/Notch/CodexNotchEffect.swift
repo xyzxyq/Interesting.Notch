@@ -18,9 +18,11 @@ enum CodexThrust {
 struct CodexFlame: View {
     var active: Bool
     var effort: Int = -1
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     var body: some View {
-        TimelineView(.animation(paused: !active || reduced)) { timeline in
+        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: !onScreen || motion.suspended || !active || reduced)) { timeline in
             Canvas { context, size in
                 let h = size.height
                 let time = reduced ? 0 : timeline.date.timeIntervalSinceReferenceDate * (effort < 0 ? 1 : CodexThrust.speed(effort))
@@ -58,6 +60,8 @@ struct CodexFlame: View {
         }
         .opacity(active ? 1 : 0)
         .animation(.easeOut(duration: reduced ? 0.15 : 0.25), value: active)
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
         .allowsHitTesting(false)
     }
 }
@@ -66,9 +70,11 @@ struct CodexSpeedLines: View {
     let shape: NotchShape
     let effort: Int
     let active: Bool
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     var body: some View {
-        TimelineView(.animation(paused: !active || effort < 2 || reduced)) { clock in
+        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: !onScreen || motion.suspended || !active || effort < 2 || reduced)) { clock in
             Canvas { context, size in
                 guard active, effort >= 2, !reduced else { return }
                 let rect = CGRect(origin: .zero, size: size).insetBy(dx: 48, dy: 48)
@@ -99,7 +105,7 @@ struct CodexSpeedLines: View {
                     context.stroke(line, with: ink, style: StrokeStyle(lineWidth: 0.75 + boost * 0.25, lineCap: .round))
                 }
             }
-        }.padding(-48).allowsHitTesting(false)
+        }.padding(-48).onAppear { onScreen = true }.onDisappear { onScreen = false }.allowsHitTesting(false)
     }
 }
 
@@ -109,9 +115,11 @@ struct CodexLiquidDrop: View, Animatable {
     var symbolOpacity: Double? = nil
     var reminderBrightness: Double = 1
     var hoverOffset: CGFloat = 0
-    var animatableData: CGFloat {
-        get { progress }
-        set { progress = newValue }
+    var mergeElapsed: Double? = nil
+    var volumeScale: CGFloat = 1
+    var animatableData: AnimatablePair<CGFloat, CGFloat> {
+        get { AnimatablePair(progress, volumeScale) }
+        set { progress = newValue.first; volumeScale = newValue.second }
     }
     var body: some View {
         let t = min(1, max(0, progress))
@@ -131,8 +139,9 @@ struct CodexLiquidDrop: View, Animatable {
                     neckContext.opacity = min(1, max(0, (0.78 - t) / 0.18))
                     neckContext.fill(bridge, with: .color(.black))
                 }
-                let radius: CGFloat = 16 * min(1, t * 1.8)
-                let compression = reduced ? 0 : max(0, progress - 1) * 4
+                let radius: CGFloat = 16 * min(1, t * 1.8) * volumeScale
+                let fusion = mergeElapsed.map { CodexMergeMotion.sample(at: $0) }
+                let compression = reduced ? 0 : max(0, progress - 1) * 4 + (fusion?.pulse ?? 0)
                 let stretch = reduced ? 0 : sin(.pi * min(1, t / 0.78)) * 0.12
                 let rx = radius * (1 + compression) / (1 + stretch)
                 let ry = radius * (1 + stretch) / (1 + compression)
@@ -147,6 +156,22 @@ struct CodexLiquidDrop: View, Animatable {
                 context.fill(drop, with: .color(.black))
                 context.stroke(drop, with: .linearGradient(Gradient(colors: [.white.opacity(0.45), .white.opacity(0.04)]),
                                                           startPoint: CGPoint(x: 20, y: cy - 16), endPoint: CGPoint(x: 40, y: cy + 16)), lineWidth: 0.7)
+                if let fusion, fusion.radius > 0, !reduced {
+                    let incomingY = -8 + (cy + 8) * fusion.travel
+                    let incoming = Path(ellipseIn: CGRect(x: 32 - fusion.radius, y: incomingY - fusion.radius * 1.25,
+                                                          width: fusion.radius * 2, height: fusion.radius * 2.5))
+                    context.fill(incoming, with: .color(.black))
+                    if fusion.travel < 0.3 {
+                        let neck = (1 - fusion.travel / 0.3) * 5
+                        var bridge = Path()
+                        bridge.move(to: CGPoint(x: 24, y: 0))
+                        bridge.addQuadCurve(to: CGPoint(x: 32 - neck, y: incomingY), control: CGPoint(x: 32, y: 0))
+                        bridge.addLine(to: CGPoint(x: 32 + neck, y: incomingY))
+                        bridge.addQuadCurve(to: CGPoint(x: 40, y: 0), control: CGPoint(x: 32, y: 0))
+                        bridge.closeSubpath()
+                        context.fill(bridge, with: .color(.black))
+                    }
+                }
                 let alpha = (symbolOpacity ?? max(0, (t - 0.72) / 0.28)) * reminderBrightness
                 var light = context
                 light.opacity = alpha
@@ -171,18 +196,28 @@ struct CodexDropButton: View {
     var count: Int
     var action: () -> Void
     @Binding var surface: CGFloat
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     @State private var progress: CGFloat = 0
     @State private var visible = false
     @State private var symbolVisible = false
     @State private var idleSince: Date?
+    @State private var targetCount = 0
+    @State private var mergedCount = 0
+    @State private var mergeStarted: Date?
+    @State private var mergeTask: Task<Void, Never>?
+
     var body: some View {
         Button(action: action) {
-            TimelineView(.animation(paused: idleSince == nil || reduced)) { clock in
+            TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: !onScreen || motion.suspended || idleSince == nil || reduced)) { clock in
                 let reminder = idleSince.map { CodexDropMotion.reminder(at: clock.date.timeIntervalSince($0)) }
                 let idleOffset = reduced ? 0 : reminder?.offset ?? 0
                 let brightness = reduced ? 1 : reminder?.brightness ?? 1
-                CodexLiquidDrop(progress: progress, reduced: reduced, symbolOpacity: symbolVisible ? 1 : 0, reminderBrightness: brightness, hoverOffset: idleOffset)
+                let mergeTime = mergeStarted.map { clock.date.timeIntervalSince($0) }
+                let addition = mergeTime.map { CodexMergeMotion.absorbed(at: $0) } ?? 0
+                CodexLiquidDrop(progress: progress, reduced: reduced, symbolOpacity: symbolVisible ? 1 : 0, reminderBrightness: brightness, hoverOffset: idleOffset, mergeElapsed: mergeTime,
+                                volumeScale: CodexMergeMotion.scale(for: Double(max(1, mergedCount)) + addition))
                 .overlay(alignment: .bottomTrailing) {
                     if count > 1 {
                         Text("\(count)").font(.system(size: 9, weight: .bold)).padding(3)
@@ -193,15 +228,33 @@ struct CodexDropButton: View {
             }
         }
         .buttonStyle(.plain)
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false; idleSince = nil; surface = 0; cancelMerging() }
+        .onChange(of: count, initial: true) { _, value in
+            if value < targetCount { cancelMerging() }
+            targetCount = max(0, value)
+            if targetCount < mergedCount {
+                withAnimation(reduced ? nil : .easeInOut(duration: 0.3)) { mergedCount = targetCount }
+            }
+            startMerging()
+        }
         .opacity(visible ? 1 : 0)
         .allowsHitTesting(waiting && visible)
-        .accessibilityLabel("Codex 需要你处理")
+        .accessibilityLabel("Codex 有 \(count) 个请求需要你处理")
         .accessibilityHint("打开待处理任务窗口")
         .accessibilityHidden(!visible)
         .help("查看 Codex 的待处理请求")
-        .task(id: "\(waiting)-\(reduced)") {
+        .task(id: "\(waiting)-\(reduced)-\(motion.suspended)") {
+            if !waiting || reduced || motion.suspended { cancelMerging() }
+            if motion.suspended {
+                mergedCount = count
+                idleSince = nil; surface = 0; progress = waiting ? 1 : 0
+                visible = waiting; symbolVisible = waiting
+                return
+            }
             do {
                 if reduced {
+                    mergedCount = count
                     idleSince = nil
                     surface = 0
                     symbolVisible = waiting
@@ -210,9 +263,12 @@ struct CodexDropButton: View {
                 } else if waiting {
                     if !visible { try await Task.sleep(for: .milliseconds(550)) }
                     try Task.checkCancellation()
+                    let alreadySettled = visible && progress == 1
                     visible = true
-                    try await move(CodexDropMotion.fall, reveal: true)
+                    if !alreadySettled { try await move(CodexDropMotion.fall, reveal: true) }
+                    if mergedCount == 0 { mergedCount = 1 }
                     idleSince = .now
+                    startMerging()
                 } else if visible {
                     // Carry the visible hover position into suction without a snap.
                     if let idleSince {
@@ -222,10 +278,32 @@ struct CodexDropButton: View {
                     symbolVisible = false
                     try await move(CodexDropMotion.returning, reveal: false)
                     visible = false
+                    mergedCount = 0
                 } else {
                     surface = 0
                 }
             } catch { /* A new state continues from the current presentation values. */ }
+        }
+    }
+
+    private func cancelMerging() {
+        mergeTask?.cancel(); mergeTask = nil; mergeStarted = nil
+    }
+    private func startMerging() {
+        guard waiting, visible, idleSince != nil, !reduced, !motion.suspended,
+              mergeTask == nil, targetCount > mergedCount else { return }
+        mergeTask = Task { @MainActor in
+            do {
+                while mergedCount < targetCount {
+                    try Task.checkCancellation()
+                    mergeStarted = .now
+                    try await Task.sleep(for: .seconds(CodexMergeMotion.duration))
+                    try Task.checkCancellation()
+                    mergedCount = min(targetCount, mergedCount + 1)
+                    mergeStarted = nil
+                }
+                mergeTask = nil
+            } catch { /* Lifecycle change already reset the merge state. */ }
         }
     }
 
@@ -255,8 +333,9 @@ struct CodexDropButton: View {
 enum CodexDropMotion {
     static func reminder(at elapsed: Double) -> (offset: CGFloat, brightness: Double) {
         let t = max(0, elapsed)
-        return (-1.5 * (1 - cos(t * 2 * .pi / 3.6)),
-                0.72 + 0.28 * cos(t * 2 * .pi / 2.8))
+        let settling = exp(-max(0, t - 12) / 8)
+        return (-1.5 * settling * (1 - cos(t * 2 * .pi / 3.6)),
+                0.86 + 0.14 * settling + (0.08 + 0.20 * settling) * (cos(t * 2 * .pi / 2.8) - 1))
     }
 
     struct Frame {
@@ -309,6 +388,8 @@ enum CodexDropMotion {
 /// Fixed housing; only the fuel surface moves, so the symbol stays crisp.
 struct CodexFuelGauge: View {
     let fuel: CodexFuel?
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     private var tint: Color {
         guard let fuel else { return .gray }
@@ -317,12 +398,14 @@ struct CodexFuelGauge: View {
             : Color(white: 0.85)
     }
     var body: some View {
-        TimelineView(.animation(paused: reduced || fuel == nil)) { tick in
+        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 15 : 1.0 / 30, paused: !onScreen || motion.suspended || reduced || fuel == nil)) { tick in
             CodexFuelFrame(level: (fuel?.remainingPercent ?? 0) / 100,
                            phase: reduced ? 0 : tick.date.timeIntervalSinceReferenceDate,
                            tint: tint, available: fuel != nil)
                 .animation(reduced ? nil : .easeInOut(duration: 0.8), value: fuel?.remainingPercent)
         }
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
         .help(fuel?.description ?? "Codex · 额度暂不可用")
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(fuel?.description ?? "Codex · 额度暂不可用")
@@ -365,5 +448,26 @@ private struct CodexFuelFrame: View, Animatable {
             context.draw(symbol,
                          in: CGRect(x: size.width / 2 - 4.5, y: size.height / 2 - 4.5, width: 9, height: 9))
         }
+    }
+}
+
+
+// Growth follows absorption; cap radius to keep the clickable drop inside its 64x82 slot.
+enum CodexMergeMotion {
+    static let duration = 0.85
+    static func scale(for count: Double) -> CGFloat {
+        guard count.isFinite else { return 1 }
+        return CGFloat(min(1.7, 1 + 0.25 * log2(max(1, count))))
+    }
+    static func absorbed(at elapsed: Double) -> Double {
+        let t = min(1, max(0, (elapsed / duration - 0.5) / 0.5))
+        return t * t * (3 - 2 * t)
+    }
+    static func sample(at elapsed: Double) -> (travel: CGFloat, radius: CGFloat, pulse: CGFloat) {
+        let t = min(1, max(0, elapsed / duration))
+        let travel = min(1, pow(t / 0.68, 2))
+        let radius = 7 * min(1, t / 0.10) * max(0, min(1, (0.75 - t) / 0.18))
+        let impact = max(0, min(1, (t - 0.55) / 0.45))
+        return (travel, radius, sin(impact * .pi * 2) * 0.10 * (1 - impact))
     }
 }

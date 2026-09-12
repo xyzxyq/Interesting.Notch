@@ -12,7 +12,7 @@ struct LyricSegment: Equatable, Identifiable {
     let text: String
 }
 
-struct LyricTrack: Equatable {
+struct LyricTrack: Codable, Equatable, Sendable {
     let bundleID: String
     let title: String
     let artist: String
@@ -25,13 +25,14 @@ struct LyricTrack: Equatable {
     }
 }
 
-struct LyricCandidate: Decodable {
+struct LyricCandidate: Codable, Equatable, Sendable {
     let trackName: String
     let artistName: String
     let albumName: String?
     let duration: Double
     let plainLyrics: String?
     let syncedLyrics: String?
+    var source: String? = nil
 }
 
 enum CompactLyrics {
@@ -54,18 +55,92 @@ enum CompactLyrics {
         guard !normalized(track.title).isEmpty, !normalized(track.artist).isEmpty,
               track.duration.isFinite, track.duration > 0 else { return nil }
         let matches = candidates.filter {
-            titleKey($0.trackName) == titleKey(track.title)
-                && searchKey($0.artistName) == searchKey(track.artist)
+            hasExpectedScript($0, track: track)
+                && (titleKey($0.trackName) == titleKey(track.title) || lyricSubtitleMatches($0, track: track))
                 && $0.duration.isFinite && abs($0.duration - track.duration) <= 2
                 && ((!requireSynced && !normalized($0.plainLyrics ?? "").isEmpty)
                     || !timeline(parseLRC($0.syncedLyrics ?? ""), duration: track.duration).isEmpty)
         }
-        let albumMatches = matches.filter { !track.album.isEmpty && searchKey($0.albumName ?? "") == searchKey(track.album) }
-        let pool = albumMatches.isEmpty ? matches : albumMatches
+        let exactArtists = matches.filter { searchKey($0.artistName) == searchKey(track.artist) }
+        let artistMatches = exactArtists.isEmpty ? matches.filter {
+            !searchKey(track.album).isEmpty && searchKey($0.albumName ?? "") == searchKey(track.album)
+                && romanizedArtistMatches($0.artistName, track.artist)
+        } : exactArtists
+        let albumMatches = artistMatches.filter { !track.album.isEmpty && searchKey($0.albumName ?? "") == searchKey(track.album) }
+        let pool = albumMatches.isEmpty ? artistMatches : albumMatches
         // Duplicate database records with the same lyric timeline are not ambiguous.
         guard let first = pool.first else { return nil }
         return pool.allSatisfy { parseLRC($0.syncedLyrics ?? "") == parseLRC(first.syncedLyrics ?? "")
             && (requireSynced || $0.plainLyrics == first.plainLyrics) } ? first : nil
+    }
+
+    /// Conservative automatic selection, not language detection: Chinese title
+    /// and artist metadata require Han lyric text. Other versions stay selectable manually.
+    static func hasExpectedScript(_ candidate: LyricCandidate, track: LyricTrack) -> Bool {
+        func containsHan(_ text: String) -> Bool {
+            text.range(of: #"\p{Han}"#, options: .regularExpression) != nil
+        }
+        guard containsHan(track.title), containsHan(track.artist) else { return true }
+        // Japanese/Korean metadata does not establish a Chinese-script expectation.
+        guard (track.title + track.artist).range(of: #"[\p{Hiragana}\p{Katakana}\p{Hangul}]"#,
+                                               options: .regularExpression) == nil else { return true }
+        let synced = parseLRC(candidate.syncedLyrics ?? "").map(\.text)
+        let lines = (synced.isEmpty ? (candidate.plainLyrics ?? "").components(separatedBy: .newlines) : synced)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty && $0.range(of: #"^(?:作词|作曲|编曲|制作人|词|曲|演唱|歌手|专辑|歌名|录音|混音|母带|监制|出品|发行|版权|翻译|译词|歌词|Lyricist|Composer|Arranger)\s*[:：]"#,
+                                             options: [.regularExpression, .caseInsensitive]) == nil }
+        guard !lines.isEmpty else { return false }
+        let hanLines = lines.filter { line in
+            let letters = line.unicodeScalars.filter { CharacterSet.letters.contains($0) }
+            let han = letters.filter { $0.properties.isIdeographic }.count
+            return han >= 2 && Double(han) / Double(max(1, letters.count)) >= 0.2
+        }.count
+        // A credit or a single Chinese label must not validate a full romanization.
+        return hanLines >= min(2, lines.count) && Double(hanLines) / Double(lines.count) >= 0.2
+    }
+
+    private static func lyricSubtitle(_ title: String) -> (base: String, quote: String)? {
+        let parts = title.split(whereSeparator: { "(（)）".contains($0) }).map(String.init)
+        guard parts.count == 2, let last = title.last, "）)".contains(last),
+              parts[1].range(of: #"^\p{Han}{4,20}$"#, options: .regularExpression) != nil else { return nil }
+        return (parts[0], parts[1])
+    }
+
+    private static func lyricSubtitleMatches(_ candidate: LyricCandidate, track: LyricTrack) -> Bool {
+        guard let subtitle = lyricSubtitle(track.title),
+              titleKey(subtitle.base) == titleKey(candidate.trackName),
+              searchKey(candidate.artistName) == searchKey(track.artist) else { return false }
+        func releaseKey(_ album: String) -> String {
+            titleKey(album.replacingOccurrences(of: #"\s+-\s+(?:Single|EP)$"#, with: "",
+                                               options: [.regularExpression, .caseInsensitive]))
+        }
+        // A quoted lyric is not a version label. Require the same single, artist, duration
+        // and the entire quote in a timed line before treating it as an alternate title.
+        guard releaseKey(track.album) == titleKey(track.title),
+              releaseKey(candidate.albumName ?? "") == titleKey(subtitle.base) else { return false }
+        return parseLRC(candidate.syncedLyrics ?? "").contains {
+            searchKey($0.text).contains(searchKey(subtitle.quote))
+        }
+    }
+
+    private static func romanizedArtistMatches(_ first: String, _ second: String) -> Bool {
+        func chineseName(_ name: String) -> Bool {
+            name.range(of: #"^\p{Han}{2,4}$"#, options: .regularExpression) != nil
+        }
+        let a = searchKey(first), b = searchKey(second)
+        guard chineseName(a) != chineseName(b) else { return false }
+        let chinese = chineseName(a) ? a : b
+        let latin = chineseName(a) ? b : a
+        guard !latin.isEmpty, latin.unicodeScalars.allSatisfy({ (97...122).contains($0.value) }) else { return false }
+        let syllables = chinese.applyingTransform(.toLatin, reverse: false)?
+            .folding(options: .diacriticInsensitive, locale: Locale(identifier: "en_US_POSIX"))
+            .lowercased().split(separator: " ").map(String.init) ?? []
+        guard syllables.count == chinese.count else { return false }
+        // ponytail: only direct pinyin and surname-first/last forms; stage names require verified aliases.
+        let surnames = chinese.count == 4 ? [1, 2] : [1]
+        return syllables.joined() == latin || surnames.contains {
+            (Array(syllables.dropFirst($0)) + Array(syllables.prefix($0))).joined() == latin
+        }
     }
 
     static func titleKey(_ value: String) -> String {
@@ -108,10 +183,15 @@ enum CompactLyrics {
         var failure: Error?
         for query in queries {
         var reachedService = false
-        for stage in 0..<3 {
+        for stage in 0..<4 {
             try Task.checkCancellation()
+            // A title-only lookup recovers localized artist names; match still verifies the artist.
+            // Do not spend another request on an outage or on a track lacking corroborating album data.
+            if stage == 3 && (!reachedService || searchKey(track.album).isEmpty) { break }
             var url = URLComponents(string: "https://lrclib.net/api/" + (stage == 0 ? "get" : "search"))!
-            url.queryItems = [.init(name: "track_name", value: query.title), .init(name: "artist_name", value: query.artist)]
+            let title = stage == 3 ? (lyricSubtitle(query.title)?.base ?? query.title) : query.title
+            url.queryItems = [.init(name: "track_name", value: title)]
+            if stage < 3 { url.queryItems?.append(.init(name: "artist_name", value: query.artist)) }
             if stage < 2 && !query.album.isEmpty { url.queryItems?.append(.init(name: "album_name", value: query.album)) }
             if stage == 0 { url.queryItems?.append(.init(name: "duration", value: String(track.duration))) }
             var request = URLRequest(url: url.url!, timeoutInterval: 8)

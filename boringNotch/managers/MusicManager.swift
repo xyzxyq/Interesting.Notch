@@ -202,6 +202,22 @@ class MusicManager: ObservableObject {
     // MARK: - Update Methods
     @MainActor
     private func updateFromPlaybackState(_ state: PlaybackState) {
+        if state.bundleIdentifier.isEmpty {
+            // Source disappearance is not a pause. Keep the last render data for
+            // SwiftUI's outgoing view, while ending activity immediately.
+            debounceIdleTask?.cancel()
+            lyricsTask?.cancel()
+            lyricsGeneration &+= 1
+            lyricsTrack = nil
+            isFetchingLyrics = false
+            elapsedTime = estimatedPlaybackPosition(at: Date())
+            timestampDate = Date()
+            playbackRate = 0
+            isPlaying = false
+            isPlayerIdle = true
+            lyricsStatus = "Lyrics idle"
+            return
+        }
         // Check for playback state changes (playing/paused)
         if state.isPlaying != self.isPlaying {
             NSLog("Playback state changed: \(state.isPlaying ? "Playing" : "Paused")")
@@ -376,8 +392,8 @@ class MusicManager: ObservableObject {
     }
 
     @MainActor
-    private func refreshLyrics(force: Bool = false) {
-        let compact = Defaults[.enableCompactLyrics] && bundleIdentifier == "com.apple.Music"
+    private func refreshLyrics(force: Bool = false, useCache: Bool = true) {
+        let compact = Defaults[.enableCompactLyrics]
         let demand = (Defaults[.enableLyrics] ? 1 : 0) + (compact ? 2 : 0)
         let track = LyricTrack(bundleID: bundleIdentifier ?? "", title: songTitle,
                                artist: artistName, album: album, duration: songDuration)
@@ -411,21 +427,12 @@ class MusicManager: ObservableObject {
                 if !native.isEmpty { self.lyricsStatus = "Plain lyrics available"; return }
             }
             do {
-                let result = try await CompactLyrics.fetch(track, requireSynced: compact)
+                let result = try await LyricsRepository.fetch(track, requireSynced: compact, useCache: useCache)
                 guard !Task.isCancelled, generation == self.lyricsGeneration else { return }
-                if let candidate = result {
-                    let lines = CompactLyrics.parseLRC(candidate.syncedLyrics ?? "").map {
-                        LyricLine(time: $0.time, text: CompactLyrics.displayText($0.text))
-                    }
-                    let plain = CompactLyrics.displayText(candidate.plainLyrics?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
-                    if self.currentLyrics.isEmpty {
-                        self.currentLyrics = plain.isEmpty ? lines.map(\.text).joined(separator: "\n") : plain
-                    }
-                    self.syncedLyrics = lines.map { (time: $0.time, text: $0.text) }
-                    self.compactSegments = compact ? CompactLyrics.timeline(lines, duration: track.duration) : []
-                    self.lyricsRevision &+= 1
-                    self.lyricsStatus = lines.isEmpty ? "Plain lyrics available" : "Synced lyrics ready"
-                    NSLog("Lyrics loaded: %d lines", lines.count)
+                if let result {
+                    self.publishLyrics(result.candidate, track: track, compact: compact,
+                                       origin: result.cached ? "本地缓存" : result.candidate.source ?? "在线")
+                    if result.cacheError { self.lyricsStatus += " · 缓存保存失败" }
                 } else {
                     self.lyricsStatus = "未找到匹配的同步歌词"
                     NSLog("Lyrics: no matching timeline")
@@ -448,7 +455,40 @@ class MusicManager: ObservableObject {
 
     @MainActor
     func retryLyrics() {
-        refreshLyrics(force: true)
+        refreshLyrics(force: true, useCache: false)
+    }
+
+    var currentLyricTrack: LyricTrack {
+        LyricTrack(bundleID: bundleIdentifier ?? "", title: songTitle, artist: artistName, album: album, duration: songDuration)
+    }
+
+    @MainActor
+    private func publishLyrics(_ candidate: LyricCandidate, track: LyricTrack, compact: Bool, origin: String) {
+        let lines = CompactLyrics.parseLRC(candidate.syncedLyrics ?? "").map {
+            LyricLine(time: $0.time, text: CompactLyrics.displayText($0.text))
+        }
+        let plain = CompactLyrics.displayText(candidate.plainLyrics?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "")
+        currentLyrics = lines.isEmpty ? plain : lines.map(\.text).joined(separator: "\n")
+        syncedLyrics = lines.map { ($0.time, $0.text) }
+        compactSegments = compact ? CompactLyrics.timeline(lines, duration: track.duration) : []
+        lyricsRevision &+= 1
+        lyricsStatus = (lines.isEmpty ? "普通歌词已就绪" : "同步歌词已就绪") + " · " + origin
+        NSLog("Lyrics loaded: %d lines (%@)", lines.count, origin)
+    }
+
+    @MainActor
+    func chooseLyrics(_ candidate: LyricCandidate, for track: LyricTrack) throws {
+        guard currentLyricTrack == track, LyricsRepository.usable(candidate, track: track) else {
+            throw NSError(domain: "LyricsSelection", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "歌曲已切换，或文件没有可用的同步时间戳。请重新打开歌词选择。"])
+        }
+        try LyricsStore().save(candidate, for: track, manual: true)
+        lyricsTask?.cancel()
+        lyricsTask = nil
+        lyricsGeneration &+= 1
+        isFetchingLyrics = false
+        publishLyrics(candidate, track: track, compact: Defaults[.enableCompactLyrics],
+                      origin: "已记住选择 · " + (candidate.source ?? "本地"))
     }
 
     private static func nativeLyrics(for track: LyricTrack) async -> String {
@@ -532,8 +572,10 @@ class MusicManager: ObservableObject {
             debounceIdleTask?.cancel()
             debounceIdleTask = Task { [weak self] in
                 guard let self = self else { return }
-                try? await Task.sleep(for: .seconds(Defaults[.waitInterval]))
-                withAnimation {
+                do { try await Task.sleep(for: .seconds(Defaults[.waitInterval])) }
+                catch { return }
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
                     self.isPlayerIdle = !self.isPlaying
                 }
             }

@@ -16,7 +16,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     // MARK: - Properties
     @Published private(set) var playbackState: PlaybackState = .init(
-        bundleIdentifier: "com.apple.Music"
+        bundleIdentifier: ""
     )
 
     var playbackStatePublisher: AnyPublisher<PlaybackState, Never> {
@@ -68,6 +68,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var process: Process?
     private var pipeHandler: JSONLinesPipeHandler?
     private var streamTask: Task<Void, Never>?
+    private var terminationObserver: AnyCancellable?
+    private var terminatedSources = Set<String>()
 
     // MARK: - Initialization
     init?() {
@@ -96,6 +98,18 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         MRMediaRemoteSetRepeatModeFunction = unsafeBitCast(
             MRMediaRemoteSetRepeatModePointer, to: (@convention(c) (Int) -> Void).self)
 
+        terminationObserver = NSWorkspace.shared.notificationCenter
+            .publisher(for: NSWorkspace.didTerminateApplicationNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                guard let self,
+                      let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                      let source = app.bundleIdentifier else { return }
+                self.terminatedSources.insert(source)
+                if self.playbackState.bundleIdentifier == source {
+                    self.playbackState = self.playbackState.endingPlayback()
+                }
+            }
         Task { await setupNowPlayingObserver() }
     }
 
@@ -226,59 +240,15 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     }
 
     // MARK: - Update Methods
+    @MainActor
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
-        let payload = update.payload
-        let diff = update.diff ?? false
-
-        var newPlaybackState = PlaybackState(bundleIdentifier: playbackState.bundleIdentifier)
-        
-        newPlaybackState.title = payload.title ?? (diff ? self.playbackState.title : "")
-        newPlaybackState.artist = payload.artist ?? (diff ? self.playbackState.artist : "")
-        newPlaybackState.album = payload.album ?? (diff ? self.playbackState.album : "")
-        newPlaybackState.duration = payload.duration ?? (diff ? self.playbackState.duration : 0)
-        
-        let clock = playbackState.clockUpdate(elapsed: payload.elapsedTime, timestamp: payload.timestamp,
-                                              diff: diff, playing: payload.playing, rate: payload.playbackRate)
-        newPlaybackState.currentTime = clock.position
-        newPlaybackState.lastUpdated = clock.date
-
-        if let shuffleMode = payload.shuffleMode {
-            newPlaybackState.isShuffled = shuffleMode != 1
-        } else if !diff {
-            newPlaybackState.isShuffled = false
-        } else {
-            newPlaybackState.isShuffled = self.playbackState.isShuffled
+        let next = playbackState.applying(update)
+        if terminatedSources.contains(next.bundleIdentifier) {
+            // Ignore late MediaRemote events from an exited app, but allow relaunch.
+            guard !NSRunningApplication.runningApplications(withBundleIdentifier: next.bundleIdentifier).isEmpty else { return }
+            terminatedSources.remove(next.bundleIdentifier)
         }
-        if let repeatModeValue = payload.repeatMode {
-            newPlaybackState.repeatMode = RepeatMode(rawValue: repeatModeValue) ?? .off
-        } else if !diff {
-            newPlaybackState.repeatMode = .off
-        } else {
-            newPlaybackState.repeatMode = self.playbackState.repeatMode
-        }
-
-        if let artworkDataString = payload.artworkData {
-            newPlaybackState.artwork = Data(
-                base64Encoded: artworkDataString.trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        } else if !diff {
-            newPlaybackState.artwork = nil
-        }
-
-        newPlaybackState.playbackRate = payload.playbackRate ?? (diff ? self.playbackState.playbackRate : 1.0)
-        newPlaybackState.isPlaying = payload.playing ?? (diff ? self.playbackState.isPlaying : false)
-        newPlaybackState.bundleIdentifier = (
-            payload.parentApplicationBundleIdentifier ??
-            payload.bundleIdentifier ??
-            (diff ? self.playbackState.bundleIdentifier : "")
-        )
-        
-        newPlaybackState.volume = payload.volume ?? (diff ? self.playbackState.volume : 0.5)
-        
-        self.playbackState = newPlaybackState
-        
-        // Fetch favorite state for supported apps asynchronously
-        // await fetchFavoriteStateIfSupported()
+        self.playbackState = next
     }
     
      private func fetchFavoriteStateIfSupported() async {
@@ -305,28 +275,6 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
          }
      }
     
-}
-
-struct NowPlayingUpdate: Codable {
-    let payload: NowPlayingPayload
-    let diff: Bool?
-}
-
-struct NowPlayingPayload: Codable {
-    let title: String?
-    let artist: String?
-    let album: String?
-    let duration: Double?
-    let elapsedTime: Double?
-    let shuffleMode: Int?
-    let repeatMode: Int?
-    let artworkData: String?
-    let timestamp: String?
-    let playbackRate: Double?
-    let playing: Bool?
-    let parentApplicationBundleIdentifier: String?
-    let bundleIdentifier: String?
-    let volume: Double?
 }
 
 actor JSONLinesPipeHandler {

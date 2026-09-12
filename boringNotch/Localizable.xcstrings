@@ -9,18 +9,18 @@
     "Lyrics request failed" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "歌词请求失败"}}}},
     "Lyric timing adjustment" : {"localizations" : {"zh-Hans" : {"stringUnit" : {"state" : "translated", "value" : "歌词时间微调"}}}},
     "Positive values advance lyrics; negative values delay them." : {"localizations" : {"zh-Hans" : {"stringUnit" : {"state" : "translated", "value" : "正值让歌词提前，负值让歌词延后。"}}}},
-    "Scrolling lyrics for Apple Music": {
+    "Scrolling lyrics": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Scrolling lyrics for Apple Music"
+            "value": "Scrolling lyrics"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple Music 右侧滚动歌词"
+            "value": "右侧滚动歌词"
           }
         }
       }

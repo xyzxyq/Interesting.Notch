@@ -236,6 +236,25 @@ struct MusicEdgeFrame: View {
     }
 }
 
+// Integrate the same exponential speed easing analytically, without per-frame state writes.
+struct MusicEdgePhase {
+    private var phase = 0.0
+    private var speed = 0.4
+    private var target = 0.4
+    private var anchor = Date.now
+    private var paused = true
+    func value(at date: Date) -> Double {
+        let dt = paused ? 0 : max(0, date.timeIntervalSince(anchor))
+        return phase + target * dt + (speed - target) * 0.7 * (1 - exp(-dt / 0.7))
+    }
+    mutating func update(target next: Double, paused nextPaused: Bool, at date: Date) {
+        let dt = paused ? 0 : max(0, date.timeIntervalSince(anchor))
+        phase = value(at: date)
+        speed = target + (speed - target) * exp(-dt / 0.7)
+        target = next; paused = nextPaused; anchor = date
+    }
+}
+
 #if !EDGE_CHECKS
 struct MusicEdgeEffect: View, Animatable {
     var shape: NotchShape
@@ -251,32 +270,31 @@ struct MusicEdgeEffect: View, Animatable {
     @AppStorage("musicEdgeSky") private var sky = true
     @AppStorage("musicEdgeAlwaysOn") private var alwaysOn = false
     @Environment(\.accessibilityReduceMotion) private var reduced
-    @State private var phase = 0.0
-    @State private var previous = Date.now
-    @State private var motionSpeed = 0.4
-    private var captureKey: String { "\(style != "off" && reactive && music.isPlaying && !reduced)-\(music.bundleIdentifier ?? "")" }
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @State private var onScreen = false
+    @State private var phase = MusicEdgePhase()
+    private var captureKey: String { "\(style != "off" && reactive && music.isPlaying && !reduced && !motion.suspended)-\(music.bundleIdentifier ?? "")" }
     var body: some View {
         let playback = MusicEdgePlayback(style: style, alwaysOn: alwaysOn, playing: music.isPlaying, energy: reactive ? audio.energy : 0)
-        TimelineView(.animation(minimumInterval: playback.ambient ? 1.0 / 30 : 1.0 / 60, paused: !playback.visible || reduced)) { clock in
+        let paused = !onScreen || motion.suspended || !playback.visible || reduced
+        TimelineView(.animation(minimumInterval: playback.ambient || motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: paused)) { clock in
             let elapsed = music.elapsedTime + (music.isPlaying ? max(0, clock.date.timeIntervalSince(music.timestampDate)) * max(0, music.playbackRate) : 0)
             let ending = CompactLyrics.dissolve(at: elapsed, duration: music.songDuration)
             let period = CompactLyrics.timeOfDay(at: clock.date)
             let tint: Color = period == .dusk ? Color(red: 0.95, green: 0.80, blue: 0.67) : period == .day ? Color(red: 0.97, green: 0.94, blue: 0.86) : Color(white: period == .dawn ? 0.70 : 0.88)
             MusicEdgeFrame(shape: shape, style: style, strength: playback.ambient ? strength * 0.75 : strength, energy: music.isPlaying && reactive ? audio.energy : 0,
-                           phase: phase, color: tint, reduced: reduced, sky: sky)
+                           phase: phase.value(at: clock.date), color: tint, reduced: reduced, sky: sky)
                 .opacity(!playback.visible ? 0 : alwaysOn && style.hasPrefix("water") ? 0.75 + (music.isPlaying ? 0.25 * (1-ending) : 0) : (1-ending) * min(1, max(0, elapsed / 2)))
                 .animation(.easeInOut(duration: 0.8), value: music.isPlaying)
                 .animation(.easeInOut(duration: 0.8), value: alwaysOn)
-                .onChange(of: clock.date) { _, date in
-                    let dt = min(0.1, max(0, date.timeIntervalSince(previous)))
-                    motionSpeed += (playback.speed - motionSpeed) * (1 - exp(-dt / 0.7))
-                    phase += dt * motionSpeed
-                    previous = date
-                }
         }
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false; phase.update(target: playback.speed, paused: true, at: .now) }
+        .onChange(of: paused) { _, value in phase.update(target: playback.speed, paused: value, at: .now) }
+        .onChange(of: playback.speed) { _, value in phase.update(target: value, paused: paused, at: .now) }
         .padding(-24 - 48 * shape.rocket)
         .allowsHitTesting(false)
-        .task(id: captureKey) { audio.configure(bundleID: music.bundleIdentifier, active: style != "off" && reactive && music.isPlaying && !reduced) }
+        .task(id: captureKey) { audio.configure(bundleID: music.bundleIdentifier, active: style != "off" && reactive && music.isPlaying && !reduced && !motion.suspended) }
     }
 }
 

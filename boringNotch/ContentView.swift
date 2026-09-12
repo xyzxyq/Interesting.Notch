@@ -57,6 +57,11 @@ struct ContentView: View {
                 : cornerRadiusInsets.closed.top
     }
 
+    private var rocketRequested: Bool {
+        let hud = coordinator.sneakPeek.show && coordinator.sneakPeek.type != .music && coordinator.sneakPeek.type != .battery
+        return codex.running && vm.notchState == .closed && !vm.hideOnClosed && !hud
+    }
+
     private var currentNotchShape: NotchShape {
         NotchShape(
             topCornerRadius: topCornerRadius,
@@ -69,7 +74,7 @@ struct ContentView: View {
     }
 
     private var compactLyricsMode: Bool {
-        enableCompactLyrics && musicManager.bundleIdentifier == "com.apple.Music"
+        enableCompactLyrics
     }
 
     private var musicSideWidth: CGFloat {
@@ -222,7 +227,7 @@ struct ContentView: View {
                     }
                     .overlay(alignment: .bottom) {
                         CodexDropButton(waiting: codex.waiting && vm.notchState == .closed && !vm.hideOnClosed,
-                                        count: codex.preview == nil ? codex.pending.count : 1,
+                                        count: codex.preview == nil ? codex.pending.count : codex.previewCount,
                                         action: codex.showRequests, surface: $liquidDepth)
                             .offset(y: 82)
                     }
@@ -245,8 +250,8 @@ struct ContentView: View {
         .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
-        .task(id: codex.running && vm.notchState == .closed && !vm.hideOnClosed) {
-            let active = codex.running && vm.notchState == .closed && !vm.hideOnClosed
+        .task(id: rocketRequested) {
+            let active = rocketRequested
             flameActive = false
             if active {
                 try? await Task.sleep(for: .milliseconds(reducedMotion ? 0 : 850))
@@ -332,17 +337,8 @@ struct ContentView: View {
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
                               .transition(.opacity)
-                      } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music) && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle) && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed {
-                          MusicLiveActivity()
-                              .frame(alignment: .center)
-                      } else if codex.running && vm.notchState == .closed && !vm.hideOnClosed {
-                          HStack(spacing: 0) {
-                              fuelSlot
-                              Color.clear.frame(width: fuelGap)
-                              Color.clear.frame(width: musicSideWidth)
-                          }.frame(height: vm.effectiveClosedNotchHeight)
-                      } else if !coordinator.expandingView.show && vm.notchState == .closed && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace] && !vm.hideOnClosed  {
-                          BoringFaceAnimation()
+                      } else if vm.notchState == .closed {
+                          closedPlaybackContent
                        } else if vm.notchState == .open {
                            BoringHeader()
                                .frame(height: max(24, vm.effectiveClosedNotchHeight))
@@ -415,6 +411,49 @@ struct ContentView: View {
         .onDrop(of: [.fileURL, .url, .utf8PlainText, .plainText, .data], delegate: GeneralDropTargetDelegate(isTargeted: $vm.generalDropTargeting))
     }
 
+    private var musicPresented: Bool {
+        (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
+            && (musicManager.isPlaying || !musicManager.isPlayerIdle)
+            && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
+    }
+
+    private var idleFacePresented: Bool {
+        !coordinator.expandingView.show && !musicManager.isPlaying && musicManager.isPlayerIdle
+            && Defaults[.showNotHumanFace] && !vm.hideOnClosed
+    }
+
+    private var playbackTransition: AnyTransition {
+        reducedMotion ? .opacity : .opacity
+            .combined(with: .scale(scale: 0.94, anchor: .top))
+            .combined(with: .offset(y: -6))
+    }
+
+    private var closedPlaybackContent: some View {
+        let fuelVisible = codex.running && !vm.hideOnClosed
+        let width = musicPresented || fuelVisible
+            ? 2 * musicSideWidth + fuelGap
+            : vm.closedNotchSize.width - 20
+                + (idleFacePresented ? max(0, vm.effectiveClosedNotchHeight - 12) + 30 + 16 : 0)
+        return ZStack {
+            if musicPresented {
+                MusicLiveActivity()
+                    .transition(playbackTransition)
+            } else if !fuelVisible && idleFacePresented {
+                BoringFaceAnimation()
+                    .transition(.opacity)
+            }
+        }
+        // Explicit geometry lets the black surface and its edge effects resize
+        // continuously, even while the outgoing content is being removed.
+        .frame(width: max(0, width), height: vm.effectiveClosedNotchHeight)
+        .overlay(alignment: .leading) {
+            // One persistent gauge: stopping music must not recreate or fade it.
+            if fuelVisible { fuelSlot }
+        }
+        .animation(reducedMotion ? .easeInOut(duration: 0.18)
+                   : .spring(response: 0.55, dampingFraction: 0.9), value: musicPresented)
+    }
+
     @ViewBuilder
     func BoringFaceAnimation() -> some View {
         HStack {
@@ -451,14 +490,11 @@ struct ContentView: View {
                 height: max(0, vm.effectiveClosedNotchHeight - 12),
                 lyricOffset: compactLyricsOffset, hidesArtwork: codex.running
             )
-            .overlay(alignment: .leading) {
-                if codex.running { fuelSlot }
-            }
             .frame(height: vm.effectiveClosedNotchHeight)
         } else {
         HStack {
             if codex.running {
-                fuelSlot
+                Color.clear.frame(width: musicSideWidth)
             } else {
             Image(nsImage: musicManager.albumArt)
                 .resizable()

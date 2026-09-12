@@ -88,3 +88,22 @@ struct NotchShape: Shape {
         .frame(width: 200, height: 32)
         .padding(10)
 }
+
+
+// One shared observer set for decorative animation across all notch windows.
+@MainActor final class NotchMotionEnvironment: NSObject, ObservableObject {
+    static let shared = NotchMotionEnvironment()
+    @Published private(set) var suspended = false
+    @Published private(set) var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+    private override init() {
+        super.init()
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.screensDidSleepNotification, object: nil)
+        center.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.willSleepNotification, object: nil)
+        center.addObserver(self, selector: #selector(waking), name: NSWorkspace.screensDidWakeNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(powerChanged), name: .NSProcessInfoPowerStateDidChange, object: nil)
+    }
+    @objc private func sleeping() { suspended = true }
+    @objc private func waking() { suspended = false; powerChanged() }
+    @objc private func powerChanged() { lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled }
+}

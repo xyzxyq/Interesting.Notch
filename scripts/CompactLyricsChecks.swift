@@ -108,6 +108,54 @@ import SwiftUI
             return response(request, 200, try JSONSerialization.data(withJSONObject: isTraditional ? [traditionalPayload] : []))
         }, sleep: { _ in })
         assert(traditional != nil, "Recovered transient errors must not block traditional search fallback")
+        // Reproduce the live database spelling: 孙燕姿 is indexed as Yanzi Sun.
+        let romanizedTrack = LyricTrack(bundleID: "com.apple.Music", title: "我怀念的", artist: "孙燕姿", album: "逆光", duration: 289.114)
+        let romanizedPayload: [String: Any] = ["trackName": "我怀念的", "artistName": "Yanzi Sun", "albumName": "逆光",
+                                               "duration": 289.135, "syncedLyrics": "[00:01]测试歌词"]
+        let romanizedResult = try! await CompactLyrics.fetch(romanizedTrack, transport: { request in
+            let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+            if request.url!.path.hasSuffix("/get") { return response(request, 404) }
+            let includesArtist = items.contains { $0.name == "artist_name" }
+            return response(request, 200, try JSONSerialization.data(withJSONObject: includesArtist ? [] : [romanizedPayload]))
+        }, sleep: { _ in })
+        assert(romanizedResult != nil, "Title-only recovery must match the album, duration and romanized artist")
+        func candidate(artist: String = "Yanzi Sun", album: String = "逆光", title: String = "我怀念的",
+                       duration: Double = 289, cue: String = "测试歌词") -> LyricCandidate {
+            LyricCandidate(trackName: title, artistName: artist, albumName: album, duration: duration,
+                           plainLyrics: nil, syncedLyrics: "[00:01]" + cue)
+        }
+        assert(CompactLyrics.match([candidate()], track: romanizedTrack) != nil)
+        assert(CompactLyrics.match([candidate(artist: "Sun Yan-Zi")], track: romanizedTrack) != nil)
+        assert(CompactLyrics.match([candidate(artist: "孙彦姿")], track: romanizedTrack) == nil, "Different Chinese names must not collapse to the same pinyin")
+        assert(CompactLyrics.match([candidate(artist: "Li Daimo")], track: romanizedTrack) == nil)
+        assert(CompactLyrics.match([candidate(album: "Other")], track: romanizedTrack) == nil)
+        assert(CompactLyrics.match([candidate(album: "")], track: romanizedTrack) == nil)
+        assert(CompactLyrics.match([candidate(duration: 294)], track: romanizedTrack) == nil)
+        assert(CompactLyrics.match([candidate(title: "我怀念的 (Live)")], track: romanizedTrack) == nil)
+        assert(CompactLyrics.match([candidate(), candidate(cue: "另一句歌词")], track: romanizedTrack) == nil)
+        let exactArtist = candidate(artist: "孙燕姿", cue: "同名歌手优先")
+        assert(CompactLyrics.match([candidate(), exactArtist], track: romanizedTrack)?.artistName == "孙燕姿")
+        let subtitleTrack = LyricTrack(bundleID: "com.apple.Music", title: "海屿你(求你别离开我)", artist: "马也_Crabbit",
+                                       album: "海屿你(求你别离开我) - Single", duration: 296.022)
+        let subtitlePayload: [String: Any] = ["trackName": "海屿你", "artistName": "馬也_Crabbit", "albumName": "海屿你 - Single",
+                                             "duration": 295, "syncedLyrics": "[00:01]求你别离开我"]
+        let subtitleResult = try! await CompactLyrics.fetch(subtitleTrack, transport: { request in
+            if request.url!.path.hasSuffix("/get") { return response(request, 404) }
+            let items = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems!
+            let baseTitle = items.contains { $0.name == "track_name" && $0.value == "海屿你" }
+            return response(request, 200, try JSONSerialization.data(withJSONObject: baseTitle ? [subtitlePayload] : []))
+        }, sleep: { _ in })
+        assert(subtitleResult != nil, "A lyric-quoted subtitle needs base-title search plus lyric, artist, album and duration verification")
+        func subtitleCandidate(artist: String = "馬也_Crabbit", album: String = "海屿你 - Single", cue: String = "求你别离开我") -> LyricCandidate {
+            LyricCandidate(trackName: "海屿你", artistName: artist, albumName: album, duration: 295,
+                           plainLyrics: nil, syncedLyrics: "[00:01]" + cue)
+        }
+        assert(CompactLyrics.match([subtitleCandidate(cue: "Unrelated lyrics")], track: subtitleTrack) == nil)
+        assert(CompactLyrics.match([subtitleCandidate(artist: "Another singer")], track: subtitleTrack) == nil)
+        assert(CompactLyrics.match([subtitleCandidate(album: "Another album")], track: subtitleTrack) == nil)
+        let versionTrack = LyricTrack(bundleID: "com.apple.Music", title: "海屿你(现场重制版本)", artist: "马也_Crabbit",
+                                      album: "海屿你(现场重制版本) - Single", duration: 296)
+        assert(CompactLyrics.match([subtitleCandidate()], track: versionTrack) == nil, "Do not blindly strip version labels")
         var calls = 0
         let recovered = try! await CompactLyrics.fetch(track, transport: { request in
             calls += 1

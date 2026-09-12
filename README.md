@@ -48,6 +48,16 @@ Codex 信息由本机桥接脚本读取，显示内容取决于客户端可提�
 
 如需查找本 fork 的发布包，请查看[本仓库 Releases](https://github.com/xyzxyq/Interesting.Notch/releases)，并核对对应提交及说明；不要使用上游下载链接来获取本 fork 的新增功能。
 
+### 歌词获取与纠错
+
+音乐来源选择“自动跟随正在播放的应用”（原 Now Playing），同步歌词不再限定 Apple Music；网易云音乐及其他提供 macOS Now Playing 信息的播放器共用这条歌词链路。播放器负责提供歌名、歌手、时长和播放进度，歌词仍来自本地缓存、LRCLIB／网易云或手动导入，并非直接提取播放器内显示的歌词。网易云音乐 3.1.9 已在本机验证。QQ 音乐、酷狗的专项适配与实机验证暂缓；不发布完整播放信息的客户端版本不能通过这条接口同步。
+
+开启“媒体 → 右侧滚动歌词”后，优先读取本机保存的歌词；没有有效缓存时并行请求 LRCLIB 和网易云，收集通过歌曲版本和正文文字校验的结果，优先匹配专辑，再按固定来源顺序选择并保存（等待上限 12 秒）。一个来源失败不会阻断另一个来源。
+
+自动匹配失败或歌词版本不正确时，打开“选择或导入歌词…”：可以修改歌曲与歌手关键词、预览候选并点击“使用并记住”，也可以导入 UTF-8 编码、带时间戳且小于 2 MB 的 LRC 文件。切歌后旧窗口的结果不能应用到新歌。“重新获取歌词”会跳过缓存重新自动匹配，成功后更新保存的结果。
+
+缓存位于 `~/Library/Application Support/InterestingNotch/Lyrics`，按播放器、歌名、歌手、专辑和时长区分；手动选定的版本在后续播放中优先复用。外部歌词服务可能缺少记录或发生接口变化，目前仍为逐句同步，未引入逐字歌词格式。
+
 ### Codex 状态桥接
 
 安装本机桥接需要 Python 3，以及可访问的本机 Codex 客户端环境。在仓库根目录执行：
@@ -80,6 +90,8 @@ python3 scripts/codex-notch-bridge-install.py --uninstall
 
 ## 许可与致谢
 
+歌词的本地缓存、多源获取与手动纠错流程参考 [LyricsX](https://github.com/ddddxxx/LyricsX)。网易云适配参考其 LyricsKit 组件，相关来源、修改及 MPL-2.0 许可证说明见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+
 本项目保留上游的 **GNU GPL v3** 许可证，完整文本见 [LICENSE](LICENSE)。原项目与第三方代码的版权和归属声明予以保留，第三方许可见 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES)。
 
 - [TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch)：本项目的上游基础。
@@ -87,3 +99,5 @@ python3 scripts/codex-notch-bridge-install.py --uninstall
 - [NotchDrop](https://github.com/Lakr233/NotchDrop)：上游文件暂存功能的早期基础。
 - [@maxtron95](https://github.com/maxtron95)：上游原始图标设计。本 fork 当前使用另行制作的蓝白笑脸图标。
 - [@himanshhhhuv](https://github.com/himanshhhhuv)：上游网站设计。
+
+中文标题及歌手信息的歌曲，自动匹配还要求存在足够的汉字歌词正文，署名行不计入；不能确认正文的拼音、译文或其他版本需手动选择。此规则是保守的文字校验，不是完整语言识别。中文名称的外语歌曲也可能需要手动选择，已手动保存的版本保持不变。旧规则的自动缓存会重新获取；显示语言仅控制中文简繁，不自动翻译原歌词。

@@ -593,6 +593,7 @@ struct HUD: View {
 }
 
 struct Media: View {
+    @State private var lyricsPickerRequest: LyricsPicker.Request?
     @ObservedObject private var musicManager = MusicManager.shared
     @Default(.waitInterval) var waitInterval
     @Default(.mediaController) var mediaController
@@ -610,7 +611,7 @@ struct Media: View {
             Section {
                 Picker("Music Source", selection: $mediaController) {
                     ForEach(availableMediaControllers) { controller in
-                        Text(controller.rawValue).tag(controller)
+                        Text(controller == .nowPlaying ? "自动跟随正在播放的应用" : controller.rawValue).tag(controller)
                     }
                 }
                 .onChange(of: mediaController) { _, _ in
@@ -636,7 +637,7 @@ struct Media: View {
                     }
                 } else {
                     Text(
-                        "'Now Playing' was the only option on previous versions and works with all media apps."
+                        "自动跟随 Apple Music、网易云音乐、QQ 音乐等向 macOS 提供歌曲信息的播放器。若播放器未提供歌名、歌手或播放进度，同步歌词暂不可用。"
                     )
                     .foregroundStyle(.secondary)
                     .font(.caption)
@@ -650,7 +651,7 @@ struct Media: View {
                 )
                 Defaults.Toggle(key: .enableCompactLyrics) {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("Scrolling lyrics for Apple Music")
+                        Text("Scrolling lyrics")
                         Text("Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -659,12 +660,19 @@ struct Media: View {
                 .onChange(of: compactLyricsEnabled) { _, enabled in
                     if enabled && NotchWeatherManager.shared.enabled { NotchWeatherManager.shared.restart() }
                 }
-                .accessibilityLabel(Text("Scrolling lyrics for Apple Music"))
+                .accessibilityLabel(Text("Scrolling lyrics"))
                 .accessibilityHint(Text("Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language."))
                 HStack {
                     Text(LocalizedStringKey(musicManager.lyricsStatus))
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
+                    Button("选择或导入歌词…") {
+                        lyricsPickerRequest = LyricsPicker.Request(track: musicManager.currentLyricTrack)
+                    }
+                        .disabled(!compactLyricsEnabled || !musicManager.currentLyricTrack.isReady)
+                        .sheet(item: $lyricsPickerRequest) { request in
+                            LyricsPicker(track: request.track)
+                        }
                     Button("重新获取歌词") { musicManager.retryLyrics() }
                         .disabled(musicManager.isFetchingLyrics)
                 }
