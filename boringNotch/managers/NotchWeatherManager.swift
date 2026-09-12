@@ -14,10 +14,25 @@ import CoreLocation
     private var switchingToAutomatic = false
     @Published private var located: WeatherPlace?
     var cityName: String { selected?.name ?? located?.name ?? "尚未获取城市" }
-    private let geocoder = CLGeocoder()
+    private let geocoder: CLGeocoder
+    private let cityTimeout: TimeInterval
+    private var cityToken: UUID?
+    private var needsCityResolution = false
+    private var lastFix: CLLocation?
+    private var lastCityAttempt = Date.distantPast
     private var cityRequest: Task<Void, Never>?
-    static func resolvedCity(locality: String?, region: String?) -> String? {
-        [locality, region].compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }.first { !$0.isEmpty }
+    static func resolvedCity(locality: String?, region: String?, district: String? = nil, administrativeArea: String? = nil) -> String? {
+        func clean(_ value: String?) -> String? {
+            let text = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return text.isEmpty ? nil : text
+        }
+        let area = clean(district)
+        let city = [clean(locality), clean(region), clean(administrativeArea)].compactMap { $0 }.first
+        guard let city else { return area }
+        return area.map { city == $0 || city.hasSuffix($0) ? city : "\(city) · \($0)" } ?? city
+    }
+    private static func isResolvedName(_ name: String) -> Bool {
+        !["正在解析", "城市名称暂不可用", "位置已获取", "尚未获取", "当前位置"].contains { name.hasPrefix($0) }
     }
     private var loop: Task<Void, Never>?
     private var request: Task<Void, Never>?
@@ -28,14 +43,16 @@ import CoreLocation
     private var lastAuthorization: CLAuthorizationStatus?
     private var cached: NotchWeatherSnapshot?
 
-    init(location: CLLocationManager = CLLocationManager()) {
+    init(location: CLLocationManager = CLLocationManager(), geocoder: CLGeocoder = CLGeocoder(), cityTimeout: TimeInterval = 10) {
         self.location = location
+        self.geocoder = geocoder
+        self.cityTimeout = cityTimeout
         super.init()
         selected = UserDefaults.standard.data(forKey: "weatherSelectedCity").flatMap { try? JSONDecoder().decode(WeatherPlace.self, from: $0) }
         cached = UserDefaults.standard.data(forKey: "weatherSnapshot").flatMap { try? JSONDecoder().decode(NotchWeatherSnapshot.self, from: $0) }
         // Created on the main actor; Core Location delegates use this run loop.
         location.delegate = self
-        location.desiredAccuracy = kCLLocationAccuracyKilometer
+        location.desiredAccuracy = kCLLocationAccuracyHundredMeters
         start()
     }
     func start() { if enabled && loop == nil { restart() } }
@@ -51,6 +68,8 @@ import CoreLocation
         selected = place
         UserDefaults.standard.set(place.flatMap { try? JSONEncoder().encode($0) }, forKey: "weatherSelectedCity")
         located = nil
+        needsCityResolution = false
+        lastFix = nil
         cached = nil
         snapshot = nil
         UserDefaults.standard.removeObject(forKey: "weatherSnapshot")
@@ -59,13 +78,14 @@ import CoreLocation
     func restart() {
         generation += 1
         location.stopUpdatingLocation()
-        cityRequest?.cancel(); cityRequest = nil
-        geocoder.cancelGeocode()
+        cancelCityResolution()
+        lastCityAttempt = .distantPast
         loop?.cancel(); loop = nil
         request?.cancel(); request = nil
         lastAttempt = .distantPast
         lastLocationRequest = .distantPast
         guard enabled else { switchingToAutomatic = false; locationNotice = nil; snapshot = nil; status = "天气动效未开启"; return }
+        if !switchingToAutomatic { locationNotice = nil }
         status = "正在启动天气…"
         tick()
         loop = Task { [weak self] in
@@ -97,6 +117,7 @@ import CoreLocation
                     switchingToAutomatic = false
                     break
                 }
+                cancelCityResolution()
                 located = nil
                 snapshot = nil
                 generation += 1
@@ -105,6 +126,9 @@ import CoreLocation
             }
         }
         guard let place = selected ?? located else { return }
+        if selected == nil, needsCityResolution, cityToken == nil, Date.now.timeIntervalSince(lastCityAttempt) >= 60 {
+            resolveCity(for: place, location: lastFix ?? CLLocation(latitude: place.latitude, longitude: place.longitude))
+        }
         if snapshot == nil, let cached, cached.place.id == place.id, cached.fresh(at: .now) { snapshot = cached }
         guard request == nil, Date.now.timeIntervalSince(lastAttempt) >= 900 else { return }
         fetch(place)
@@ -141,45 +165,74 @@ import CoreLocation
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard enabled, (selected == nil || switchingToAutomatic), let value = locations.last, value.horizontalAccuracy >= 0,
               abs(value.timestamp.timeIntervalSinceNow) < 600 else { return }
-        // City-scale coordinates are sufficient for these decorative effects.
-        let place = WeatherPlace(name: "正在解析城市…", latitude: (value.coordinate.latitude * 100).rounded() / 100,
-                                 longitude: (value.coordinate.longitude * 100).rounded() / 100)
+        // Weather uses roughly 100 m coordinates; reverse geocoding uses the original fix.
+        let place = WeatherPlace(name: "位置已获取", latitude: (value.coordinate.latitude * 1000).rounded() / 1000,
+                                 longitude: (value.coordinate.longitude * 1000).rounded() / 1000)
         guard place.valid else { return }
+        lastFix = value
         if switchingToAutomatic {
             switchingToAutomatic = false
             locationNotice = nil
             selected = nil
             UserDefaults.standard.removeObject(forKey: "weatherSelectedCity")
         }
-        if located?.id != place.id {
+        let changed = located?.id != place.id
+        if changed {
+            cancelCityResolution()
             generation += 1; request?.cancel(); request = nil
             snapshot = nil; lastAttempt = .distantPast
+            located = cached.flatMap { $0.place.id == place.id && Self.isResolvedName($0.place.name) ? $0.place : nil } ?? place
+            needsCityResolution = true
+            lastCityAttempt = .distantPast
         }
-        if located?.id != place.id { located = place }
         locationRetryInterval = 900
+        if cityToken == nil, changed || Date.now.timeIntervalSince(lastCityAttempt) >= 60 {
+            resolveCity(for: located ?? place, location: value)
+        }
         tick()
-        resolveCity(for: place)
     }
-    private func resolveCity(for place: WeatherPlace) {
-        cityRequest?.cancel()
+    private func cancelCityResolution() {
+        if locationNotice == "正在解析城市与区域…" { locationNotice = nil }
+        cityToken = nil
+        cityRequest?.cancel(); cityRequest = nil
         geocoder.cancelGeocode()
-        let token = generation
+    }
+    private func resolveCity(for place: WeatherPlace, location fix: CLLocation) {
+        guard cityToken == nil else { return }
+        let token = UUID()
+        cityToken = token
+        lastCityAttempt = .now
+        locationNotice = "正在解析城市与区域…"
         cityRequest = Task { [weak self] in
-            guard let self else { return }
-            let marks = try? await self.geocoder.reverseGeocodeLocation(CLLocation(latitude: place.latitude, longitude: place.longitude))
-            guard !Task.isCancelled, self.enabled, self.selected == nil,
-                  self.generation == token, self.located?.id == place.id else { return }
-            let city = marks?.first.flatMap { Self.resolvedCity(locality: $0.locality, region: $0.subAdministrativeArea) }
-            let named = WeatherPlace(name: city ?? "城市名称暂不可用", latitude: place.latitude, longitude: place.longitude)
-            self.located = named
-            if let current = self.snapshot, current.place.id == place.id {
-                let updated = NotchWeatherSnapshot(kind: current.kind, wind: current.wind, observed: current.observed,
-                                                  fetched: current.fetched, place: named)
-                self.snapshot = updated; self.cached = updated
-                UserDefaults.standard.set(try? JSONEncoder().encode(updated), forKey: "weatherSnapshot")
-                self.status = "\(named.name) · \(updated.kind.label) · \(updated.observed.formatted(date: .omitted, time: .shortened)) 更新"
+            guard let timeout = self?.cityTimeout else { return }
+            do { try await Task.sleep(for: .seconds(timeout)) } catch { return }
+            self?.finishCity(nil, place: place, token: token, timedOut: true)
+        }
+        geocoder.reverseGeocodeLocation(fix, preferredLocale: .current) { [weak self] marks, _ in
+            Task { @MainActor in
+                let name = marks?.first.flatMap {
+                    Self.resolvedCity(locality: $0.locality, region: $0.subAdministrativeArea,
+                                      district: $0.subLocality, administrativeArea: $0.administrativeArea)
+                }
+                self?.finishCity(name, place: place, token: token, timedOut: false)
             }
-            self.cityRequest = nil
+        }
+    }
+    private func finishCity(_ name: String?, place: WeatherPlace, token: UUID, timedOut: Bool) {
+        guard cityToken == token, enabled, selected == nil, located?.id == place.id else { return }
+        cancelCityResolution()
+        needsCityResolution = name == nil
+        let previous = located?.name
+        let displayName = name ?? previous.flatMap { Self.isResolvedName($0) ? $0 : nil } ?? "位置已获取，城市／区域暂不可用"
+        let named = WeatherPlace(name: displayName, latitude: place.latitude, longitude: place.longitude)
+        located = named
+        locationNotice = name == nil ? "地址解析\(timedOut ? "超时" : "暂不可用")，一分钟后自动重试；天气仍按设备坐标查询" : nil
+        if let current = snapshot, current.place.id == place.id {
+            let updated = NotchWeatherSnapshot(kind: current.kind, wind: current.wind, observed: current.observed,
+                                              fetched: current.fetched, place: named)
+            snapshot = updated; cached = updated
+            UserDefaults.standard.set(try? JSONEncoder().encode(updated), forKey: "weatherSnapshot")
+            status = "\(named.name) · \(updated.kind.label) · \(updated.observed.formatted(date: .omitted, time: .shortened)) 更新"
         }
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -192,6 +245,7 @@ import CoreLocation
         }
         let code = (error as? CLError)?.code
         if code == .denied {
+            cancelCityResolution()
             located = nil
             snapshot = nil
             generation += 1

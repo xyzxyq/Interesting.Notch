@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import SwiftUI
 import CoreLocation
+import MapKit
 
 private final class WeatherStub: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var fail = false
@@ -22,16 +23,34 @@ private final class LocationStub: CLLocationManager {
     override func stopUpdatingLocation() {}
 }
 
+private final class DistrictMark: CLPlacemark, @unchecked Sendable {
+    override var locality: String? { "厦门市" }
+    override var subLocality: String? { "思明区" }
+}
+private final class GeocoderStub: CLGeocoder {
+    var replies: [CLGeocodeCompletionHandler] = []
+    var fix: CLLocation?
+    override func reverseGeocodeLocation(_ location: CLLocation, preferredLocale locale: Locale?, completionHandler: @escaping CLGeocodeCompletionHandler) {
+        fix = location
+        replies.append(completionHandler)
+    }
+    override func cancelGeocode() {}
+}
+
 @main @MainActor struct WeatherManagerChecks {
     static func main() async throws {
         assert(NotchWeatherManager.resolvedCity(locality: "北京市", region: "其他区域") == "北京市")
         assert(NotchWeatherManager.resolvedCity(locality: " ", region: "杭州市") == "杭州市")
         assert(NotchWeatherManager.resolvedCity(locality: nil, region: nil) == nil)
+        assert(NotchWeatherManager.resolvedCity(locality: "厦门市", region: "福建省", district: "思明区") == "厦门市 · 思明区")
+        assert(NotchWeatherManager.resolvedCity(locality: "上海市", region: nil, district: "上海市") == "上海市")
+        assert(NotchWeatherManager.resolvedCity(locality: nil, region: nil, district: " ", administrativeArea: "福建省") == "福建省")
         URLProtocol.registerClass(WeatherStub.self)
         UserDefaults.standard.set(true, forKey: "weatherEffectsEnabled")
         UserDefaults.standard.set(try JSONEncoder().encode(WeatherPlace(name: "Saved city", latitude: 39.9, longitude: 116.4)), forKey: "weatherSelectedCity")
         let location = LocationStub()
-        let manager = NotchWeatherManager(location: location)
+        let geocoder = GeocoderStub()
+        let manager = NotchWeatherManager(location: location, geocoder: geocoder, cityTimeout: 0.1)
         assert(manager.status != "天气动效未开启", "Restored enabled setting retained disabled state")
         try await Task.sleep(for: .milliseconds(200))
         assert(manager.snapshot?.place.name == "Saved city", "Startup did not load saved city's weather")
@@ -65,6 +84,24 @@ private final class LocationStub: CLLocationManager {
         assert(manager.locationNotice?.contains("继续使用手动城市") == true)
         manager.locationManager(location, didUpdateLocations: [CLLocation(latitude: 24.48, longitude: 118.08)])
         assert(manager.selected == nil, "Successful coordinates did not switch to automatic")
+        // A geocoder that never calls back must not leave a permanent loading label.
+        try await Task.sleep(for: .milliseconds(200))
+        assert(manager.locationNotice?.contains("超时") == true)
+        assert(!manager.cityName.contains("正在解析") && manager.snapshot != nil)
+        geocoder.replies[0]([DistrictMark(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: 24.48, longitude: 118.08)))], nil)
+        try await Task.sleep(for: .milliseconds(20))
+        assert(!manager.cityName.contains("思明区"), "Late timed-out result overwrote state")
+        manager.enabled = false
+        manager.enabled = true
+        manager.locationManager(location, didUpdateLocations: [CLLocation(latitude: 24.48123, longitude: 118.08123)])
+        assert(geocoder.fix?.coordinate.latitude == 24.48123, "Geocoder received rounded coordinates")
+        geocoder.replies.last!([DistrictMark(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: 24.48, longitude: 118.08)))], nil)
+        try await Task.sleep(for: .milliseconds(60))
+        assert(manager.cityName == "厦门市 · 思明区" && manager.locationNotice == nil)
+        assert(manager.snapshot?.place.name == "厦门市 · 思明区", "Weather retained loading name")
+        let count = geocoder.replies.count
+        manager.locationManager(location, didUpdateLocations: [CLLocation(latitude: 24.48123, longitude: 118.08123)])
+        assert(geocoder.replies.count == count, "Duplicate fix restarted geocoding")
         manager.enabled = false
         manager.select(manual)
         manager.enabled = true
@@ -92,6 +129,6 @@ private final class LocationStub: CLLocationManager {
         assert(manager.cityName == "尚未获取城市")
         for key in ["weatherEffectsEnabled", "weatherSelectedCity", "weatherSnapshot"] { UserDefaults.standard.removeObject(forKey: key) }
         URLProtocol.unregisterClass(WeatherStub.self)
-        print("Weather manager checks passed: enable, disable, 503 cache fallback, city change, toggle reload")
+        print("Weather manager checks passed: city/district, timeout, late callback, raw fix, duplicate fix, enable/disable, 503 cache and toggle reload")
     }
 }
