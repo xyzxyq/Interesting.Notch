@@ -308,6 +308,7 @@ class Bridge:
     def snapshot(self):
         with self.lock:
             tasks = []
+            idle_task_ids = []
             now = time.time()
             fresh = self.connected and now - self.last_contact < 45
             # Refresh live snapshots periodically: even a silent long tool run
@@ -317,6 +318,8 @@ class Bridge:
                 fresh = False
             for (host, task_id), entry in self.runtimes.items():
                 state = task_state(entry['runtime'], entry.get('pendingQuestions', False))
+                if not state and (entry.get('runtime') or {}).get('type') == 'idle' and now - entry.get('receivedAt', 0) < 35:
+                    idle_task_ids.append(f'{host}/{task_id}')
                 if state:
                     tasks.append(dict(id=task_id, hostId=host, title='Codex task', state=state,
                                       isRunning=task_state(entry['runtime']) == 'running', reasoningEffort=entry.get('effort'),
@@ -324,7 +327,7 @@ class Bridge:
                                       pendingQuestionIds=pending_question_ids(entry.get('questions', {})),
                                       questions=pending_questions(entry.get('questions', {})),
                                       detail='Needs your attention in Codex' if state == 'waiting' else 'Codex is working'))
-            return dict(connected=fresh, tasks=tasks if fresh else [], updatedAt=self.last_contact, replyToken=self.reply_token,
+            return dict(connected=fresh, tasks=tasks if fresh else [], idleTaskIds=idle_task_ids if fresh else [], updatedAt=self.last_contact, replyToken=self.reply_token,
                         allowances=[w for w in self.allowances if now - w['updatedAt'] < 150 and now < w['resetsAt']],
                         fuel=self.fuel if self.fuel and now - self.fuel['updatedAt'] < 150 and now < self.fuel['resetsAt'] else None)
 

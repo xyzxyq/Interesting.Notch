@@ -8,6 +8,36 @@ import AppKit
         var blockedQuestion = activeQuestion
         blockedQuestion.isRunning = false
         assert(blockedQuestion.waiting && !blockedQuestion.working)
+        assert(CodexActivity.shouldShowRocket(enabled: true, running: true, waiting: false))
+        assert(!CodexActivity.shouldShowRocket(enabled: true, running: true, waiting: true))
+        assert(!CodexActivity.shouldShowRocket(enabled: true, running: false, waiting: false))
+        assert(!CodexActivity.shouldShowRocket(enabled: false, running: true, waiting: false))
+        let runningTask = CodexTask(id: activeQuestion.id, title: "test", state: "running", detail: nil)
+        assert(CodexActivity.didFinishWork(previous: [runningTask], current: [], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(!CodexActivity.didFinishWork(previous: [runningTask], current: [activeQuestion], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(!CodexActivity.didFinishWork(previous: [activeQuestion], current: [], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(!CodexActivity.didFinishWork(previous: [runningTask], current: [], confirmedIdle: [runningTask.identity], continuousConnection: false))
+        assert(!CodexActivity.didFinishWork(previous: [], current: [], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(!CodexActivity.didFinishWork(previous: [runningTask, blockedQuestion], current: [runningTask], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(!CodexActivity.didFinishWork(previous: [runningTask], current: [], confirmedIdle: [], continuousConnection: true))
+        assert(CodexCompletionCue.flameOutDuration > 0 && CodexCompletionCue.ribbonDuration > 0)
+        assert(CodexCompletionCue.ribbonDuration == 1.5)
+        for index in 0..<CodexCompletionCue.particleCount {
+            assert(CodexCompletionCue.particle(index, at: -0.1).opacity == 0)
+            assert(CodexCompletionCue.particle(index, at: 0).opacity == 0)
+            assert(CodexCompletionCue.particle(index, at: 0.4).opacity > 0.9)
+            assert(CodexCompletionCue.particle(index, at: 1.5).opacity == 0)
+            var previousX = 0.0
+            for elapsed in stride(from: 0.0, through: 1.5, by: 0.025) {
+                let piece = CodexCompletionCue.particle(index, at: elapsed)
+                assert(piece.position.x.isFinite && piece.position.y.isFinite)
+                assert((0...1).contains(piece.opacity))
+                assert(piece.position.x >= -1 && piece.position.x < 186)
+                assert(piece.position.y > -12 && piece.position.y < 226)
+                assert(abs(piece.position.x - previousX) < 10)
+                previousX = piece.position.x
+            }
+        }
 
         assert(CodexMergeMotion.scale(for: 1) == 1)
         assert(CodexMergeMotion.scale(for: 2) > CodexMergeMotion.scale(for: 1))

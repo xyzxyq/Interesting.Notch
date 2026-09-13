@@ -16,6 +16,47 @@ enum CodexThrust {
 
 }
 
+enum CodexCompletionCue {
+    static let flameOutDuration = 0.25
+    static let ribbonDuration = 1.5
+    static let particleCount = 88
+
+    struct Particle {
+        let position: CGPoint
+        let opacity: Double
+        let rotation: Double
+        let tumble: Double
+    }
+
+    // Stable seeds keep each piece on the same trajectory across frames.
+    static func seed(_ index: Int, _ salt: Int) -> Double {
+        let mixed: Int = index * 127 + salt * 311
+        let value: Int = (mixed + index * salt * 73) % 997
+        return Double(value) / 997.0
+    }
+
+    static func particle(_ index: Int, at elapsed: Double) -> Particle {
+        let delay = seed(index, 1) * 0.24
+        let age = max(0, elapsed - delay)
+        let lifetime = ribbonDuration - delay - seed(index, 10) * 0.18
+        let progress = min(1, age / lifetime)
+        let resistance = 1.8 + seed(index, 11) * 2.3
+        let drag = (1 - exp(-resistance * age)) / resistance
+        let flutter = sin(age * 10 + seed(index, 2) * .pi * 2) * (1 - exp(-5 * age))
+        let fade = min(1, age / 0.04) * pow(min(1, (1 - progress) / 0.3), 1.5)
+        let ribbon = index < 7
+        let vx = ribbon ? 170 + seed(index, 3) * 150 : 70 + seed(index, 3) * 265
+        let vy = -18 + seed(index, 4) * 180
+        return Particle(
+            position: CGPoint(x: vx * drag + flutter * age * 4,
+                              y: vy * drag + (15 + seed(index, 12) * 30) * age * age + flutter * age * 5),
+            opacity: elapsed >= delay && elapsed < ribbonDuration ? fade : 0,
+            rotation: seed(index, 5) * .pi * 2 + age * (ribbon ? 1.8 : 4 + seed(index, 6) * 10),
+            tumble: cos(age * (7 + seed(index, 7) * 9) + seed(index, 8) * .pi))
+    }
+
+}
+
 struct CodexFlame: View {
     var active: Bool
     var effort: Int = -1
@@ -60,10 +101,126 @@ struct CodexFlame: View {
             .padding(.trailing, -80)
         }
         .opacity(active ? 1 : 0)
-        .animation(.easeOut(duration: reduced ? 0.15 : 0.25), value: active)
+        .animation(.easeOut(duration: reduced ? 0.15 : CodexCompletionCue.flameOutDuration), value: active)
         .onAppear { onScreen = true }
         .onDisappear { onScreen = false }
         .allowsHitTesting(false)
+    }
+}
+
+/// A one-shot completion cue emitted from the rocket nozzle after the flame fades.
+struct CodexConfetti: View {
+    var active: Bool
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @State private var onScreen = false
+    @State private var startedAt = Date.distantPast
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
+    var body: some View {
+        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60,
+                               paused: !onScreen || motion.suspended || !active || reduced)) { clock in
+            Canvas { context, size in
+                guard active, !reduced else { return }
+                let elapsed = clock.date.timeIntervalSince(startedAt)
+                CodexConfettiFrame.draw(in: &context, size: size, elapsed: elapsed)
+            }
+            .padding(.trailing, -192)
+            .padding(.bottom, -200)
+        }
+
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false }
+        .onChange(of: active, initial: true) { _, value in
+            if value { startedAt = .now }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
+// Shared drawing allows the production effect to be checked at exact timestamps.
+enum CodexConfettiFrame {
+    static let colors: [Color] = [
+        Color(red: 1, green: 0.76, blue: 0.27),
+        Color(red: 1, green: 0.38, blue: 0.53),
+        Color(red: 0.65, green: 0.48, blue: 1),
+        Color(red: 0.25, green: 0.78, blue: 1),
+        Color(red: 0.35, green: 0.91, blue: 0.72),
+        Color(red: 1, green: 0.9, blue: 0.65)
+    ]
+
+    static func draw(in context: inout GraphicsContext, size: CGSize, elapsed: Double) {
+        let height = max(0, size.height - 200)
+        let width = max(0, size.width - 192)
+        let nozzle = NotchShape.rocketCoordinate(width + height * 0.182, width: width, height: height)
+        // A warm, brief muzzle flash precedes the paper; no persistent glow.
+        if elapsed > 0 && elapsed < 0.16 {
+            let flash = sin(.pi * elapsed / 0.16)
+            var light = context
+            light.addFilter(.blur(radius: 4))
+            light.fill(Path(ellipseIn: CGRect(x: nozzle - 3, y: height / 2 - 5, width: 16, height: 10)),
+                       with: .color(colors[0].opacity(flash * 0.65)))
+        }
+        // Fine distant pieces first, long satin ribbons last.
+        for index in (0..<CodexCompletionCue.particleCount).reversed() {
+            let particle = CodexCompletionCue.particle(index, at: elapsed)
+            guard particle.opacity > 0 else { continue }
+            let seed = CodexCompletionCue.seed(index, 9)
+            let color = colors[index % colors.count]
+            let depth = 0.5 + CodexCompletionCue.seed(index, 13) * 0.7
+            var piece = context
+            piece.opacity = particle.opacity * (0.65 + depth * 0.28)
+            piece.translateBy(x: nozzle + particle.position.x, y: height / 2 + particle.position.y)
+            if index < 7 {
+                // A narrow filled band has folds and a lit edge, rather than a noodle-like stroke.
+                piece.rotate(by: .radians(sin(particle.rotation) * 0.65))
+                let length = (28 + seed * 22) * min(1, max(0, elapsed) / 0.2)
+                let thickness = 1.6 + seed * 1.2
+                var band = Path()
+                var edge = Path()
+                func point(_ step: Int, _ side: Double) -> CGPoint {
+                    let u = Double(step) / 24
+                    let curl = sin(u * .pi * 2.6 - elapsed * 8 + seed * 6)
+                    return CGPoint(x: (u - 0.5) * length,
+                                   y: curl * (3 + u * 3) + side * thickness * (0.4 + 0.6 * abs(cos(u * .pi * 2 - elapsed * 6))))
+                }
+                for step in 0...24 {
+                    let p = point(step, -1)
+                    if step == 0 { band.move(to: p); edge.move(to: p) }
+                    else { band.addLine(to: p); edge.addLine(to: p) }
+                }
+                for step in (0...24).reversed() { band.addLine(to: point(step, 1)) }
+                band.closeSubpath()
+                piece.fill(band, with: .linearGradient(
+                    Gradient(stops: [.init(color: color.opacity(0.6), location: 0),
+                                     .init(color: color, location: 0.35),
+                                     .init(color: .white.opacity(0.9), location: 0.52),
+                                     .init(color: color, location: 0.7),
+                                     .init(color: color.opacity(0.7), location: 1)]),
+                    startPoint: CGPoint(x: -length / 2, y: -4), endPoint: CGPoint(x: length / 2, y: 4)))
+                piece.stroke(edge, with: .color(.white.opacity(0.45)), lineWidth: 0.45)
+            } else if index.isMultiple(of: 6) {
+                // Tiny foil glints provide contrast between larger pieces.
+                let radius = (1.4 + seed * 1.4) * depth
+                piece.opacity *= 0.55 + 0.45 * abs(particle.tumble)
+                var star = Path()
+                star.move(to: CGPoint(x: 0, y: -radius * 1.6))
+                star.addQuadCurve(to: CGPoint(x: radius, y: 0), control: .zero)
+                star.addQuadCurve(to: CGPoint(x: 0, y: radius * 1.6), control: .zero)
+                star.addQuadCurve(to: CGPoint(x: -radius, y: 0), control: .zero)
+                star.addQuadCurve(to: CGPoint(x: 0, y: -radius * 1.6), control: .zero)
+                piece.fill(star, with: .color(index.isMultiple(of: 12) ? colors[0] : .white))
+            } else {
+                piece.rotate(by: .radians(particle.rotation))
+                piece.scaleBy(x: (0.16 + abs(particle.tumble) * 0.84) * depth, y: depth)
+                let rect = CGRect(x: -2, y: -3, width: 3 + seed * 2.5, height: 4 + seed * 4)
+                let paper = Path(roundedRect: rect, cornerRadius: 0.45)
+                piece.fill(paper, with: .linearGradient(Gradient(colors: [color, color.opacity(0.65)]),
+                    startPoint: CGPoint(x: rect.minX, y: rect.minY), endPoint: CGPoint(x: rect.maxX, y: rect.maxY)))
+                piece.fill(Path(CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height * 0.3)),
+                           with: .color(.white.opacity(max(0, particle.tumble) * 0.45)))
+            }
+        }
     }
 }
 

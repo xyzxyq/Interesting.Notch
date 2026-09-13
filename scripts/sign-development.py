@@ -17,7 +17,7 @@ password_file = state / 'keychain-password'
 identity = 'InterestingNotch Local Development'
 
 def run(*args):
-    result = subprocess.run(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    result = subprocess.run(args, stdout=subprocess.DEVNULL, stderr=None if args[0] == 'codesign' else subprocess.DEVNULL)
     if result.returncode:
         raise SystemExit(f"{args[0]} failed (exit {result.returncode}); signing stopped.")
 

@@ -34,6 +34,8 @@ struct ContentView: View {
     @State private var liquidDepth: CGFloat = 0
     @State private var rocketProgress: CGFloat = 0
     @State private var flameActive = false
+    @State private var confettiActive = false
+    @State private var handledCompletion = 0
 
     @State private var haptics: Bool = false
 
@@ -57,10 +59,13 @@ struct ContentView: View {
                 : cornerRadiusInsets.closed.top
     }
 
-    private var rocketRequested: Bool {
+    private var rocketSurfaceAvailable: Bool {
         let hud = coordinator.sneakPeek.show && coordinator.sneakPeek.type != .music && coordinator.sneakPeek.type != .battery
-        return codex.running && vm.notchState == .closed && !vm.hideOnClosed && !hud
+        return codex.enabled && vm.notchState == .closed && !vm.hideOnClosed && !hud
     }
+
+    private var rocketRequested: Bool { codex.rocketVisible && rocketSurfaceAvailable }
+    private var rocketPresented: Bool { codex.rocketVisible || rocketProgress > 0 }
 
     private var currentNotchShape: NotchShape {
         NotchShape(
@@ -94,7 +99,7 @@ struct ContentView: View {
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
         {
             chinWidth += (2 * musicSideWidth + 20)
-        } else if codex.running && vm.notchState == .closed && !vm.hideOnClosed {
+        } else if rocketPresented && vm.notchState == .closed && !vm.hideOnClosed {
             chinWidth += 2 * musicSideWidth + 20
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
@@ -138,6 +143,7 @@ struct ContentView: View {
                     .overlay { MusicEdgeEffect(shape: currentNotchShape) }
                     .overlay { CodexSpeedLines(shape: currentNotchShape, effort: codex.effort, active: flameActive) }
                     .overlay { CodexFlame(active: flameActive, effort: codex.effort) }
+                    .overlay { CodexConfetti(active: confettiActive) }
                     .shadow(
                         color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
                             ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
@@ -250,19 +256,38 @@ struct ContentView: View {
         .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
-        .task(id: rocketRequested) {
-            let active = rocketRequested
+        .onAppear { handledCompletion = codex.completionSequence }
+        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.waiting)-\(codex.completionSequence)-\(reducedMotion)") {
+            let completed = codex.completionSequence > handledCompletion
+            handledCompletion = codex.completionSequence
             flameActive = false
-            if active {
+            confettiActive = false
+            if rocketRequested {
                 try? await Task.sleep(for: .milliseconds(reducedMotion ? 0 : 850))
                 guard !Task.isCancelled else { return }
-            }
-            withAnimation(.easeInOut(duration: reducedMotion ? 0.15 : 0.5)) { rocketProgress = active ? 1 : 0 }
-            if active {
+                withAnimation(.easeInOut(duration: reducedMotion ? 0.15 : 0.5)) { rocketProgress = 1 }
                 try? await Task.sleep(for: .milliseconds(reducedMotion ? 150 : 500))
                 guard !Task.isCancelled else { return }
                 flameActive = true
+                return
             }
+
+            guard completed && rocketSurfaceAvailable && !codex.waiting && !reducedMotion else {
+                withAnimation(.easeInOut(duration: 0.15)) { rocketProgress = 0 }
+                return
+            }
+            if rocketProgress < 0.98 {
+                withAnimation(.easeInOut(duration: 0.15)) { rocketProgress = 1 }
+                try? await Task.sleep(for: .milliseconds(170))
+                guard !Task.isCancelled else { return }
+            }
+            try? await Task.sleep(for: .milliseconds(Int(CodexCompletionCue.flameOutDuration * 1_000)))
+            guard !Task.isCancelled else { return }
+            confettiActive = true
+            try? await Task.sleep(for: .milliseconds(Int(CodexCompletionCue.ribbonDuration * 1_000)))
+            guard !Task.isCancelled else { return }
+            confettiActive = false
+            withAnimation(.easeInOut(duration: 0.5)) { rocketProgress = 0 }
         }
         .onChange(of: vm.anyDropZoneTargeting) { _, isTargeted in
             anyDropDebounceTask?.cancel()
@@ -431,7 +456,7 @@ struct ContentView: View {
     }
 
     private var closedPlaybackContent: some View {
-        let fuelVisible = codex.running && !vm.hideOnClosed
+        let fuelVisible = rocketPresented && !vm.hideOnClosed
         let width = musicPresented || fuelVisible
             ? 2 * musicSideWidth + fuelGap
             : vm.closedNotchSize.width - 20
@@ -490,12 +515,12 @@ struct ContentView: View {
                 albumArt: musicManager.albumArt, sideWidth: musicSideWidth,
                 gap: max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top + 16),
                 height: max(0, vm.effectiveClosedNotchHeight - 12),
-                lyricOffset: compactLyricsOffset, hidesArtwork: codex.running
+                lyricOffset: compactLyricsOffset, hidesArtwork: rocketPresented
             )
             .frame(height: vm.effectiveClosedNotchHeight)
         } else {
         HStack {
-            if codex.running {
+            if rocketPresented {
                 Color.clear.frame(width: musicSideWidth)
             } else {
             Image(nsImage: musicManager.albumArt)

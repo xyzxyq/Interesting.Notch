@@ -19,13 +19,13 @@
 
 ## 下载与安装
 
-当前版本：**3.0.3（build 303）** · [更新说明](docs/releases/3.0.3.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.3)
+当前版本：**3.0.4（build 304）** · [更新说明](docs/releases/3.0.4.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.4)
 
-1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.3/interesting-notch-3.0.3-arm64.dmg)。
+1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.4/interesting-notch-3.0.4-arm64.dmg)。
 2. 退出旧版，打开 DMG，将 `Interesting Notch.app` 拖到 `Applications` 图标；应用会复制到系统 `/Applications` 文件夹。
 3. 在设置 → 媒体中选择“自动跟随正在播放的应用”，开启“右侧滚动歌词”。
 
-安装包仅支持 Apple Silicon（M 系列芯片），最低部署目标 macOS 14，未提供 Intel 包。DMG 仅展示应用和 `Applications` 拖拽目标；Release 同时提供 `SHA256SUMS.txt` 与可选的 `interesting-notch-3.0.3-codex-bridge.zip` 附件。
+安装包仅支持 Apple Silicon（M 系列芯片），最低部署目标 macOS 14，未提供 Intel 包。DMG 仅展示应用和 `Applications` 拖拽目标；Release 同时提供 `SHA256SUMS.txt` 与可选的 `interesting-notch-3.0.4-codex-bridge.zip` 附件。
 
 **本安装包使用本地开发证书签名，尚未经过 Apple Developer ID 公证。** 首次打开可能被 macOS 阻止，请在核对来源后使用系统提供的“仍要打开”入口。内部标识暂沿用上游，不建议与上游原版同时运行；测试版使用独立的 Preview 标识。
 
@@ -33,6 +33,7 @@
 
 | 功能 | 表现 |
 | --- | --- |
+| 任务结束彩带 | 桥接确认所有运行任务结束后，尾焰熄灭，再播放 1.5 秒的分层彩带与彩纸；等待输入、断线或状态丢失不会当作完成。 |
 | Codex 火箭状态 | 执行任务时将灵动岛呈现为火箭，尾焰与速度效果随思考强度变化。 |
 | 交互提醒水滴 | 等待用户交互时显示水滴；展开后可直接选择异步问题的选项，或输入文字并回车回复。收到 Codex 确认后对应提醒粒子消散；支持收起和清空本地提醒。 |
 | 额度与模型信息 | 以燃油表现剩余额度；展开栏显示额度、模型名称及思考强度。Plus 优先展示 5 小时额度，Pro 及以上优先展示周额度。 |
@@ -43,7 +44,31 @@ Codex 信息由本机桥接脚本读取，包括待回答问题的题目和选�
 
 ## 效果展示
 
-以下图片由项目自身的 SwiftUI 视图渲染，展示不同状态的静态采样；不是桌面实拍或连续动画录屏。实际颜色、尺寸和动效会随设置与屏幕变化。
+以下 GIF 由项目原生 SwiftUI／Canvas 组件逐帧生成，可在 GitHub README 中循环播放；使用演示状态和时间采样，**不是桌面录屏，也不证明真实任务、音乐或跨应用指针联动**。实际效果随设置、屏幕与“减少动态效果”选项变化。
+
+### 任务结束：熄火 → 彩带
+
+<img src="docs/assets/codex-completion.gif" width="640" alt="火箭出现，尾焰熄灭后喷出持续 1.5 秒的彩纸与长飘带，再收回普通刘海">
+
+彩带阶段为 1.5 秒，包含长飘带、翻转彩纸与细小闪光。当前桥接确认的是运行回到空闲，不能区分成功、失败或取消；多个任务并行时，全部运行任务结束才触发。设置中只保留 Codex 模式开关与状态，已移除火箭／水滴预览按钮。
+
+### 液态水滴：下落与融合
+
+<img src="docs/assets/codex-droplet.gif" width="640" alt="液态提醒水滴从刘海分离下落，新提醒落入后融合变大">
+
+### 音乐边缘：彩色水波与流星
+
+<img src="docs/assets/music-edge.gif" width="640" alt="彩色水波和流星边缘随演示时间与模拟音频能量运动">
+
+这里使用模拟能量展示绘制效果；真实播放时可选择音乐边缘风格，并搭配右侧滚动歌词、左侧封面及昼夜太阳／月球装饰。歌词来源和播放器兼容性见下文。
+
+### 纸飞机：折面与尺寸
+
+<img src="docs/assets/paper-plane.gif" width="640" alt="黑色折纸指针外观在 75% 到 175% 范围内变化">
+
+此图展示指针图像与缩放，不修改系统指针；实际功能为默认关闭的实验性选项，详见下文限制。
+
+演示可通过 `./scripts/render-readme-demos.sh` 从源码重新生成。下面保留静态状态图供对照。
 
 ### 火箭与交互提醒
 

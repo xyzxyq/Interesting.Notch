@@ -229,3 +229,20 @@ assert activity.snapshot()['tasks'][0]['isRunning'] is False
 entry['runtime'] = dict(type='idle')
 assert activity.snapshot()['tasks'][0]['isRunning'] is False
 print('PASS: async reminders preserve running state; blocking and idle states stop rocket')
+
+# Disappearance alone (owner disconnect / missing revision) is not completion.
+completion = bridge.Bridge(Path('/tmp'))
+completion.connected = True
+completion.last_contact = time.time()
+completion.runtimes[('local', 'test')] = dict(runtime=dict(type='idle'), receivedAt=time.time())
+assert completion.snapshot()['idleTaskIds'] == ['local/test']
+completion.runtimes[('local', 'test')]['runtime'] = None
+assert completion.snapshot()['idleTaskIds'] == []
+completion.runtimes.clear()
+assert completion.snapshot()['idleTaskIds'] == []
+completion.runtimes[('local', 'test')] = dict(runtime=dict(type='idle'), receivedAt=time.time() - 36)
+assert completion.snapshot()['idleTaskIds'] == []
+completion.runtimes[('local', 'test')]['receivedAt'] = time.time()
+completion.connected = False
+assert completion.snapshot()['idleTaskIds'] == []
+print('PASS: completion requires fresh explicit idle, never disappearance or disconnect')

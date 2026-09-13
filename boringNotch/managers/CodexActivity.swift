@@ -50,6 +50,7 @@ struct CodexSnapshot: Decodable {
     let connected: Bool
     let tasks: [CodexTask]
     let updatedAt: Double
+    var idleTaskIds: [String]? = nil
     var fuel: CodexFuel? = nil
     var allowances: [CodexFuel]? = nil
     var replyToken: String? = nil
@@ -85,6 +86,7 @@ struct CodexTaskStability {
         didSet { UserDefaults.standard.set(enabled, forKey: "codexRocketEnabled"); if !enabled { tasks = []; preview = nil; stability.reset() }; dismissResolvedRequests() }
     }
     @Published private(set) var tasks: [CodexTask] = [] { didSet { dismissResolvedRequests() } }
+    @Published private(set) var completionSequence = 0
     @Published private(set) var connected = false { didSet { dismissResolvedRequests() } }
     @Published private(set) var fuel: CodexFuel?
     @Published private(set) var allowances: [CodexFuel] = []
@@ -104,6 +106,19 @@ struct CodexTaskStability {
     private var panelTask: Task<Void, Never>?
     var waiting: Bool { enabled && (preview == "waiting" || (preview == nil && !pending.isEmpty)) }
     var running: Bool { enabled && (preview == "running" || (preview == nil && tasks.contains { $0.working })) }
+    // An async question can keep a Codex turn technically active. The notification
+    // state still wins visually, so the rocket always yields to the user's next action.
+    static func shouldShowRocket(enabled: Bool, running: Bool, waiting: Bool) -> Bool {
+        enabled && running && !waiting
+    }
+    var rocketVisible: Bool { Self.shouldShowRocket(enabled: enabled, running: running, waiting: waiting) }
+    // The bridge reports active tasks, not success/failure. Only a fresh, connected
+    // transition to idle counts; waiting and transport cleanup are not completion.
+    static func didFinishWork(previous: [CodexTask], current: [CodexTask], confirmedIdle: [String], continuousConnection: Bool) -> Bool {
+        continuousConnection && current.isEmpty && previous.contains { $0.working && !$0.waiting }
+            && previous.allSatisfy { confirmedIdle.contains($0.identity) }
+    }
+
     var effort: Int {
         if preview == "running" { return previewEffort }
         return tasks.filter { $0.working }.compactMap {
@@ -195,7 +210,10 @@ struct CodexTaskStability {
                         if self.allowances != allowances { self.allowances = allowances }
                         let tasks = snapshot.tasks.filter { UUID(uuidString: $0.id) != nil && ["running", "waiting"].contains($0.state) }
                         let stable = self.stability.update(tasks, at: .now)
+                        let finished = Self.didFinishWork(previous: self.tasks, current: stable,
+                                                          confirmedIdle: snapshot.idleTaskIds ?? [], continuousConnection: self.connected)
                         if self.tasks != stable { self.tasks = stable }
+                        if finished && self.enabled && self.preview == nil { self.completionSequence += 1 }
                         if !self.connected { self.connected = true }
                     } catch {
                         if self.connected { self.connected = false }
@@ -477,18 +495,6 @@ struct CodexActivitySettings: View {
         Toggle("Codex 火箭与提醒水滴", isOn: $activity.enabled)
         Text(activity.status).font(.caption).foregroundStyle(.secondary)
         if activity.enabled {
-            HStack {
-                Button("预览火箭") { activity.demonstrate("running") }
-                Button("预览水滴") { activity.demonstrate("waiting") }
-                if activity.preview != nil { Button("结束预览") { activity.demonstrate(nil) } }
-            }
-            if activity.preview == "running" {
-                Picker("预览思考强度", selection: $activity.previewEffort) {
-                    ForEach(0..<CodexThrust.labels.count, id: \.self) { index in
-                        Text(CodexThrust.labels[index]).tag(index)
-                    }
-                }
-            }
             Text("尾焰反映所选思考强度，不表示真实 token 速度；高及以上显示速度参照线。")
                 .font(.caption).foregroundStyle(.secondary)
         }
