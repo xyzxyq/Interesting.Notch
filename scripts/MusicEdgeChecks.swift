@@ -3,6 +3,13 @@ import AppKit
 
 @main @MainActor struct MusicEdgeChecks {
     static func main() throws {
+        assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: false) == 1.0 / 24)
+        assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: true) == 1.0 / 15)
+        assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: false) == 1.0 / 30)
+        assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: true) == 1.0 / 15)
+        assert(CodexThrust.frameInterval(lowPower: false) == 1.0 / 24)
+        assert(CodexThrust.frameInterval(lowPower: true) == 1.0 / 15)
+        assert(MusicEdgeFrame.waterSampleCount == 120)
         for style in ["water", "waterWhite", "waterColor"] {
             let idle = MusicEdgePlayback(style: style, alwaysOn: true, playing: false, energy: 1)
             let playing = MusicEdgePlayback(style: style, alwaysOn: true, playing: true, energy: 0)
@@ -23,6 +30,9 @@ import AppKit
         let contour = EdgeContour(path: shape.path(in: CGRect(x: 8, y: 8, width: 300, height: 32)))
         assert(contour.length > 500)
         assert(hypot(contour.point(0).x - contour.point(1).x, contour.point(0).y - contour.point(1).y) < 0.0001)
+        let sample = contour.sample(0.37)
+        let displaced = contour.point(0.37, outward: 3)
+        assert(hypot(displaced.x - (sample.point.x + sample.normal.x * 3), displaced.y - (sample.point.y + sample.normal.y * 3)) < 0.0001)
         for i in 0..<100 { let p = contour.point(Double(i)/100, outward: 3); assert(p.x.isFinite && p.y.isFinite) }
         let styles = ["water", "waterWhite", "waterColor", "ripple", "dust", "meteor", "mist"]
         func render(_ style: String, energy: Double, reduced: Bool = false, phase: Double = 0.7, sky: Bool = true) -> Data {

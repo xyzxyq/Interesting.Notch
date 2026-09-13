@@ -57,8 +57,16 @@ try:
         '--timestamp=none', '--preserve-metadata=entitlements,flags,runtime', sys.argv[1])
     # Self-signed identities have no Apple Team ID, so library validation rejects
     # even our bundled frameworks. Scope the exception to this local signer.
-    entitlements = plistlib.loads(subprocess.check_output(
-        ['codesign', '-d', '--entitlements', ':-', sys.argv[1]], stderr=subprocess.DEVNULL))
+    raw_entitlements = subprocess.check_output(
+        ['codesign', '-d', '--entitlements', ':-', sys.argv[1]], stderr=subprocess.DEVNULL)
+    if raw_entitlements.strip():
+        entitlements = plistlib.loads(raw_entitlements)
+    else:
+        # CODE_SIGNING_ALLOWED=NO builds have no embedded entitlements yet.
+        bundle_id = plistlib.load(open(Path(sys.argv[1]) / 'Contents/Info.plist', 'rb'))['CFBundleIdentifier']
+        source = Path(__file__).resolve().parents[1] / 'boringNotch/boringNotch.entitlements'
+        entitlements = plistlib.loads(source.read_bytes().replace(
+            b'$(PRODUCT_BUNDLE_IDENTIFIER)', bundle_id.encode()))
     entitlements['com.apple.security.cs.disable-library-validation'] = True
     with tempfile.TemporaryDirectory() as temp:
         entitlement_file = Path(temp) / 'entitlements.plist'

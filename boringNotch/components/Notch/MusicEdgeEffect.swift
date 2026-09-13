@@ -34,8 +34,8 @@ struct EdgeContour {
             }
         }
     }
-    func point(_ fraction: Double, outward: Double = 0) -> CGPoint {
-        guard length > 0, points.count > 1 else { return .zero }
+    func sample(_ fraction: Double) -> (point: CGPoint, normal: CGPoint) {
+        guard length > 0, points.count > 1 else { return (.zero, .zero) }
         let f = fraction - floor(fraction)
         let distance = f * length
         var low = 1; var high = distances.count - 1
@@ -43,8 +43,13 @@ struct EdgeContour {
         let a = points[low - 1]; let b = points[low]
         let segment = max(0.0001, distances[low] - distances[low - 1])
         let t = (distance - distances[low - 1]) / segment
-        return CGPoint(x: a.x + (b.x-a.x)*t - (b.y-a.y)/segment*outward,
-                       y: a.y + (b.y-a.y)*t + (b.x-a.x)/segment*outward)
+        return (CGPoint(x: a.x + (b.x-a.x)*t, y: a.y + (b.y-a.y)*t),
+                CGPoint(x: -(b.y-a.y)/segment, y: (b.x-a.x)/segment))
+    }
+    func point(_ fraction: Double, outward: Double = 0) -> CGPoint {
+        let sample = sample(fraction)
+        return CGPoint(x: sample.point.x + sample.normal.x * outward,
+                       y: sample.point.y + sample.normal.y * outward)
     }
 }
 
@@ -79,6 +84,7 @@ struct MusicEdgePlayback {
 }
 
 struct MusicEdgeFrame: View {
+    static let waterSampleCount = 120
     let shape: NotchShape
     let style: String
     let strength: Double
@@ -94,7 +100,6 @@ struct MusicEdgeFrame: View {
             let outline = shape.path(in: rect)
             var mask = Path(CGRect(origin: .zero, size: size)); mask.addPath(outline)
             context.clip(to: mask, style: FillStyle(eoFill: true))
-            let contour = EdgeContour(path: outline)
             let e = min(1, max(0, energy))
             guard style != "off" else { return }
             let isWater = style.hasPrefix("water")
@@ -109,13 +114,14 @@ struct MusicEdgeFrame: View {
                 func surface(distance: Double, amplitude: Double) -> Path {
                     let expanded = EdgeContour(path: shape.path(in: rect.insetBy(dx: -distance, dy: -distance)))
                     var path = Path()
-                    for i in 0..<240 {
-                        let f = Double(i) / 240
+                    for i in 0..<Self.waterSampleCount {
+                        let f = Double(i) / Double(Self.waterSampleCount)
                         let undulation = sin(f * .pi * 10 - phase * 3) * 0.65
                             + sin(f * .pi * 18 + phase * 2) * 0.35
-                        let base = expanded.point(f)
-                        let taper = min(1, max(0, (base.y - rect.minY) / 12))
-                        let point = expanded.point(f, outward: undulation * amplitude * taper)
+                        let sample = expanded.sample(f)
+                        let taper = min(1, max(0, (sample.point.y - rect.minY) / 12))
+                        let point = CGPoint(x: sample.point.x + sample.normal.x * undulation * amplitude * taper,
+                                            y: sample.point.y + sample.normal.y * undulation * amplitude * taper)
                         if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
                     }
                     path.closeSubpath()
@@ -156,6 +162,7 @@ struct MusicEdgeFrame: View {
                     context.stroke(wave, with: .color(color.opacity((1-t) * (0.72+e*0.25))), style: StrokeStyle(lineWidth: 1.7 * strength, lineJoin: .round))
                 }
             } else {
+                let contour = EdgeContour(path: outline)
                 let count = style == "meteor" ? 11 : style == "mist" ? 110 : 78
                 for i in 0..<count {
                     let seed = Double(i) * 0.61803398875
@@ -278,7 +285,7 @@ struct MusicEdgeEffect: View, Animatable {
     var body: some View {
         let playback = MusicEdgePlayback(style: style, alwaysOn: alwaysOn, playing: musicPlaying, energy: reactive ? audio.energy : 0)
         let paused = !onScreen || motion.suspended || !playback.visible || reduced
-        TimelineView(.animation(minimumInterval: playback.ambient || motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: paused)) { clock in
+        TimelineView(.animation(minimumInterval: NotchMotionEnvironment.decorativeFrameInterval(lowPower: playback.ambient || motion.lowPower), paused: paused)) { clock in
             let elapsed = music.elapsedTime + (musicPlaying ? max(0, clock.date.timeIntervalSince(music.timestampDate)) * max(0, music.playbackRate) : 0)
             let ending = CompactLyrics.dissolve(at: elapsed, duration: music.songDuration)
             let period = CompactLyrics.timeOfDay(at: clock.date)

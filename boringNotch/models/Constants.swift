@@ -18,6 +18,16 @@ let appVersion = "\(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as
 let temporaryDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first!
 let spacing: CGFloat = 16
 
+enum Brand {
+    static func localized(_ key: String) -> String {
+        NSLocalizedString(key, tableName: "Brand", bundle: .main, value: key, comment: "")
+    }
+
+    static func localized(_ key: String, _ arguments: CVarArg...) -> String {
+        String(format: localized(key), locale: .current, arguments: arguments)
+    }
+}
+
 struct CustomVisualizer: Codable, Hashable, Equatable, Defaults.Serializable {
     let UUID: UUID
     var name: String
@@ -57,6 +67,7 @@ enum SneakPeekStyle: String, CaseIterable, Identifiable, Defaults.Serializable {
     case inline = "Inline"
     
     var id: String { self.rawValue }
+    var localizedName: String { Brand.localized(rawValue) }
 }
 
 // Action to perform when Option (⌥) is held while pressing media keys
@@ -66,6 +77,7 @@ enum OptionKeyAction: String, CaseIterable, Identifiable, Defaults.Serializable 
     case none = "No Action"
 
     var id: String { self.rawValue }
+    var localizedName: String { Brand.localized(rawValue) }
 }
 
 extension Defaults.Keys {

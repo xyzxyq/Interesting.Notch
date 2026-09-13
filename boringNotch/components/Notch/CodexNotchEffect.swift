@@ -5,6 +5,7 @@ enum CodexThrust {
     static let labels = ["轻度", "中度", "高", "极高", "最高", "Ultra"]
     static func length(_ level: Int) -> Double { [0.55, 0.7, 0.85, 1.05, 1.4, 2.0][min(5, max(0, level))] }
     static func speed(_ level: Int) -> Double { [0.65, 0.8, 1, 1.3, 1.9, 3.0][min(5, max(0, level))] }
+    @MainActor static func frameInterval(lowPower: Bool) -> Double { NotchMotionEnvironment.decorativeFrameInterval(lowPower: lowPower) }
     static func wakePoint(_ progress: Double, lane: Int, side: Double, rect: CGRect) -> CGPoint {
         let p = min(1, max(0, progress))
         let x = p * (rect.width + 40)
@@ -22,7 +23,7 @@ struct CodexFlame: View {
     @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     var body: some View {
-        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: !onScreen || motion.suspended || !active || reduced)) { timeline in
+        TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || motion.suspended || !active || reduced)) { timeline in
             Canvas { context, size in
                 let h = size.height
                 let time = reduced ? 0 : timeline.date.timeIntervalSinceReferenceDate * (effort < 0 ? 1 : CodexThrust.speed(effort))
@@ -74,7 +75,7 @@ struct CodexSpeedLines: View {
     @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
     var body: some View {
-        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: !onScreen || motion.suspended || !active || effort < 2 || reduced)) { clock in
+        TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || motion.suspended || !active || effort < 2 || reduced)) { clock in
             Canvas { context, size in
                 guard active, effort >= 2, !reduced else { return }
                 let rect = CGRect(origin: .zero, size: size).insetBy(dx: 48, dy: 48)
@@ -215,7 +216,7 @@ struct CodexDropButton: View {
             let anchor = anchorView.window?.convertPoint(toScreen: anchorView.convert(local, to: nil)) ?? NSEvent.mouseLocation
             action(anchor)
         } label: {
-            TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 30 : 1.0 / 60, paused: !onScreen || motion.suspended || idleSince == nil || reduced)) { clock in
+            TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || motion.suspended || idleSince == nil || reduced)) { clock in
                 let reminder = idleSince.map { CodexDropMotion.reminder(at: clock.date.timeIntervalSince($0)) }
                 let idleOffset = reduced ? 0 : reminder?.offset ?? 0
                 let brightness = reduced ? 1 : reminder?.brightness ?? 1

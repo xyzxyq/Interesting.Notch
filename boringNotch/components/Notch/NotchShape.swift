@@ -93,6 +93,12 @@ struct NotchShape: Shape {
 // One shared observer set for decorative animation across all notch windows.
 @MainActor final class NotchMotionEnvironment: NSObject, ObservableObject {
     static let shared = NotchMotionEnvironment()
+    static func decorativeFrameInterval(lowPower: Bool) -> Double {
+        lowPower ? 1.0 / 15 : 1.0 / 24
+    }
+    static func lyricsFrameInterval(lowPower: Bool) -> Double {
+        lowPower ? 1.0 / 15 : 1.0 / 30
+    }
     @Published private(set) var suspended = false
     @Published private(set) var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
     private override init() {

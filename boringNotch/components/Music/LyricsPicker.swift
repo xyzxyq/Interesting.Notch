@@ -21,12 +21,12 @@ struct LyricsPicker: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("选择同步歌词").font(.title2.bold())
-            Text("当前歌曲：\(track.title) · \(track.artist)").foregroundStyle(.secondary)
+            Text(Brand.localized("Select synchronized lyrics")).font(.title2.bold())
+            Text("\(Brand.localized("Current song:")) \(track.title) · \(track.artist)").foregroundStyle(.secondary)
             HStack {
-                TextField("歌曲名称", text: $title)
-                TextField("歌手", text: $artist)
-                Button("搜索") { requestID += 1 }.disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
+                TextField(Brand.localized("Song title"), text: $title)
+                TextField(Brand.localized("Artist"), text: $artist)
+                Button(Brand.localized("Search")) { requestID += 1 }.disabled(title.trimmingCharacters(in: .whitespaces).isEmpty)
             }
             HSplitView {
                 List(selection: $selection) {
@@ -34,31 +34,31 @@ struct LyricsPicker: View {
                         let row = rows[index]
                         VStack(alignment: .leading, spacing: 3) {
                             Text(row.trackName).fontWeight(.medium)
-                            Text("\(row.artistName) · \(row.albumName ?? "未知专辑")").font(.caption)
-                            Text("\(row.source ?? "未知来源") · \(Int(row.duration.isFinite ? max(0, min(86400, row.duration)) : 0)) 秒")
+                            Text("\(row.artistName) · \(row.albumName ?? Brand.localized("Unknown album"))").font(.caption)
+                            Text("\(row.source == "Imported LRC" ? Brand.localized("Imported LRC") : row.source ?? Brand.localized("Unknown source")) · \(Int(row.duration.isFinite ? max(0, min(86400, row.duration)) : 0)) \(Brand.localized("seconds"))")
                                 .font(.caption).foregroundStyle(.secondary)
                         }.tag(index)
                     }
                 }.frame(minWidth: 280)
                 ScrollView {
-                    Text(selected.map { CompactLyrics.parseLRC($0.syncedLyrics ?? "").map(\.text).joined(separator: "\n") } ?? "选择左侧结果，预览歌词")
+                    Text(selected.map { CompactLyrics.parseLRC($0.syncedLyrics ?? "").map(\.text).joined(separator: "\n") } ?? Brand.localized("Select a result on the left to preview lyrics"))
                         .textSelection(.enabled).frame(maxWidth: .infinity, alignment: .leading).padding(8)
                 }.frame(minWidth: 230)
             }.frame(height: 280)
-            if loading { ProgressView("正在搜索 LRCLIB 和网易云…").controlSize(.small) }
+            if loading { ProgressView(Brand.localized("Searching LRCLIB and NetEase Cloud Music…")).controlSize(.small) }
             if changedTrack {
-                Text("歌曲已切换，请关闭后重新打开。当前结果不会应用到新歌。").foregroundStyle(.orange)
+                Text(Brand.localized("The song changed. Close and reopen this sheet; these results will not be applied to the new song.")).foregroundStyle(.orange)
             } else if !message.isEmpty {
                 Text(message).font(.caption).foregroundStyle(.secondary)
             }
             if let selected, CompactLyrics.match([selected], track: track) == nil {
-                Text("此结果未通过自动版本校验，请试听并核对后再使用。").font(.caption).foregroundStyle(.orange)
+                Text(Brand.localized("This result did not pass automatic version matching. Please listen and confirm before using it.")).font(.caption).foregroundStyle(.orange)
             }
             HStack {
-                Button("导入 LRC…") { importFile() }.disabled(changedTrack)
+                Button(Brand.localized("Import LRC…")) { importFile() }.disabled(changedTrack)
                 Spacer()
-                Button("取消") { dismiss() }.keyboardShortcut(.cancelAction)
-                Button("使用并记住") { if let selected { apply(selected) } }
+                Button("Cancel") { dismiss() }.keyboardShortcut(.cancelAction)
+                Button(Brand.localized("Use and remember")) { if let selected { apply(selected) } }
                     .disabled(selected == nil || changedTrack).keyboardShortcut(.defaultAction)
             }
         }
@@ -72,8 +72,8 @@ struct LyricsPicker: View {
             guard !Task.isCancelled else { return }
             rows = result.candidates
             loading = false
-            message = rows.isEmpty ? "未找到同步歌词。可以修改关键词，或导入带时间戳的 LRC 文件。" : "选择后将保存到本机，下次播放自动使用。"
-            if !result.failures.isEmpty { message += " 暂不可用：" + result.failures.joined(separator: "、") }
+            message = rows.isEmpty ? Brand.localized("No synchronized lyrics were found. Change the query or import a timestamped LRC file.") : Brand.localized("The selected lyrics will be saved locally and used automatically next time.")
+            if !result.failures.isEmpty { message += " " + Brand.localized("Temporarily unavailable:") + " " + result.failures.joined(separator: ", ") }
         }
     }
     private var selected: LyricCandidate? {
@@ -95,8 +95,8 @@ struct LyricsPicker: View {
                 guard size <= 2_000_000 else { throw CompactLyrics.FetchError.invalidResponse }
                 let content = try String(contentsOf: url, encoding: .utf8)
                 apply(LyricCandidate(trackName: track.title, artistName: track.artist, albumName: track.album,
-                                     duration: track.duration, plainLyrics: nil, syncedLyrics: content, source: "导入 LRC"))
-            } catch { message = "无法导入：需要小于 2 MB、UTF-8 编码的同步 LRC 文件。" }
+                                     duration: track.duration, plainLyrics: nil, syncedLyrics: content, source: "Imported LRC"))
+            } catch { message = Brand.localized("Cannot import: use a timestamped UTF-8 LRC file smaller than 2 MB.") }
         }
     }
 }

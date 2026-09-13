@@ -1,6 +1,6 @@
-<p align="center"><img src="docs/assets/interesting-botch-icon.png" width="160" alt="interesting botch 图标"></p>
+<p align="center"><img src="docs/assets/interesting-botch-icon.png" width="160" alt="Interesting Notch 图标"></p>
 
-<h1 align="center">interesting botch</h1>
+<h1 align="center">Interesting Notch</h1>
 <p align="center">让 macOS 灵动岛呈现音乐、Codex 任务与日常状态。</p>
 
 <p align="center">
@@ -11,7 +11,7 @@
 
 ## 项目来源
 
-**interesting botch 是基于 [TheBoredTeam/boring.notch（Boring Notch）](https://github.com/TheBoredTeam/boring.notch) fork 后进行二次开发的独立衍生项目，由 [xyzxyq](https://github.com/xyzxyq) 维护。**
+**Interesting Notch 是基于 [TheBoredTeam/boring.notch（Boring Notch）](https://github.com/TheBoredTeam/boring.notch) fork 后进行二次开发的独立衍生项目，由 [xyzxyq](https://github.com/xyzxyq) 维护。**
 
 原项目及其贡献者提供了灵动岛窗口、音乐控制、文件暂存、日历与系统 HUD 等基础能力。本仓库在这些工作的基础上，继续开发 Codex 状态联动、火箭与液态水滴动画、音乐边缘动效、歌词展示以及相关稳定性修复。感谢上游作者和所有贡献者。
 
@@ -19,10 +19,10 @@
 
 ## 下载与安装
 
-当前版本：**3.0.1 · Super Rocket（build 301）** · [更新说明](docs/releases/3.0.1.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.1)
+当前版本：**3.0.2（build 302）** · [更新说明](docs/releases/3.0.2.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.2)
 
-1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.1/interesting-botch-3.0.1-arm64.dmg)。
-2. 退出旧版，打开 DMG，将 `interesting botch.app` 拖入 Applications 后运行。
+1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.2/interesting-notch-3.0.2-arm64.dmg)。
+2. 退出旧版，打开 DMG，将 `Interesting Notch.app` 拖入 Applications 后运行。
 3. 在设置 → 媒体中选择“自动跟随正在播放的应用”，开启“右侧滚动歌词”。
 
 安装包仅支持 Apple Silicon（M 系列芯片），最低部署目标 macOS 14，未提供 Intel 包。Release 同时提供 `SHA256SUMS.txt` 供校验。DMG 内附可选 Codex Bridge、安装说明及许可证。
@@ -88,7 +88,7 @@ Codex 信息由本机桥接脚本读取，包括待回答问题的题目和选�
    ```
 3. 在 Xcode 选择 `boringNotch` scheme，配置自己的签名身份后按 `⌘R` 构建运行。
 
-`interesting botch` 是当前项目展示名称。工程名、内部标识与部分开发构建名称暂时保留 `boringNotch` / `InterestingNotch Preview`，以避免重命名影响已有设置和授权。项目图标采用蓝白笑脸与顶部黑色刘海的设计。
+`Interesting Notch` 是当前项目展示名称。工程名、内部标识与部分开发构建名称暂时保留 `boringNotch` / `Interesting Notch Preview`，以避免重命名影响已有设置和授权。项目图标采用蓝白笑脸与顶部黑色刘海的设计。
 
 如需查找本 fork 的发布包，请查看[本仓库 Releases](https://github.com/xyzxyq/Interesting.Notch/releases)，并核对对应提交及说明；不要使用上游下载链接来获取本 fork 的新增功能。
 

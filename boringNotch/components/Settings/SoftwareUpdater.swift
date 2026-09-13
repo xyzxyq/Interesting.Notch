@@ -14,7 +14,7 @@ struct UpdaterSettingsView: View {
     var body: some View {
         Section("Software updates") {
             CheckForUpdatesLink()
-            Text("通过本项目的 GitHub Releases 下载更新。")
+            Text(Brand.localized("Download updates from this project's GitHub Releases."))
                 .font(.caption).foregroundStyle(.secondary)
         }
     }

@@ -159,7 +159,7 @@ struct GeneralSettings: View {
                     Text("Show menu bar icon")
                 }
                 .tint(.effectiveAccent)
-                LaunchAtLogin.Toggle("Launch at login")
+                LaunchAtLogin.Toggle(Brand.localized("Launch at login"))
                 Defaults.Toggle(key: .showOnAllDisplays) {
                     Text("Show on all displays")
                 }
@@ -494,7 +494,7 @@ struct HUD: View {
                 
                 if let failure = interceptor.failure, accessibilityAuthorized, hudReplacement {
                     Text(failure).font(.caption).foregroundStyle(.secondary)
-                    Button("重新连接 HUD") {
+                    Button(Brand.localized("Reconnect HUD")) {
                         Task { await interceptor.start() }
                     }
                 }
@@ -505,12 +505,12 @@ struct HUD: View {
                             .foregroundStyle(.secondary)
 
                         HStack(spacing: 12) {
-                            Button("打开辅助功能设置") {
+                            Button(Brand.localized("Open Accessibility Settings")) {
                                 XPCHelperClient.shared.requestAccessibilityAuthorization()
                             }
                             .buttonStyle(.borderedProminent)
                         }
-                        Text("在系统设置中允许“\(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "InterestingNotch")”使用辅助功能，然后返回这里开启 HUD。")
+                        Text(Brand.localized("Allow %@ to use Accessibility in System Settings, then return here to enable the HUD.", Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? Brand.localized("Interesting Notch")))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(.top, 6)
@@ -520,7 +520,7 @@ struct HUD: View {
             Section {
                 Picker("Option key behaviour", selection: $optionKeyAction) {
                     ForEach(OptionKeyAction.allCases) { opt in
-                        Text(opt.rawValue).tag(opt)
+                        Text(opt.localizedName).tag(opt)
                     }
                 }
                 
@@ -613,7 +613,7 @@ struct Media: View {
             Section {
                 Picker("Music Source", selection: $mediaController) {
                     ForEach(availableMediaControllers) { controller in
-                        Text(controller == .nowPlaying ? "自动跟随正在播放的应用" : controller.rawValue).tag(controller)
+                        Text(controller == .nowPlaying ? Brand.localized("Follow the currently playing app") : controller.rawValue).tag(controller)
                     }
                 }
                 .onChange(of: mediaController) { _, _ in
@@ -639,7 +639,7 @@ struct Media: View {
                     }
                 } else {
                     Text(
-                        "自动跟随 Apple Music、网易云音乐、QQ 音乐等向 macOS 提供歌曲信息的播放器。若播放器未提供歌名、歌手或播放进度，同步歌词暂不可用。"
+                        Brand.localized("Follow Apple Music, NetEase Cloud Music, QQ Music, and other players that provide song information to macOS. Synchronized lyrics are unavailable when a player does not provide a title, artist, or playback position.")
                     )
                     .foregroundStyle(.secondary)
                     .font(.caption)
@@ -668,14 +668,14 @@ struct Media: View {
                     Text(LocalizedStringKey(musicManager.lyricsStatus))
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
-                    Button("选择或导入歌词…") {
+                    Button(Brand.localized("Choose or import lyrics…")) {
                         lyricsPickerRequest = LyricsPicker.Request(track: musicManager.currentLyricTrack)
                     }
                         .disabled(!compactLyricsEnabled || !musicManager.currentLyricTrack.isReady)
                         .sheet(item: $lyricsPickerRequest) { request in
                             LyricsPicker(track: request.track)
                         }
-                    Button("重新获取歌词") { musicManager.retryLyrics() }
+                    Button(Brand.localized("Retry fetching lyrics")) { musicManager.retryLyrics() }
                         .disabled(musicManager.isFetchingLyrics)
                 }
                 CodexActivitySettings()
@@ -691,7 +691,7 @@ struct Media: View {
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
                 Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in
-                        Text(style.rawValue).tag(style)
+                        Text(style.localizedName).tag(style)
                     }
                 }
                 HStack {
@@ -933,7 +933,7 @@ struct About: View {
             }
             VStack(spacing: 0) {
                 Divider()
-                Text("Made with 🫶🏻 by not so boring not.people")
+                Text(Brand.localized("Made with 🫶🏻 by Interesting Notch"))
                     .foregroundStyle(.secondary)
                     .padding(.top, 5)
                     .padding(.bottom, 7)
@@ -1229,51 +1229,51 @@ struct Appearance: View {
                                             in: RoundedRectangle(cornerRadius: 12))
                         }
                     }
-                    .accessibilityLabel("黑色纸飞机指针在浅色与深色背景下的预览")
+                    .accessibilityLabel(Brand.localized("Preview of the black paper-plane pointer on light and dark backgrounds"))
                     VStack(alignment: .leading, spacing: 4) {
-                        Toggle("纸飞机指针", isOn: Binding(
+                        Toggle(Brand.localized("Paper-plane pointer"), isOn: Binding(
                             get: { pointer.enabled },
                             set: { pointer.setEnabled($0) }
                         ))
                         .toggleStyle(.switch)
-                        Text("黑色折纸轮廓 · 细描边 · 轻阴影")
+                        Text(Brand.localized("Black folded-paper outline · fine border · soft shadow"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                 }
                 HStack {
-                    Text("指针大小")
+                    Text(Brand.localized("Pointer size"))
                     Slider(value: Binding(
                         get: { pointer.magnification },
                         set: { pointer.setMagnification($0, apply: false) }
                     ), in: 0.75...1.75, step: 0.05) { editing in
                         if !editing { pointer.setMagnification(pointer.magnification) }
                     }
-                    .accessibilityLabel("纸飞机指针大小")
+                    .accessibilityLabel(Brand.localized("Paper-plane pointer size"))
                     Text("\(Int((pointer.magnification * 100).rounded()))%")
                         .monospacedDigit().frame(width: 44, alignment: .trailing)
-                    Button("默认") { pointer.setMagnification(1) }
+                    Button(Brand.localized("Reset")) { pointer.setMagnification(1) }
                 }
                 Text(pointer.status)
                     .font(.caption)
                     .foregroundStyle(pointer.hasFailure ? Color.orange : Color.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if pointer.colorConflict {
-                    Button("打开系统指针颜色设置") { pointer.openPointerSettings() }
-                    Text("在“指针”区域点击“还原颜色”，然后回来重新开启。此操作会将系统指针颜色改回黑色填充、白色描边。")
+                    Button(Brand.localized("Open System Pointer Color Settings")) { pointer.openPointerSettings() }
+                    Text(Brand.localized("In System Settings, choose Restore Colors in Pointer, then return and enable this again. This restores the black fill and white outline for system pointers."))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 } else if pointer.hasFailure {
-                    Button("重试恢复原指针") { pointer.setEnabled(false) }
+                    Button(Brand.localized("Retry restoring the original pointer")) { pointer.setEnabled(false) }
                 }
             } header: {
                 HStack {
-                    Text("鼠标指针")
-                    customBadge(text: "实验性")
+                    Text(Brand.localized("Pointer"))
+                    customBadge(text: Brand.localized("Experimental"))
                 }
             } footer: {
-                Text("仅替换普通箭头。系统更新或应用自定义指针可能影响效果。")
+                Text(Brand.localized("Only ordinary arrows are replaced. System updates or app-specific cursors can affect the result."))
             }
             .onAppear { pointer.checkColorCompatibility() }
 
@@ -1292,13 +1292,13 @@ struct Appearance: View {
                     Text("Colored spectrogram")
                 }
                 Defaults
-                    .Toggle("Player tinting", key: .playerColorTinting)
+                    .Toggle(Brand.localized("Player tinting"), key: .playerColorTinting)
                 Defaults.Toggle(key: .lightingEffect) {
                     Text("Enable blur effect behind album art")
                 }
                 Picker("Slider color", selection: $sliderColor) {
                     ForEach(SliderColorEnum.allCases, id: \.self) { option in
-                        Text(option.rawValue)
+                        Text(option.localizedName)
                     }
                 }
             } header: {
@@ -1871,7 +1871,7 @@ func comingSoonTag() -> some View {
 }
 
 func customBadge(text: String) -> some View {
-    Text(text)
+    Text(Brand.localized(text))
         .foregroundStyle(.secondary)
         .font(.footnote.bold())
         .padding(.vertical, 3)

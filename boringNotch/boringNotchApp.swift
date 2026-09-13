@@ -29,7 +29,7 @@ struct DynamicNotchApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("boring.notch", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
+        MenuBarExtra(Brand.localized("Interesting Notch"), systemImage: "sparkle", isInserted: $showMenuBarIcon) {
             Button("Settings") {
                 DispatchQueue.main.async {
                     SettingsWindowController.shared.showWindow()
@@ -38,7 +38,7 @@ struct DynamicNotchApp: App {
             .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
             CheckForUpdatesView(updater: updaterController.updater)
             Divider()
-            Button("Restart Boring Notch") {
+            Button(Brand.localized("Restart Interesting Notch")) {
                 ApplicationRelauncher.restart()
             }
             Button("Quit", role: .destructive) {
@@ -281,6 +281,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DispatchQueue.main.async { NSApp.mainMenu?.items.first?.title = Brand.localized("Interesting Notch") }
         PaperPlanePointerManager.shared.start()
 
         NotificationCenter.default.addObserver(

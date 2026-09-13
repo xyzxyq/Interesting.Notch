@@ -58,6 +58,7 @@ struct CompactLyricsView: View {
     @State private var cover: PortalGlyph?
     @State private var outgoingGlyph: PortalGlyph?
     @ObservedObject private var weather = NotchWeatherManager.shared
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
     @State private var shownWeather: NotchWeatherSnapshot?
     @State private var previousWeather: NotchWeatherSnapshot?
     @State private var weatherBlend = 1.0
@@ -71,8 +72,8 @@ struct CompactLyricsView: View {
             #endif
             return CompactLyrics.timeOfDay(at: clock.date)
         }()
-        TimelineView(.animation(minimumInterval: reduceMotion ? 0.25 : 1.0 / 60,
-                                paused: !isPlaying || (duration > 0 && position >= duration - 0.2))) { tick in
+        TimelineView(.animation(minimumInterval: reduceMotion ? 0.25 : NotchMotionEnvironment.lyricsFrameInterval(lowPower: motion.lowPower),
+                                paused: !isPlaying || motion.suspended || (duration > 0 && position >= duration - 0.2))) { tick in
             let elapsed = max(0, isPlaying ? position + max(0, tick.date.timeIntervalSince(sampleDate)) * max(0, rate) : position)
             let lyricTime = max(0, elapsed + lyricOffset)
             let phase = elapsed >= duration - 0.2 && duration > 0 ? LyricPhase.finished : CompactLyrics.phase(at: min(lyricTime, max(0, duration - 0.201)), cues: segments, duration: duration)

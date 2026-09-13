@@ -1737,7 +1737,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Accessibility access is required to replace the system HUD."
+            "value" : "替换系统屏幕提示需要辅助功能权限。"
           }
         }
       }
@@ -2238,7 +2238,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Advanced"
+            "value" : "高级"
           }
         }
       }
@@ -2538,7 +2538,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Always show full event titles"
+            "value" : "始终显示完整事件标题"
           }
         }
       }
@@ -2938,7 +2938,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Auto-scroll to next event"
+            "value" : "自动滚动到下一个事件"
           }
         }
       }
@@ -4438,7 +4438,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Change media with horizontal gestures"
+            "value" : "使用水平手势切换媒体"
           }
         }
       }
@@ -4938,7 +4938,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Choose any color"
+            "value" : "选择任意颜色"
           }
         }
       }
@@ -5038,7 +5038,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : ""
+            "value" : "使用系统强调色，或自定义选择一种强调色。"
           }
         }
       }
@@ -5138,7 +5138,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Choose which service to use when sharing files from the shelf. Click the shelf button to select files, or drag files onto it to share immediately."
+            "value" : "选择从搁架共享文件时使用的服务。点击搁架按钮选择文件，或将文件拖到搁架后立即共享。"
           }
         }
       }
@@ -5338,7 +5338,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Clear slot"
+            "value" : "清除位置"
           }
         }
       }
@@ -5638,7 +5638,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Closed Notch"
+            "value" : "收起的刘海"
           }
         }
       }
@@ -5738,7 +5738,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Color Presets"
+            "value" : "颜色预设"
           }
         }
       }
@@ -5838,7 +5838,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Colored spectrogram"
+            "value" : "彩色频谱图"
           }
         }
       }
@@ -6138,7 +6138,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Copy items on drag"
+            "value" : "拖放时复制项目"
           }
         }
       }
@@ -6438,7 +6438,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Custom"
+            "value" : "自定义"
           }
         }
       }
@@ -7038,7 +7038,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Customize which controls appear in the music player. Volume expands when active."
+            "value" : "自定义音乐播放器中显示的控制项；音量控制会在使用时展开。"
           }
         }
       }
@@ -7742,7 +7742,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Drag a control onto a slot"
+            "value" : "将控制项拖到一个位置"
           }
         }
       }
@@ -7842,7 +7842,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Drag items in the preview to reorder or drop from the palette"
+            "value" : "在预览中拖动项目以重新排序，或从控制项面板拖入"
           }
         }
       }
@@ -8743,7 +8743,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Enable haptic feedback"
+            "value" : "启用触觉反馈"
           }
         }
       }
@@ -9243,7 +9243,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Expanded drag detection area"
+            "value" : "扩大拖放检测区域"
           }
         }
       }
@@ -9544,7 +9544,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Files dropped on the shelf will be shared via this service"
+            "value" : "拖放到搁架的文件将通过此服务共享"
           }
         }
       }
@@ -9744,7 +9744,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Full screen behavior"
+            "value" : "全屏时的行为"
           }
         }
       }
@@ -10544,7 +10544,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Hide all-day events"
+            "value" : "隐藏全天事件"
           }
         }
       }
@@ -10744,7 +10744,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Hide for all apps"
+            "value" : "所有应用全屏时隐藏"
           }
         }
       }
@@ -10844,7 +10844,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Hide for media app only"
+            "value" : "仅媒体应用全屏时隐藏"
           }
         }
       }
@@ -10944,7 +10944,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Hide from screen recording"
+            "value" : "在屏幕录制时隐藏"
           }
         }
       }
@@ -11044,7 +11044,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Hide title bar"
+            "value" : "隐藏标题栏"
           }
         }
       }
@@ -11344,7 +11344,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Hover delay"
+            "value" : "悬停延迟"
           }
         }
       }
@@ -11544,7 +11544,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "HUD 样式"
+            "value" : "屏幕提示样式"
           }
         }
       }
@@ -11644,7 +11644,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "HUD"
+            "value" : "屏幕提示"
           }
         }
       }
@@ -12045,7 +12045,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Layout Preview"
+            "value" : "布局预览"
           }
         }
       }
@@ -12745,7 +12745,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Match menu bar height"
+            "value" : "匹配菜单栏高度"
           }
         }
       }
@@ -12945,7 +12945,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Match real notch height"
+            "value" : "匹配真实刘海高度"
           }
         }
       }
@@ -15246,7 +15246,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Notch行为"
+            "value" : "刘海行为"
           }
         }
       }
@@ -15346,7 +15346,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Notch height on non-notch displays"
+            "value" : "非刘海屏上的刘海高度"
           }
         }
       }
@@ -15446,7 +15446,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Notch height on notch displays"
+            "value" : "刘海屏上的刘海高度"
           }
         }
       }
@@ -15546,7 +15546,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Notch sizing"
+            "value" : "刘海尺寸"
           }
         }
       }
@@ -15746,7 +15746,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Open Notch"
+            "value" : "展开的刘海"
           }
         }
       }
@@ -15846,7 +15846,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "悬停时打开Notch"
+            "value" : "悬停时展开刘海"
           }
         }
       }
@@ -16146,7 +16146,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Option key behaviour"
+            "value" : "Option 键行为"
           }
         }
       }
@@ -16246,7 +16246,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Pick a Color"
+            "value" : "选择颜色"
           }
         }
       }
@@ -16446,7 +16446,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Preferred display"
+            "value" : "首选显示器"
           }
         }
       }
@@ -16546,7 +16546,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Progress bar style"
+            "value" : "进度条样式"
           }
         }
       }
@@ -16646,7 +16646,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Quick Share"
+            "value" : "快速共享"
           }
         }
       }
@@ -16746,7 +16746,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Quick Share Service"
+            "value" : "快速共享服务"
           }
         }
       }
@@ -17446,7 +17446,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Remove from shelf after dragging"
+            "value" : "拖放后从搁架移除"
           }
         }
       }
@@ -17546,7 +17546,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Replace system HUD"
+            "value" : "替换系统屏幕提示"
           }
         }
       }
@@ -17646,7 +17646,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Replaces the standard macOS volume, display brightness, and keyboard brightness HUDs with a custom design."
+            "value" : "使用自定义设计替换 macOS 标准的音量、显示器亮度和键盘亮度屏幕提示。"
           }
         }
       }
@@ -17846,7 +17846,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Reset to Defaults"
+            "value" : "恢复默认设置"
           }
         }
       }
@@ -19148,7 +19148,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show cool face animation while inactive"
+            "value" : "未活动时显示趣味表情动画"
           }
         }
       }
@@ -19248,7 +19248,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show HUD in open notch"
+            "value" : "在展开的刘海中显示屏幕提示"
           }
         }
       }
@@ -19348,7 +19348,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show lyrics below artist name"
+            "value" : "在歌手名称下方显示歌词"
           }
         }
       }
@@ -19448,7 +19448,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show menu bar icon"
+            "value" : "显示菜单栏图标"
           }
         }
       }
@@ -19548,7 +19548,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show music live activity"
+            "value" : "显示音乐实时动态"
           }
         }
       }
@@ -19648,7 +19648,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show notch on lock screen"
+            "value" : "在锁定屏幕显示刘海"
           }
         }
       }
@@ -19848,7 +19848,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show percentage"
+            "value" : "显示百分比"
           }
         }
       }
@@ -20148,7 +20148,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show settings icon in notch"
+            "value" : "在刘海中显示设置图标"
           }
         }
       }
@@ -20248,7 +20248,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Show sneak peek on playback changes"
+            "value" : "播放状态变化时显示预览"
           }
         }
       }
@@ -20548,7 +20548,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Sneak Peek 样式"
+            "value" : "预览样式"
           }
         }
       }
@@ -21150,7 +21150,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "System"
+            "value" : "系统"
           }
         }
       }
@@ -21450,7 +21450,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Tint progress bar with accent color"
+            "value" : "使用强调色为进度条着色"
           }
         }
       }
@@ -21750,7 +21750,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "在Notch里双指向上滑动以关闭。当**悬停在Notch时打开**选项禁用时，双指向下滑动即可打开"
+            "value" : "在刘海区域双指向上滑动可收起；关闭“悬停时展开刘海”后，双指向下滑动可展开。"
           }
         }
       }
@@ -22551,7 +22551,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Using System Accent"
+            "value" : "使用系统强调色"
           }
         }
       }
@@ -23151,7 +23151,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Window Appearance"
+            "value" : "窗口外观"
           }
         }
       }
@@ -23251,7 +23251,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Window Behavior"
+            "value" : "窗口行为"
           }
         }
       }
@@ -23551,7 +23551,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "needs_review",
-            "value" : "Your macOS system accent color"
+            "value" : "你的 macOS 系统强调色"
           }
         }
       }

@@ -66,4 +66,6 @@ enum SliderColorEnum: String, CaseIterable, Defaults.Serializable {
     case white = "White"
     case albumArt = "Match album art"
     case accent = "Accent color"
+
+    var localizedName: String { Brand.localized(rawValue) }
 }

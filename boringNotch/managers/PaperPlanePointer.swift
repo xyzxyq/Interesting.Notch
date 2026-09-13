@@ -103,7 +103,7 @@ struct PointerImage: Codable {
 
     static func png(_ image: CGImage) throws -> Data {
         guard let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
-            throw PointerError.message("无法保存原指针图像，未更改指针。")
+            throw PointerError.message(Brand.localized("Unable to save original pointer images; the pointer was not changed."))
         }
         return data
     }
@@ -112,12 +112,12 @@ struct PointerImage: Codable {
         guard size.width > 0, size.width <= 256, size.height > 0, size.height <= 256,
               hotSpot.x >= 0, hotSpot.x < size.width, hotSpot.y >= 0, hotSpot.y < size.height,
               frames == 1, duration.isFinite, duration >= 0, (1...8).contains(pngs.count) else {
-            throw PointerError.message("指针备份格式无效，已停止更改。")
+            throw PointerError.message(Brand.localized("The pointer backup format is invalid; changes were stopped."))
         }
         return try pngs.map {
             guard let image = NSBitmapImageRep(data: $0)?.cgImage,
                   image.width <= 2048, image.height <= 2048 else {
-                throw PointerError.message("无法读取指针备份图像。")
+                throw PointerError.message(Brand.localized("Unable to read a pointer backup image."))
             }
             return image
         }
@@ -135,7 +135,7 @@ struct PointerImage: Codable {
                                               bitsPerComponent: 8, bytesPerRow: image.width * 4,
                                               space: CGColorSpace(name: CGColorSpace.sRGB)!,
                                               bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
-                    throw PointerError.message("无法校验指针图像。")
+                throw PointerError.message(Brand.localized("Unable to validate a pointer image."))
                 }
                 context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
                 let pixels = Data(bytes: context.data!, count: context.bytesPerRow * context.height)
@@ -169,12 +169,12 @@ struct PointerRegistry {
 
     static func system() throws -> PointerRegistry {
         guard let handle = dlopen("/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices", RTLD_LAZY) else {
-            throw PointerError.message("当前 macOS 不支持纸飞机指针。")
+            throw PointerError.message(Brand.localized("This macOS version does not support the paper-plane pointer."))
         }
         // The function pointers live as long as the process; retain the library handle.
         func symbol<T>(_ name: String, _: T.Type) throws -> T {
             guard let address = dlsym(handle, name) else {
-                throw PointerError.message("当前 macOS 缺少指针接口，未更改指针。")
+                throw PointerError.message(Brand.localized("This macOS version is missing the pointer interface; the pointer was not changed."))
             }
             return unsafeBitCast(address, to: T.self)
         }
@@ -190,7 +190,7 @@ struct PointerRegistry {
             let error = copy(connection, name, &size, &hotSpot, &frames, &duration, &result)
             let array = result?.takeRetainedValue()
             guard error == 0, let images = array as? [CGImage], !images.isEmpty else {
-                throw PointerError.message("无法读取系统箭头（\(error)），未更改此指针。")
+                throw PointerError.message(Brand.localized("Unable to read the system arrow (%@); this pointer was not changed.", error))
             }
             return try PointerImage(size: size, hotSpot: hotSpot, frames: frames, duration: duration,
                                     pngs: images.map { try PointerImage.png($0) })
@@ -199,7 +199,7 @@ struct PointerRegistry {
             var seed: Int32 = 0
             let error = register(connection, name, true, true, image.size, image.hotSpot,
                                  image.frames, image.duration, images as CFArray, &seed)
-            guard error == 0 else { throw PointerError.message("系统未接受指针更改（\(error)）。") }
+            guard error == 0 else { throw PointerError.message(Brand.localized("The system did not accept the pointer change (%d).", error)) }
         })
     }
 }
@@ -228,7 +228,7 @@ final class PointerTheme {
     func enable(customizedColors: Bool, magnification: Double = 1) throws {
         try restore()
         guard !customizedColors else {
-            throw PointerError.message("系统自定义指针颜色会使纸飞机仅在 Dock 等区域生效。请在系统设置 → 辅助功能 → 显示 → 指针中还原颜色，再开启此功能。")
+            throw PointerError.message(Brand.localized("Custom system pointer colors limit the paper-plane pointer to areas such as the Dock. Restore pointer colors in System Settings → Accessibility → Display → Pointer, then enable this feature again."))
         }
         let image = try PointerImage.paperPlane(magnification: magnification)
         var originals: [String: PointerImage] = [:]
@@ -249,7 +249,7 @@ final class PointerTheme {
             for name in originals.keys.sorted() {
                 let received = try registry.read(name)
                 guard try received.matches(image) else {
-                    throw PointerError.message("系统指针回读校验失败，已尝试恢复原指针。")
+                    throw PointerError.message(Brand.localized("System pointer verification failed; the original pointer was restored."))
                 }
             }
         } catch {
@@ -264,7 +264,7 @@ final class PointerTheme {
         let journal = try PropertyListDecoder().decode(Journal.self, from: Data(contentsOf: journalURL))
         guard !journal.originals.isEmpty,
               Set(journal.originals.keys).isSubset(of: Set(PointerRegistry.arrowNames)) else {
-            throw PointerError.message("指针恢复记录无效，已停止更改。")
+            throw PointerError.message(Brand.localized("The pointer recovery record is invalid; changes were stopped."))
         }
         // Arrow reads through ArrowS on macOS 26: decide ownership before any write,
         // update both aliases, and only then verify the complete group.
@@ -275,7 +275,7 @@ final class PointerTheme {
         for (name, original) in restore { try registry.write(name, original) }
         for (name, original) in restore {
             guard try registry.read(name).matches(original) else {
-                throw PointerError.message("原指针恢复未通过校验，请重试恢复。")
+                throw PointerError.message(Brand.localized("The original pointer did not pass verification after restoration. Try restoring it again."))
             }
         }
         try FileManager.default.removeItem(at: journalURL)
@@ -285,7 +285,7 @@ final class PointerTheme {
 @MainActor final class PaperPlanePointerManager: ObservableObject {
     static let shared = PaperPlanePointerManager()
     @Published private(set) var enabled = false
-    @Published private(set) var status = "关闭后恢复原指针；文本选择与窗口缩放保持原样。"
+    @Published private(set) var status = Brand.localized("The original pointer is restored when disabled; text selection and window resizing stay unchanged.")
     @Published private(set) var hasFailure = false
     @Published private(set) var colorConflict = false
     @Published private(set) var magnification = 1.0
@@ -322,7 +322,7 @@ final class PointerTheme {
 
     func setEnabled(_ value: Bool) {
         do {
-            guard let theme else { throw PointerError.message("当前系统的指针接口不可用。") }
+            guard let theme else { throw PointerError.message(Brand.localized("The system pointer interface is unavailable.")) }
             colorConflict = PointerTheme.systemUsesCustomizedColors
             if value && suspended.isEmpty {
                 try theme.enable(customizedColors: colorConflict, magnification: magnification)
@@ -330,7 +330,7 @@ final class PointerTheme {
             enabled = value
             defaults.set(value, forKey: preference)
             hasFailure = false
-            status = value ? "纸飞机指针已开启；部分应用的自定义指针仍由应用控制。" : "已恢复原指针。"
+            status = value ? Brand.localized("Paper-plane pointer enabled; app-specific cursors remain controlled by their apps.") : Brand.localized("Original pointer restored.")
         } catch { fail(error) }
     }
 
