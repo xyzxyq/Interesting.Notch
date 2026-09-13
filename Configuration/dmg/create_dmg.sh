@@ -32,7 +32,7 @@ ensure_dmgbuild_and_badge_support() {
     die "Dependency lock file not found: $req_file"
   fi
 
-  die "dmgbuild is not installed. Install hash-pinned dependencies first: python3 -m pip install --require-hashes -r $req_file"
+  die "dmgbuild is not installed. Install hash-pinned dependencies with Python 3.11+: python3.13 -m pip install --require-hashes -r $req_file"
 }
 
 find_app_icns() {
