@@ -642,7 +642,9 @@ enum CodexMergeMotion {
 }
 
 
-// Fragment the rendered content itself; bounded tile count and no idle timer.
+// Animate a mask, never a Canvas symbol of live AppKit controls: resolving a
+// ScrollView/TextField symbol can re-enter SwiftUI layout and abort AttributeGraph.
+// Keep mask hit testing enabled: disabling it makes the masked window click-through.
 struct CodexDissolve: AnimatableModifier {
     var progress: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduced
@@ -651,15 +653,17 @@ struct CodexDissolve: AnimatableModifier {
         set { progress = newValue }
     }
     func body(content: Content) -> some View {
-        if reduced {
-            content.opacity(1 - Double(progress))
-        } else if progress <= 0 {
-            content
-        } else {
-            content.hidden().overlay {
+        content.mask {
+            if reduced {
+                Color.white.opacity(1 - Double(min(1, max(0, progress))))
+            } else {
                 Canvas { context, size in
-                    guard let source = context.resolveSymbol(id: 0) else { return }
                     let p = min(1, max(0, progress))
+                    guard p < 1 else { return }
+                    if p == 0 {
+                        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
+                        return
+                    }
                     let columns = 18, rows = 12
                     let w = size.width / CGFloat(columns), h = size.height / CGFloat(rows)
                     for row in 0..<rows {
@@ -669,14 +673,13 @@ struct CodexDissolve: AnimatableModifier {
                             tile.opacity = pow(1 - Double(p), 1.5)
                             tile.translateBy(x: CGFloat(sin(seed * 19)) * p * 24,
                                              y: -p * CGFloat(12 + seed * 36))
-                            tile.clip(to: Path(CGRect(x: CGFloat(column) * w + p * w * 0.35,
+                            tile.fill(Path(CGRect(x: CGFloat(column) * w + p * w * 0.35,
                                                      y: CGFloat(row) * h + p * h * 0.35,
-                                                     width: w * (1 - p * 0.7), height: h * (1 - p * 0.7))))
-                            tile.draw(source, at: CGPoint(x: size.width / 2, y: size.height / 2))
+                                                     width: w * (1 - p * 0.7), height: h * (1 - p * 0.7))),
+                                      with: .color(.white))
                         }
                     }
-                } symbols: { content.tag(0) }
-                .allowsHitTesting(false)
+                }
             }
         }
     }

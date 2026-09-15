@@ -343,6 +343,7 @@ struct CodexTaskStability {
             panel.backgroundColor = .clear
             panel.hasShadow = false
             panel.isReleasedWhenClosed = false
+            panel.hidesOnDeactivate = false
             panel.level = .floating
             panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             panel.contentView = NSHostingView(rootView: CodexRequests(activity: self))
