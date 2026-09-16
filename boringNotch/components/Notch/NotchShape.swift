@@ -54,12 +54,12 @@ struct NotchShape: Shape {
         var path = Path()
         path.move(to: point(0, 0, 0, 0))
         path.addCurve(to: point(r, r, -head, h * 0.5),
-                      control1: point(r * 2 / 3, 0, -head * 0.25, h * 0.18),
-                      control2: point(r, r / 3, -head, h * 0.46))
+                      control1: point(r * 2 / 3, 0, -head * 0.30, h * 0.15),
+                      control2: point(r, r / 3, -head, h * 0.42))
         path.addLine(to: point(r, h - b, -head, h * 0.5))
         path.addCurve(to: point(r + b, h, 0, h),
-                      control1: point(r, h - b / 3, -head, h * 0.54),
-                      control2: point(r + b / 3, h, -head * 0.25, h * 0.82))
+                      control1: point(r, h - b / 3, -head, h * 0.58),
+                      control2: point(r + b / 3, h, -head * 0.30, h * 0.85))
         let depth = max(0, liquid) * (1 - t)
         let span = min(60, max(0, (w - 2 * (r + b)) / 3))
         path.addLine(to: point(w / 2 - span, h, w / 2 - span, h))
@@ -70,11 +70,15 @@ struct NotchShape: Shape {
                       control1: CGPoint(x: rect.midX + span * 0.35, y: rect.maxY + depth),
                       control2: CGPoint(x: rect.midX + span * 0.55, y: rect.maxY))
         path.addLine(to: point(w - r - b, h, w - h * 0.2, h))
-        path.addQuadCurve(to: point(w - r, h - b, w + tail, h),
+        path.addQuadCurve(to: point(w - r, h - b, w + tail, h * 0.96),
                           control: point(w - r, h, w + tail, h))
-        path.addLine(to: point(w - r, h - b, w + tail * 0.65, h * 0.7))
+        path.addCurve(to: point(w - r, h - b, w + tail * 0.65, h * 0.7),
+                      control1: point(w - r, h - b, w + tail, h * 0.88),
+                      control2: point(w - r, h - b, w + tail * 0.65, h * 0.79))
         path.addLine(to: point(w - r, r, w + tail * 0.65, h * 0.3))
-        path.addLine(to: point(w - r, r, w + tail, 0))
+        path.addCurve(to: point(w - r, r, w + tail, h * 0.04),
+                      control1: point(w - r, r, w + tail * 0.65, h * 0.21),
+                      control2: point(w - r, r, w + tail, h * 0.12))
         path.addQuadCurve(to: point(w, 0, w - h * 0.2, 0),
                           control: point(w - r, 0, w + tail, 0))
         path.closeSubpath()

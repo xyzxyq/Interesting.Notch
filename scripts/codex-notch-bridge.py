@@ -318,7 +318,7 @@ class Bridge:
                 fresh = False
             for (host, task_id), entry in self.runtimes.items():
                 state = task_state(entry['runtime'], entry.get('pendingQuestions', False))
-                if not state and (entry.get('runtime') or {}).get('type') == 'idle' and now - entry.get('receivedAt', 0) < 35:
+                if (entry.get('runtime') or {}).get('type') == 'idle' and now - entry.get('receivedAt', 0) < 35:
                     idle_task_ids.append(f'{host}/{task_id}')
                 if state:
                     tasks.append(dict(id=task_id, hostId=host, title='Codex task', state=state,

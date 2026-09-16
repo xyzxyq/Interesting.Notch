@@ -236,6 +236,11 @@ completion.connected = True
 completion.last_contact = time.time()
 completion.runtimes[('local', 'test')] = dict(runtime=dict(type='idle'), receivedAt=time.time())
 assert completion.snapshot()['idleTaskIds'] == ['local/test']
+completion.runtimes[('local', 'test')]['pendingQuestions'] = True
+assert completion.snapshot()['idleTaskIds'] == ['local/test']
+assert completion.snapshot()['tasks'][0]['state'] == 'waiting'
+assert completion.snapshot()['tasks'][0]['isRunning'] is False
+completion.runtimes[('local', 'test')]['pendingQuestions'] = False
 completion.runtimes[('local', 'test')]['runtime'] = None
 assert completion.snapshot()['idleTaskIds'] == []
 completion.runtimes.clear()

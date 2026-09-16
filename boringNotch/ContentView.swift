@@ -132,7 +132,10 @@ struct ContentView: View {
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
                     .frame(width: vm.notchState == .open ? vm.notchSize.width : nil)
-                    .background { currentNotchShape.fill(.black) }
+                    .background {
+                        currentNotchShape.fill(.black)
+                            .overlay { CodexRocketSurface(shape: currentNotchShape) }
+                    }
                     .overlay(alignment: .top) {
                         Rectangle()
                             .fill(.black)
@@ -232,7 +235,8 @@ struct ContentView: View {
                         //                    .keyboardShortcut("E", modifiers: .command)
                     }
                     .overlay(alignment: .bottom) {
-                        CodexDropButton(waiting: codex.waiting && vm.notchState == .closed && !vm.hideOnClosed,
+                        CodexDropButton(waiting: codex.waiting && !vm.hideOnClosed,
+                                        expanded: vm.notchState == .open,
                                         count: codex.preview == nil ? codex.pending.count : codex.previewCount,
                                         action: codex.showRequests, surface: $liquidDepth)
                             .offset(y: 82)
@@ -257,7 +261,7 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .environmentObject(vm)
         .onAppear { handledCompletion = codex.completionSequence }
-        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.waiting)-\(codex.completionSequence)-\(reducedMotion)") {
+        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.completionSequence)-\(reducedMotion)") {
             let completed = codex.completionSequence > handledCompletion
             handledCompletion = codex.completionSequence
             flameActive = false
@@ -272,7 +276,7 @@ struct ContentView: View {
                 return
             }
 
-            guard completed && rocketSurfaceAvailable && !codex.waiting && !reducedMotion else {
+            guard completed && rocketSurfaceAvailable && !reducedMotion else {
                 withAnimation(.easeInOut(duration: 0.15)) { rocketProgress = 0 }
                 return
             }

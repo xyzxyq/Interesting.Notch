@@ -24,10 +24,15 @@ enum CompactLyricsLayout {
         // Stylized curved terminator: retain curvature at half progress as well.
         return (2 * p - 1) * arc + 1.4 * p * (1 - p) * arc * arc
     }
+    static func entranceDuration(sideWidth: CGFloat, gap: CGFloat) -> Double {
+        // Keep one second per visible side; cross the hidden gap at twice that speed.
+        2 + Double(max(0, gap) / (2 * max(1, sideWidth)))
+    }
     static func entranceEdge(sideWidth: CGFloat, gap: CGFloat, progress: Double) -> CGFloat {
-        // Spend the two-second reveal on visible content, not the physical notch.
-        let visible = 2 * sideWidth * min(1, max(0, progress))
-        return visible + (visible >= sideWidth ? gap : 0)
+        let distance = (2 * sideWidth + gap / 2) * min(1, max(0, progress))
+        if distance <= sideWidth { return distance }
+        if distance < sideWidth + gap / 2 { return sideWidth + (distance - sideWidth) * 2 }
+        return distance + gap / 2
     }
 
     static func textX(_ text: String, width: CGFloat, sideWidth: CGFloat, progress: Double) -> CGFloat {
@@ -83,7 +88,7 @@ struct CompactLyricsView: View {
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
                               glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
                               hidesArtwork: hidesArtwork, outgoing: outgoing, outgoingGlyph: outgoingGlyph?.text == outgoing?.text ? outgoingGlyph : nil,
-                              entrance: min(1, max(0, elapsed / 2)),
+                              entrance: min(1, max(0, elapsed / (reduceMotion ? 2 : CompactLyricsLayout.entranceDuration(sideWidth: sideWidth, gap: gap)))),
                               daylight: period == .day ? 1 : 0, dawn: period == .dawn ? 1 : 0, dusk: period == .dusk ? 1 : 0,
                               weather: shownWeather, previousWeather: previousWeather, weatherBlend: weatherBlend,
                               weatherPresence: min(1, max(0, ((segments.first { $0.start > lyricTime }?.start ?? (lyricTime + 1)) - lyricTime) / 0.3)))
@@ -217,7 +222,9 @@ struct PortalLyricsFrame: View, Animatable {
             }
             if !reduced, reveal > 0, reveal < 1 {
                 var portal = baseContext
-                portal.clip(to: Path(CGRect(origin: .zero, size: size)))
+                var visibleSides = Path(left)
+                visibleSides.addRect(right)
+                portal.clip(to: visibleSides)
                 portal.opacity = sin(.pi * reveal)
                 let beam = CGRect(x: edge - 0.7, y: 1, width: 1.4, height: size.height - 2)
                 portal.fill(Path(roundedRect: beam, cornerRadius: 1), with: .color(tint.opacity(0.8)))

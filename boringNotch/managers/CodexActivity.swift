@@ -100,23 +100,24 @@ struct CodexTaskStability {
     @Published private(set) var submitting = Set<String>()
     @Published private(set) var replyErrors: [String: String] = [:]
     @Published private(set) var windowDissolve: CGFloat = 1
+    @Published private(set) var windowReveal: CGFloat = 1
     @Published private(set) var panelReady = false
     @Published private var readReminders = Set(UserDefaults.standard.stringArray(forKey: "codexHiddenQuestionReminders") ?? [])
     private var dismissTask: Task<Void, Never>?
     private var panelTask: Task<Void, Never>?
     var waiting: Bool { enabled && (preview == "waiting" || (preview == nil && !pending.isEmpty)) }
     var running: Bool { enabled && (preview == "running" || (preview == nil && tasks.contains { $0.working })) }
-    // An async question can keep a Codex turn technically active. The notification
-    // state still wins visually, so the rocket always yields to the user's next action.
-    static func shouldShowRocket(enabled: Bool, running: Bool, waiting: Bool) -> Bool {
-        enabled && running && !waiting
+    // Pending reminders live in the droplet; they must not hide active work.
+    static func shouldShowRocket(enabled: Bool, running: Bool) -> Bool {
+        enabled && running
     }
-    var rocketVisible: Bool { Self.shouldShowRocket(enabled: enabled, running: running, waiting: waiting) }
+    var rocketVisible: Bool { Self.shouldShowRocket(enabled: enabled, running: running) }
     // The bridge reports active tasks, not success/failure. Only a fresh, connected
-    // transition to idle counts; waiting and transport cleanup are not completion.
+    // transition to idle counts; old reminders may remain after work finishes.
     static func didFinishWork(previous: [CodexTask], current: [CodexTask], confirmedIdle: [String], continuousConnection: Bool) -> Bool {
-        continuousConnection && current.isEmpty && previous.contains { $0.working && !$0.waiting }
-            && previous.allSatisfy { confirmedIdle.contains($0.identity) }
+        let working = previous.filter(\.working)
+        return continuousConnection && !current.contains(where: \.working) && !working.isEmpty
+            && working.allSatisfy { confirmedIdle.contains($0.identity) }
     }
 
     var effort: Int {
@@ -176,6 +177,11 @@ struct CodexTaskStability {
         readReminders.formUnion(reminders.map(\.identity))
         UserDefaults.standard.set(Array(readReminders).sorted(), forKey: "codexHiddenQuestionReminders")
         dismissResolvedRequests()
+    }
+    func removeRequest(_ task: CodexTask) { markRead([task]) }
+    func removePreviewRequest() {
+        previewCount = max(0, previewCount - 1)
+        if previewCount == 0 { demonstrate("running") }
     }
     func clearRequests() {
         if preview != nil { demonstrate("running") }
@@ -288,22 +294,26 @@ struct CodexTaskStability {
         // A disconnected bridge cannot confirm that the user resolved a request.
         return connected && pendingCount == 0
     }
+    private var closingDuration: Double {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0.15 : CodexDissolve.duration
+    }
     private func dismissResolvedRequests() {
         let resolved = Self.shouldDismissRequests(enabled: enabled, preview: preview, connected: connected, pendingCount: pending.count)
         guard resolved else {
             if dismissTask != nil {
                 dismissTask?.cancel(); dismissTask = nil
-                windowDissolve = 0
+                withAnimation(.easeOut(duration: closingDuration)) { windowDissolve = 0 }
                 panelReady = true
             }
             return
         }
         guard window?.isVisible == true, dismissTask == nil else { return }
         panelTask?.cancel(); panelTask = nil
+        panelReady = false
         dismissTask = Task { @MainActor in
-            withAnimation(.easeOut(duration: 0.65)) { windowDissolve = 1 }
+            withAnimation(.easeInOut(duration: closingDuration)) { windowDissolve = 1 }
             do {
-                try await Task.sleep(for: .milliseconds(700))
+                try await Task.sleep(for: .seconds(closingDuration + 0.03))
                 try Task.checkCancellation()
                 window?.orderOut(nil)
                 panelReady = false
@@ -317,9 +327,9 @@ struct CodexTaskStability {
         panelReady = false
         panelTask?.cancel()
         panelTask = Task { @MainActor in
-            windowDissolve = 1
+            withAnimation(.easeInOut(duration: closingDuration)) { windowDissolve = 1 }
             do {
-                try await Task.sleep(for: .milliseconds(600))
+                try await Task.sleep(for: .seconds(closingDuration + 0.03))
                 try Task.checkCancellation()
                 window?.orderOut(nil)
                 panelTask = nil
@@ -331,11 +341,14 @@ struct CodexTaskStability {
         navigationError = nil
         if window?.isVisible == true { closeRequests(); return }
         guard panelTask == nil else { return }
-        dismissTask?.cancel(); dismissTask = nil; windowDissolve = 1
+        dismissTask?.cancel(); dismissTask = nil
+        var reset = Transaction()
+        reset.disablesAnimations = true
+        withTransaction(reset) { windowDissolve = 0; windowReveal = 1 }
         panelTask?.cancel(); panelTask = nil
         panelReady = false
         if window == nil {
-            let panel = CodexRequestPanel(contentRect: NSRect(x: 0, y: 0, width: 476, height: 456),
+            let panel = CodexRequestPanel(contentRect: NSRect(x: 0, y: 0, width: 476, height: 438),
                                           styleMask: [.borderless], backing: .buffered, defer: false)
             panel.onCancel = { [weak self] in self?.closeRequests() }
             panel.title = "Codex · 需要你处理"
@@ -364,8 +377,9 @@ struct CodexTaskStability {
             do {
                 try await Task.sleep(for: .milliseconds(32))
                 try Task.checkCancellation()
-                windowDissolve = 0
-                try await Task.sleep(for: .milliseconds(600))
+                let duration = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 0.15 : CodexCardReveal.duration
+                withAnimation(.linear(duration: duration)) { windowReveal = 0 }
+                try await Task.sleep(for: .seconds(duration + 0.03))
                 try Task.checkCancellation()
                 panelReady = true
                 panelTask = nil
@@ -380,6 +394,22 @@ private class CodexRequestPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) { onCancel?() }
 }
 
+// Keep AppKit's overlay fading and drag behavior; only use the compact scroller size.
+struct CodexScrollAppearance: NSViewRepresentable {
+    final class Probe: NSView {
+        func configure() {
+            guard let scroll = enclosingScrollView else { return }
+            scroll.scrollerStyle = .overlay
+            scroll.autohidesScrollers = true
+            scroll.verticalScroller?.controlSize = .small
+        }
+        override func viewDidMoveToWindow() { super.viewDidMoveToWindow(); configure() }
+        override func viewDidMoveToSuperview() { super.viewDidMoveToSuperview(); configure() }
+    }
+    func makeNSView(context: Context) -> Probe { Probe() }
+    func updateNSView(_ nsView: Probe, context: Context) { nsView.configure() }
+}
+
 private struct CodexRequests: View {
     @ObservedObject var activity: CodexActivity
     @Environment(\.accessibilityReduceMotion) private var reduced
@@ -390,8 +420,22 @@ private struct CodexRequests: View {
             HStack {
                 Label("需要你处理", systemImage: "lightbulb").font(.title2.weight(.semibold))
                 Spacer()
-                Button("收起", action: activity.closeRequests)
-                    .buttonStyle(.plain)
+                HStack(spacing: 6) {
+                    Button(action: activity.clearRequests) {
+                        Text("清空提醒").foregroundStyle(Color(nsColor: .systemRed))
+                            .padding(.horizontal, 9).padding(.vertical, 5)
+                            .background(Color(nsColor: .systemRed).opacity(0.13), in: Capsule())
+                    }
+                    .help("清空当前提醒")
+                    Button(action: activity.closeRequests) {
+                        Text("收起").foregroundStyle(Color(nsColor: .systemYellow))
+                            .padding(.horizontal, 9).padding(.vertical, 5)
+                            .background(Color(nsColor: .systemYellow).opacity(0.13), in: Capsule())
+                    }
+                }
+                .font(.caption.weight(.medium))
+                .buttonStyle(.plain)
+                .fixedSize()
             }
             Text(activity.status).font(.caption).foregroundStyle(.secondary)
             ScrollView {
@@ -399,7 +443,15 @@ private struct CodexRequests: View {
                     if activity.preview != nil {
                         Text("这是水滴交互预览，不会提交任何批准或选择。")
                         ForEach(0..<activity.previewCount, id: \.self) { index in
-                            Text("待处理提示 \(index + 1)")
+                            HStack {
+                                Text("待处理提示 \(index + 1)")
+                                Spacer()
+                                Button(role: .destructive, action: activity.removePreviewRequest) {
+                                    Image(systemName: "trash").frame(width: 24, height: 24)
+                                }
+                                .buttonStyle(.plain).foregroundStyle(Color(red: 0.72, green: 0.32, blue: 0.31))
+                                .help("删除此提醒").accessibilityLabel("删除此提醒")
+                            }
                         }
                         Button("追加一个预览请求") { activity.previewCount += 1 }
                         Button("预览恢复运行") { activity.demonstrate("running") }
@@ -407,8 +459,18 @@ private struct CodexRequests: View {
                         Text(activity.connected ? "待处理请求已在 Codex 中解决。" : "状态连接已断开，请在 Codex 中检查任务。")
                     } else {
                         ForEach(rows, id: \.identity) { task in
-                            CodexQuestionRow(activity: activity, task: task)
-                            .modifier(CodexDissolve(progress: dissolving.contains(task.identity) ? 1 : 0))
+                            HStack(alignment: .top, spacing: 8) {
+                                CodexQuestionRow(activity: activity, task: task)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Button(role: .destructive) { activity.removeRequest(task) } label: {
+                                    Image(systemName: "trash").frame(width: 24, height: 24)
+                                }
+                                .buttonStyle(.plain).foregroundStyle(Color(red: 0.72, green: 0.32, blue: 0.31))
+                                .help("删除此提醒，不影响 Codex 任务")
+                                .accessibilityLabel("删除此提醒")
+                            }
+                            .opacity(dissolving.contains(task.identity) ? 0 : 1)
+                            .offset(y: reduced || !dissolving.contains(task.identity) ? 0 : -4)
                             .allowsHitTesting(!dissolving.contains(task.identity))
                             Divider()
                         }
@@ -416,18 +478,41 @@ private struct CodexRequests: View {
                 }.frame(maxWidth: .infinity, alignment: .leading)
                     // Native focus rings extend beyond the field's layout bounds.
                     .padding(4)
-            }
-            HStack {
-                Text("收起保留问题；清空仅隐藏提醒").font(.caption2).foregroundStyle(.secondary)
-                Spacer()
-                Button("清空提醒", action: activity.clearRequests)
-                    .buttonStyle(.plain).foregroundStyle(.secondary).font(.caption)
+                    .padding(.trailing, 8)
+                    .background(CodexScrollAppearance())
             }
             if let error = activity.navigationError { Text(error).foregroundStyle(.red).font(.caption) }
-        }.padding(20).frame(width: 380, height: 360)
-        .background(Color(white: 0.09), in: RoundedRectangle(cornerRadius: 20))
+        }
+        .opacity(activity.windowReveal == 0 && activity.windowDissolve == 0 ? 1 : 0)
+        .animation(.easeOut(duration: reduced ? 0.15 : 0.26).delay(reduced ? 0 : 0.25), value: activity.windowReveal)
+        .animation(.easeOut(duration: reduced ? 0.15 : 0.18), value: activity.windowDissolve)
+        .padding(20).frame(width: 380, height: 332)
+        .background {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(LinearGradient(colors: [Color(white: 0.065), Color(white: 0.018)],
+                                     startPoint: .topLeading, endPoint: .bottomTrailing))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(LinearGradient(colors: [.white.opacity(0.13), .white.opacity(0.025)],
+                                                     startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.6)
+                }
+        }
+        .padding(.bottom, 10)
+        .overlay(alignment: .bottom) {
+            VStack(spacing: 3) {
+                Capsule().fill(LinearGradient(colors: [.clear, .white.opacity(0.18), .clear],
+                                              startPoint: .leading, endPoint: .trailing))
+                    .frame(width: 140, height: 1)
+                Capsule().fill(LinearGradient(colors: [.clear, .white.opacity(0.08), .clear],
+                                              startPoint: .leading, endPoint: .trailing))
+                    .frame(width: 92, height: 1)
+            }
+            .padding(.bottom, 1)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
         .modifier(CodexDissolve(progress: activity.windowDissolve))
-        .animation(.easeInOut(duration: 0.55), value: activity.windowDissolve)
+        .modifier(CodexCardReveal(progress: activity.windowReveal))
         .allowsHitTesting(activity.panelReady && activity.windowDissolve == 0)
         .padding(48)
         .preferredColorScheme(.dark)
@@ -436,12 +521,16 @@ private struct CodexRequests: View {
             let ids = Set(incoming.map(\.identity))
             let oldIDs = Set(rows.map(\.identity))
             rows += incoming.filter { !oldIDs.contains($0.identity) }
-            withAnimation(.easeOut(duration: 0.65)) { dissolving = Set(rows.map(\.identity)).subtracting(ids) }
+            let removed = Set(rows.map(\.identity)).subtracting(ids)
+            guard !removed.isEmpty else { rows = incoming; dissolving = []; return }
+            withAnimation(.easeOut(duration: reduced ? 0.15 : 0.22)) { dissolving = removed }
             do {
-                try await Task.sleep(for: .milliseconds(650))
+                try await Task.sleep(for: .seconds(reduced ? 0.15 : 0.22))
                 try Task.checkCancellation()
-                rows = incoming
-                dissolving = []
+                withAnimation(reduced ? nil : .easeInOut(duration: 0.22)) {
+                    rows = incoming
+                    dissolving = []
+                }
             } catch { }
         }
     }
@@ -462,9 +551,19 @@ private struct CodexQuestionRow: View {
                             editing = true
                         } else { activity.submit(option, for: task) }
                     } label: {
-                        Text(option).frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 5)
-                    }.buttonStyle(.bordered)
+                        Text(option)
+                            .lineLimit(nil)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10).padding(.vertical, 9)
+                            .background(.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                    .strokeBorder(.white.opacity(0.065), lineWidth: 0.5)
+                            }
+                            .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    }.buttonStyle(.plain)
                 }
                 HStack(alignment: .bottom) {
                     TextField("或自行输入，回车提交", text: $draft, axis: .vertical)

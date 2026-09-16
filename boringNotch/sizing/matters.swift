@@ -14,8 +14,9 @@ let batterySneakSize: CGSize = .init(width: 160, height: 1)
 
 let shadowPadding: CGFloat = 20
 let openNotchSize: CGSize = .init(width: 580, height: 190)
-// Transparent room for the outer music waves, including when the notch is open.
-let windowSize: CGSize = .init(width: openNotchSize.width + 208, height: openNotchSize.height + shadowPadding + 24)
+// Keep the full 82-point droplet area inside the window while the notch expands
+// and the droplet retracts. Shadow padding also leaves room for spring overshoot.
+let windowSize: CGSize = .init(width: openNotchSize.width + 208, height: openNotchSize.height + shadowPadding + 82)
 let cornerRadiusInsets: (opened: (top: CGFloat, bottom: CGFloat), closed: (top: CGFloat, bottom: CGFloat)) = (opened: (top: 19, bottom: 24), closed: (top: 6, bottom: 14))
 
 enum MusicPlayerImageSizes {

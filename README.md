@@ -19,13 +19,13 @@
 
 ## 下载与安装
 
-当前版本：**3.0.4（build 304）** · [更新说明](docs/releases/3.0.4.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.4)
+当前版本：**3.0.5（build 305）** · [更新说明](docs/releases/3.0.5.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.5)
 
-1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.4/interesting-notch-3.0.4-arm64.dmg)。
+1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.5/interesting-notch-3.0.5-arm64.dmg)。
 2. 退出旧版，打开 DMG，将 `Interesting Notch.app` 拖到 `Applications` 图标；应用会复制到系统 `/Applications` 文件夹。
 3. 在设置 → 媒体中选择“自动跟随正在播放的应用”，开启“右侧滚动歌词”。
 
-安装包仅支持 Apple Silicon（M 系列芯片），最低部署目标 macOS 14，未提供 Intel 包。DMG 仅展示应用和 `Applications` 拖拽目标；Release 同时提供 `SHA256SUMS.txt` 与可选的 `interesting-notch-3.0.4-codex-bridge.zip` 附件。
+安装包仅支持 Apple Silicon（M 系列芯片），最低部署目标 macOS 14，未提供 Intel 包。DMG 仅展示应用和 `Applications` 拖拽目标；Release 同时提供 `SHA256SUMS.txt` 与可选的 `interesting-notch-3.0.5-codex-bridge.zip` 附件。
 
 **本安装包使用本地开发证书签名，尚未经过 Apple Developer ID 公证。** 首次打开可能被 macOS 阻止，请在核对来源后使用系统提供的“仍要打开”入口。内部标识暂沿用上游，不建议与上游原版同时运行；测试版使用独立的 Preview 标识。
 
@@ -35,7 +35,7 @@
 | --- | --- |
 | 任务结束彩带 | 桥接确认所有运行任务结束后，尾焰熄灭，再播放 1.5 秒的分层彩带与彩纸；等待输入、断线或状态丢失不会当作完成。 |
 | Codex 火箭状态 | 执行任务时将灵动岛呈现为火箭，尾焰与速度效果随思考强度变化。 |
-| 交互提醒水滴 | 等待用户交互时显示水滴；展开后可直接选择异步问题的选项，或输入文字并回车回复。收到 Codex 确认后对应提醒粒子消散；支持收起和清空本地提醒。 |
+| 交互提醒水滴 | 等待用户交互时显示水滴；展开后可直接选择异步问题的选项，或输入文字并回车回复。收到 Codex 确认后对应提醒粒子消散；支持逐项删除、收起和清空本地提醒，长选项完整换行。 |
 | 额度与模型信息 | 以燃油表现剩余额度；展开栏显示额度、模型名称及思考强度。Plus 优先展示 5 小时额度，Pro 及以上优先展示周额度。 |
 | 音乐与歌词 | 支持 Apple Music 与网易云的紧凑歌词，提供多源获取、本地缓存、候选预览和 LRC 导入；播放、暂停及退出播放器时衔接音乐布局。 |
 | 权限与稳定性 | HUD 使用主程序的辅助功能权限；音频响应在后台先检查权限，并提供显式授权与重连入口。 |
@@ -72,7 +72,7 @@ Codex 信息由本机桥接脚本读取，包括待回答问题的题目和选�
 
 ### 火箭与交互提醒
 
-普通刘海随 Codex 执行状态过渡为黑色火箭；“高”及以上增加速度参照线，Ultra 使用更大的尾焰。需要用户确认时，火箭收回并显示可点击的灯泡水滴。
+普通刘海随 Codex 执行状态过渡为黑色火箭；“高”及以上增加速度参照线，Ultra 使用更大的尾焰。待处理请求显示为可点击的灯泡水滴；仍有任务运行时，火箭与水滴同时显示。
 
 <p align="center"><img src="docs/assets/codex-rocket-states.png" width="800" alt="普通刘海、火箭过渡、高强度及 Ultra 火箭，以及灯泡水滴的形态预览"></p>
 

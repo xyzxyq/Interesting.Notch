@@ -8,14 +8,17 @@ import AppKit
         var blockedQuestion = activeQuestion
         blockedQuestion.isRunning = false
         assert(blockedQuestion.waiting && !blockedQuestion.working)
-        assert(CodexActivity.shouldShowRocket(enabled: true, running: true, waiting: false))
-        assert(!CodexActivity.shouldShowRocket(enabled: true, running: true, waiting: true))
-        assert(!CodexActivity.shouldShowRocket(enabled: true, running: false, waiting: false))
-        assert(!CodexActivity.shouldShowRocket(enabled: false, running: true, waiting: false))
+        assert(CodexActivity.shouldShowRocket(enabled: true, running: true))
+        assert(CodexActivity.shouldShowRocket(enabled: true, running: activeQuestion.working))
+        assert(!CodexActivity.shouldShowRocket(enabled: true, running: false))
+        assert(!CodexActivity.shouldShowRocket(enabled: false, running: true))
         let runningTask = CodexTask(id: activeQuestion.id, title: "test", state: "running", detail: nil)
         assert(CodexActivity.didFinishWork(previous: [runningTask], current: [], confirmedIdle: [runningTask.identity], continuousConnection: true))
         assert(!CodexActivity.didFinishWork(previous: [runningTask], current: [activeQuestion], confirmedIdle: [runningTask.identity], continuousConnection: true))
-        assert(!CodexActivity.didFinishWork(previous: [activeQuestion], current: [], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(CodexActivity.didFinishWork(previous: [activeQuestion], current: [], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(CodexActivity.didFinishWork(previous: [activeQuestion], current: [blockedQuestion], confirmedIdle: [runningTask.identity], continuousConnection: true))
+        assert(!CodexActivity.didFinishWork(previous: [activeQuestion], current: [blockedQuestion], confirmedIdle: [], continuousConnection: true))
+        assert(!CodexActivity.didFinishWork(previous: [blockedQuestion], current: [blockedQuestion], confirmedIdle: [runningTask.identity], continuousConnection: true))
         assert(!CodexActivity.didFinishWork(previous: [runningTask], current: [], confirmedIdle: [runningTask.identity], continuousConnection: false))
         assert(!CodexActivity.didFinishWork(previous: [], current: [], confirmedIdle: [runningTask.identity], continuousConnection: true))
         assert(!CodexActivity.didFinishWork(previous: [runningTask, blockedQuestion], current: [runningTask], confirmedIdle: [runningTask.identity], continuousConnection: true))
@@ -82,6 +85,13 @@ import AppKit
         assert(CodexActivity.unread(reminders, excluding: seen).count == 1)
         assert(CodexActivity.unread(reminders, excluding: Set(reminders.map(\.identity))).isEmpty)
         assert(CodexActivity.unread(reminders, excluding: seen).first?.identity == reminders[1].identity)
+        // Deleting one reminder must not hide another host or a new question in the same task.
+        var remoteReminder = reminders[0]
+        remoteReminder.hostId = "remote"
+        var nextReminder = reminders[0]
+        nextReminder.requestId = "question-new"
+        assert(CodexActivity.unread([reminders[0], reminders[1], remoteReminder, nextReminder], excluding: seen)
+            .map(\.identity) == [reminders[1], remoteReminder, nextReminder].map(\.identity))
         multiQuestion.pendingQuestionIds = ["question-b"]
         assert(CodexActivity.reminders(in: [multiQuestion]).count == 1)
         var stability = CodexTaskStability()
@@ -193,6 +203,18 @@ import AppKit
         assert(abs(rocket.boundingRect.maxX - rect.maxX) < 0.01)
         assert(abs(rocket.boundingRect.width - rect.width) < 0.01)
         let noseEnd = rect.minX + NotchShape.rocketCoordinate(0, width: rect.width, height: rect.height)
+        let nozzle = rect.minX + NotchShape.rocketCoordinate(rect.width + rect.height * 0.182, width: rect.width, height: rect.height)
+        assert(rocket.contains(CGPoint(x: nozzle - 0.5, y: rect.midY)))
+        assert(!rocket.contains(CGPoint(x: nozzle + 0.5, y: rect.midY)))
+        for x in stride(from: rect.maxX - 12, to: rect.maxX, by: 0.5) {
+            for y in stride(from: 0.3, to: rect.height / 2, by: 0.7) {
+                assert(rocket.contains(CGPoint(x: x, y: rect.minY + y)) == rocket.contains(CGPoint(x: x, y: rect.maxY - y)))
+            }
+        }
+        // Keep a tapered nose with only a small rounding at the tip.
+        assert(rocket.contains(CGPoint(x: rect.minX + 2, y: rect.midY - 2)))
+        assert(rocket.contains(CGPoint(x: rect.minX + 2, y: rect.midY + 2)))
+        assert(!rocket.contains(CGPoint(x: rect.minX + 1, y: rect.midY - 6)))
         for x in stride(from: rect.minX + 0.3, to: noseEnd, by: 0.7) {
             for y in stride(from: 0.3, to: rect.height / 2, by: 0.7) {
                 assert(rocket.contains(CGPoint(x: x, y: rect.minY + y)) == rocket.contains(CGPoint(x: x, y: rect.maxY - y)))
@@ -261,6 +283,7 @@ import AppKit
         VStack(spacing: 24) {
             ZStack {
                 NotchShape(rocket: progress).fill(.black)
+                    .overlay { CodexRocketSurface(shape: NotchShape(rocket: progress)) }
                 MusicEdgeFrame(shape: NotchShape(rocket: progress), style: "waterColor", strength: 1,
                                energy: 0.6, phase: 2.1, color: .white, reduced: false, sky: false)
                     .padding(-24 - 48 * progress)

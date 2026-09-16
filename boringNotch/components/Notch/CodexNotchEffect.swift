@@ -224,6 +224,39 @@ enum CodexConfettiFrame {
     }
 }
 
+struct CodexRocketSurface: View {
+    let shape: NotchShape
+
+    var body: some View {
+        GeometryReader { geometry in
+            let height = geometry.size.height
+            RadialGradient(colors: [.white.opacity(0.22), .white.opacity(0.07), .clear],
+                           center: UnitPoint(x: 0.28, y: 0.22),
+                           startRadius: 0, endRadius: height * 0.9)
+                .frame(width: height * 1.15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .trailing) {
+                    RadialGradient(colors: [.white.opacity(0.14), .white.opacity(0.04), .clear],
+                                   center: UnitPoint(x: 0.88, y: 0.25),
+                                   startRadius: 0, endRadius: height * 0.65)
+                        .frame(width: height * 0.75)
+                }
+                .overlay {
+                    shape.stroke(.white.opacity(0.18), lineWidth: 0.7)
+                        .mask {
+                            LinearGradient(colors: [.white, .clear], startPoint: .leading, endPoint: .trailing)
+                                .frame(width: height * 0.9)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                }
+                .clipShape(shape)
+                .opacity(Double(min(1, max(0, shape.rocket))))
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct CodexSpeedLines: View {
     let shape: NotchShape
     let effort: Int
@@ -304,21 +337,29 @@ struct CodexLiquidDrop: View, Animatable {
                 let rx = radius * (1 + compression) / (1 + stretch)
                 let ry = radius * (1 + stretch) / (1 + compression)
                 var drop = Path()
-                drop.move(to: CGPoint(x: 32, y: cy - ry - 3))
+                let crown = cy - ry - 3 * t * volumeScale
+                // Horizontal crown tangents and vertical side tangents avoid a pointed cusp.
+                drop.move(to: CGPoint(x: 32, y: crown))
+                drop.addCurve(to: CGPoint(x: 32 + rx, y: cy + ry * 0.1),
+                              control1: CGPoint(x: 32 + rx * 0.3, y: crown),
+                              control2: CGPoint(x: 32 + rx, y: cy - ry * 0.5))
                 drop.addCurve(to: CGPoint(x: 32, y: cy + ry),
-                              control1: CGPoint(x: 32 + rx * 1.6, y: cy - ry * 0.1),
-                              control2: CGPoint(x: 32 + rx, y: cy + ry))
-                drop.addCurve(to: CGPoint(x: 32, y: cy - ry - 3),
-                              control1: CGPoint(x: 32 - rx, y: cy + ry),
-                              control2: CGPoint(x: 32 - rx * 1.6, y: cy - ry * 0.1))
-                context.fill(drop, with: .color(.black))
-                context.stroke(drop, with: .linearGradient(Gradient(colors: [.white.opacity(0.45), .white.opacity(0.04)]),
-                                                          startPoint: CGPoint(x: 20, y: cy - 16), endPoint: CGPoint(x: 40, y: cy + 16)), lineWidth: 0.7)
+                              control1: CGPoint(x: 32 + rx, y: cy + ry * 0.65),
+                              control2: CGPoint(x: 32 + rx * 0.55, y: cy + ry))
+                drop.addCurve(to: CGPoint(x: 32 - rx, y: cy + ry * 0.1),
+                              control1: CGPoint(x: 32 - rx * 0.55, y: cy + ry),
+                              control2: CGPoint(x: 32 - rx, y: cy + ry * 0.65))
+                drop.addCurve(to: CGPoint(x: 32, y: crown),
+                              control1: CGPoint(x: 32 - rx, y: cy - ry * 0.5),
+                              control2: CGPoint(x: 32 - rx * 0.3, y: crown))
+                drop.closeSubpath()
+                Self.drawLiquid(drop, center: CGPoint(x: 32, y: cy), in: &context,
+                                reflection: Double(min(1, max(0, (t - 0.3) / 0.5))))
                 if let fusion, fusion.radius > 0, !reduced {
                     let incomingY = -8 + (cy + 8) * fusion.travel
                     let incoming = Path(ellipseIn: CGRect(x: 32 - fusion.radius, y: incomingY - fusion.radius * 1.25,
                                                           width: fusion.radius * 2, height: fusion.radius * 2.5))
-                    context.fill(incoming, with: .color(.black))
+                    Self.drawLiquid(incoming, center: CGPoint(x: 32, y: incomingY), in: &context, reflection: Double(fusion.travel))
                     if fusion.travel < 0.3 {
                         let neck = (1 - fusion.travel / 0.3) * 5
                         var bridge = Path()
@@ -333,8 +374,12 @@ struct CodexLiquidDrop: View, Animatable {
                 let alpha = (symbolOpacity ?? max(0, (t - 0.72) / 0.28)) * reminderBrightness
                 var light = context
                 light.opacity = alpha
+                // Scale the symbol and its ring with the same volume as the liquid surface.
+                light.translateBy(x: 32, y: cy)
+                light.scaleBy(x: volumeScale, y: volumeScale)
+                light.translateBy(x: -32, y: -cy)
                 let ring = Path(ellipseIn: CGRect(x: 20.5, y: cy - 11.5, width: 23, height: 23))
-                light.stroke(ring, with: .color(Color(red: 1, green: 0.9, blue: 0.65).opacity(0.55)), lineWidth: 0.7)
+                light.stroke(ring, with: .color(Color(red: 1, green: 0.9, blue: 0.65).opacity(0.24)), lineWidth: 0.6)
                 if let bulb = context.resolveSymbol(id: "bulb") {
                     light.draw(bulb, at: CGPoint(x: 32, y: cy))
                 }
@@ -347,10 +392,50 @@ struct CodexLiquidDrop: View, Animatable {
         .frame(width: 64, height: 82)
     }
 
+    // Keep every reflection inside the silhouette, including during stretch and fusion.
+    private static func drawLiquid(_ path: Path, center: CGPoint, in context: inout GraphicsContext, reflection: Double) {
+        let bounds = path.boundingRect
+        let materialScale = min(bounds.width / 32, bounds.height / 35)
+        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            CGPoint(x: bounds.minX + bounds.width * x, y: bounds.minY + bounds.height * y)
+        }
+        context.fill(path, with: .color(.black))
+        var surface = context
+        surface.clip(to: path)
+        surface.opacity *= reflection
+        surface.fill(path, with: .radialGradient(
+            Gradient(stops: [.init(color: Color(white: 0.24), location: 0),
+                             .init(color: Color(white: 0.09), location: 0.38),
+                             .init(color: .black, location: 0.85)]),
+            center: point(0.28, 0.25), startRadius: 0, endRadius: max(1, bounds.height)))
+        surface.fill(path, with: .radialGradient(
+            Gradient(colors: [Color(red: 0.52, green: 0.61, blue: 0.69).opacity(0.3), .clear]),
+            center: point(0.68, 1.06), startRadius: 0, endRadius: max(1, bounds.height * 0.48)))
+        var rim = surface
+        rim.addFilter(.blur(radius: 0.6 * materialScale))
+        rim.stroke(path, with: .linearGradient(
+            Gradient(colors: [.white.opacity(0.24), .white.opacity(0.02), .white.opacity(0.12)]),
+            startPoint: point(0, 0), endPoint: point(1, 1)), lineWidth: 1.2 * materialScale)
+
+        // Share the bulb ring's center; a soft concentric arc replaces the detached streak.
+        let radius = min(bounds.width / 2, bounds.maxY - center.y) * 0.9
+        var highlight = Path()
+        highlight.addArc(center: center, radius: max(0, radius),
+                         startAngle: .degrees(195), endAngle: .degrees(285), clockwise: false)
+        var sheen = surface
+        sheen.addFilter(.blur(radius: 0.65 * materialScale))
+        sheen.stroke(highlight, with: .linearGradient(
+            Gradient(colors: [.white.opacity(0.02), .white.opacity(0.32), .white.opacity(0.02)]),
+            startPoint: CGPoint(x: center.x - radius, y: center.y),
+            endPoint: CGPoint(x: center.x + radius * 0.3, y: center.y - radius)),
+            style: StrokeStyle(lineWidth: max(0.8, bounds.width * 0.035), lineCap: .round))
+    }
+
 }
 
 struct CodexDropButton: View {
     var waiting: Bool
+    var expanded = false
     var count: Int
     var action: (CGPoint) -> Void
     @State private var anchorView = NSView(frame: .zero)
@@ -403,10 +488,10 @@ struct CodexDropButton: View {
             startMerging()
         }
         .opacity(visible ? 1 : 0)
-        .allowsHitTesting(waiting && visible)
+        .allowsHitTesting(waiting && visible && !expanded)
         .accessibilityLabel("Codex 有 \(count) 个请求需要你处理")
         .accessibilityHint("打开待处理任务窗口")
-        .accessibilityHidden(!visible)
+        .accessibilityHidden(!visible || expanded)
         .help("查看 Codex 的待处理请求")
         .task(id: "\(waiting)-\(reduced)-\(motion.suspended)") {
             if !waiting || reduced || motion.suspended { cancelMerging() }
@@ -447,6 +532,10 @@ struct CodexDropButton: View {
                 }
             } catch { /* A new state continues from the current presentation values. */ }
         }
+        // Hovering changes presentation only; keep the reminder's fall, size and idle phase alive.
+        .opacity(expanded ? 0 : 1)
+        .offset(y: expanded && !reduced ? -16 : 0)
+        .animation(.easeInOut(duration: reduced ? 0.15 : 0.24), value: expanded)
     }
 
     private func cancelMerging() {
@@ -642,10 +731,63 @@ enum CodexMergeMotion {
 }
 
 
-// Animate a mask, never a Canvas symbol of live AppKit controls: resolving a
-// ScrollView/TextField symbol can re-enter SwiftUI layout and abort AttributeGraph.
-// Keep mask hit testing enabled: disabling it makes the masked window click-through.
+// Keep native controls live: never render the card through a Canvas symbol.
+struct CodexCardReveal: AnimatableModifier {
+    static let duration = 0.65
+    var progress: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    var animatableData: CGFloat {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    static func outline(size: CGSize, progress: CGFloat) -> Path {
+        let t = 1 - min(1, max(0, progress))
+        if t == 1 { return Path(CGRect(origin: .zero, size: size)) }
+        func smooth(_ value: CGFloat) -> CGFloat {
+            let u = min(1, max(0, value))
+            return u * u * (3 - 2 * u)
+        }
+        let seed = min(32, size.width, size.height)
+        let width = seed + (size.width - seed) * smooth(t / 0.72)
+        let height = seed + (size.height - seed) * smooth((t - 0.08) / 0.82)
+        let radius = 16 + 4 * t + 28 * sin(.pi * t)
+        return Path(roundedRect: CGRect(x: (size.width - width) / 2, y: 0, width: width, height: height),
+                    cornerRadius: min(radius, width / 2, height / 2))
+    }
+
+    static func settlingOffset(progress: CGFloat) -> CGFloat {
+        let t = 1 - min(1, max(0, progress))
+        let settle = min(1, max(0, (t - 0.62) / 0.38))
+        let wave = sin(.pi * settle)
+        // Zero velocity and acceleration at both ends avoid the old abrupt stop.
+        return 1.2 * wave * wave * wave
+    }
+
+    func body(content: Content) -> some View {
+        let t = 1 - min(1, max(0, progress))
+        content
+            // Reveal the native controls without stretching their text or taking snapshots.
+            .overlay {
+                GeometryReader { geometry in
+                    Self.outline(size: geometry.size, progress: progress)
+                        .stroke(.white.opacity(reduced ? 0 : Double(sin(.pi * t)) * 0.12), lineWidth: 0.8)
+                }.allowsHitTesting(false)
+            }
+            .mask {
+                GeometryReader { geometry in
+                    Self.outline(size: geometry.size, progress: reduced ? 0 : progress).fill(.white)
+                }
+            }
+            .opacity(reduced ? Double(t) : Double(min(1, t / 0.12)))
+            .offset(y: reduced ? 0 : Self.settlingOffset(progress: progress))
+    }
+}
+
+// The dissolving boundary converges on the top-center droplet attachment point.
+// The mask retains hit testing so native fields and buttons don't become click-through.
 struct CodexDissolve: AnimatableModifier {
+    static let duration = 0.8
     var progress: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduced
     var animatableData: CGFloat {
@@ -659,24 +801,33 @@ struct CodexDissolve: AnimatableModifier {
             } else {
                 Canvas { context, size in
                     let p = min(1, max(0, progress))
-                    guard p < 1 else { return }
+                    guard p < 1, size.width > 0, size.height > 0 else { return }
                     if p == 0 {
                         context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
                         return
                     }
-                    let columns = 18, rows = 12
+                    let columns = max(1, Int(ceil(size.width / 5)))
+                    let rows = max(1, Int(ceil(size.height / 5)))
                     let w = size.width / CGFloat(columns), h = size.height / CGFloat(rows)
                     for row in 0..<rows {
                         for column in 0..<columns {
-                            let seed = Double((row * 37 + column * 19) % 101) / 100
-                            var tile = context
-                            tile.opacity = pow(1 - Double(p), 1.5)
-                            tile.translateBy(x: CGFloat(sin(seed * 19)) * p * 24,
-                                             y: -p * CGFloat(12 + seed * 36))
-                            tile.fill(Path(CGRect(x: CGFloat(column) * w + p * w * 0.35,
-                                                     y: CGFloat(row) * h + p * h * 0.35,
-                                                     width: w * (1 - p * 0.7), height: h * (1 - p * 0.7))),
-                                      with: .color(.white))
+                            let x = (CGFloat(column) + 0.5) / CGFloat(columns)
+                            let y = (CGFloat(row) + 0.5) / CGFloat(rows)
+                            // Bottom and side edges dissolve first; the final remnant stays by the droplet.
+                            let depth = 1 - min(1, hypot((x - 0.5) * 2, y))
+                            let seed = CGFloat((row * 73 + column * 137 + row * column * 19) % 101) / 100
+                            let local = min(1, max(0, (p - depth * 0.62 - seed * 0.12) / 0.26))
+                            let fade = local * local * (3 - 2 * local)
+                            guard fade < 1 else { continue }
+                            let inset = fade * min(w, h) * 0.32
+                            let rect = CGRect(x: CGFloat(column) * w + inset,
+                                              y: CGFloat(row) * h + inset,
+                                              width: w - inset * 2, height: h - inset * 2)
+                                // Overlap intact cells to avoid antialiasing seams in the solid center.
+                                .insetBy(dx: -0.35 * (1 - fade), dy: -0.35 * (1 - fade))
+                                .offsetBy(dx: (0.5 - x) * fade * 5, dy: -fade * (2 + y * 4))
+                            context.fill(Path(roundedRect: rect, cornerRadius: inset),
+                                         with: .color(.white.opacity(Double(1 - fade))))
                         }
                     }
                 }

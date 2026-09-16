@@ -234,11 +234,25 @@ extension CompactLyricsChecks {
             assert(CompactLyricsLayout.moonBoundary(progress: Double(step) / 100, angle: 0)
                 < CompactLyricsLayout.moonBoundary(progress: Double(step + 1) / 100, angle: 0))
         }
-        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0) == 0)
-        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.25) == 27)
-        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.5) == 204)
-        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 0.75) == 231)
-        assert(CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: 150, progress: 1) == 258)
+        for gap in [0.0, 150, 210] {
+            let duration = CompactLyricsLayout.entranceDuration(sideWidth: 54, gap: gap)
+            func edge(_ time: Double) -> CGFloat {
+                CompactLyricsLayout.entranceEdge(sideWidth: 54, gap: gap, progress: time / duration)
+            }
+            assert(abs(duration - (2 + gap / 108)) < 0.00001)
+            assert(edge(0) == 0 && abs(edge(duration) - (108 + gap)) < 0.00001)
+            assert(abs(edge(1) - 54) < 0.00001)
+            assert(abs(edge(duration - 1) - (54 + gap)) < 0.00001)
+            for time in [0.5, duration - 0.5] {
+                assert(abs((edge(time + 0.01) - edge(time)) / 0.01 - 54) < 0.00001)
+            }
+            if gap > 0 {
+                assert(abs((edge(duration / 2 + 0.01) - edge(duration / 2)) / 0.01 - 108) < 0.00001)
+            }
+            for boundary in [1.0, duration - 1] {
+                assert(abs(edge(boundary + 0.00001) - edge(boundary - 0.00001)) < 0.003, "Portal position stays continuous")
+            }
+        }
         let cover = NSImage(systemSymbolName: "music.note", accessibilityDescription: nil)!
         let cue = LyricSegment(id: 0, start: 0, end: 6, text: "歌颂这种平凡")
         let final = LyricSegment(id: 1, start: 25, end: 30, text: "一直唱到最后")
@@ -314,7 +328,7 @@ extension CompactLyricsChecks {
         let nextCue = LyricSegment(id: 2, start: 6, end: 12, text: "也曾像朋友一样和我诉说")
         let nextGlyph = PortalGlyph(text: nextCue.text)
         let transitionTimes = [5.999, 6.0, 6.1, 6.25, 6.4]
-        let entranceTimes = [0.1, 0.5, 1.0, 1.6, 2.0]
+        let entranceTimes = [0.1, 0.5, 1.0, 2.4, 3.8, 4.3, 4.8]
         let transitions = HStack(alignment: .top, spacing: 20) {
             VStack(alignment: .leading, spacing: 12) {
                 Text("句尾居中 → 旧句消散、新句显现").font(.system(size: 12))
@@ -331,14 +345,14 @@ extension CompactLyricsChecks {
                 }
             }
             VStack(alignment: .leading, spacing: 12) {
-                Text("两秒 → 左到右传送门揭示内容").font(.system(size: 12))
+                Text("加速通过刘海 → 两侧保持原速").font(.system(size: 12))
                 ForEach(entranceTimes.indices, id: \.self) { i in
                     let time = entranceTimes[i]
                     VStack(alignment: .leading, spacing: 4) {
                         Text(String(format: "%.2f 秒", time)).font(.system(size: 10)).foregroundStyle(.gray)
                         PortalLyricsFrame(phase: .waves, elapsed: time, duration: 30,
                             sideWidth: 54, gap: 150, tint: .white, reduced: false,
-                            glyph: nil, cover: coverGlyph, albumArt: cover, entrance: time / 2)
+                            glyph: nil, cover: coverGlyph, albumArt: cover, entrance: time / CompactLyricsLayout.entranceDuration(sideWidth: 54, gap: 150))
                             .frame(width: 258, height: 26).background(.black)
                     }
                 }
@@ -424,15 +438,15 @@ extension CompactLyricsChecks {
         }
         settle(); let first = frame(); settle(0.3)
         assert(frame() == first, "Paused motion changed")
-        clock.position = 3; clock.date = Date(); settle()
+        clock.position = 5.5; clock.date = Date(); settle()
         assert(frame() != first, "Seek failed to move sentence")
-        clock.position = 2; clock.date = Date(); settle()
+        clock.position = 5; clock.date = Date(); settle()
         assert(frame() == first, "Backward seek changed line state")
         clock.playing = true; clock.date = Date(); settle(0.2); let moving = frame(); settle(0.2)
         assert(frame() != moving, "Playing text did not move")
         clock.playing = false; clock.position = 29.9; clock.date = Date(); settle()
         let ended = frame()
-        clock.position = 2; clock.date = Date(); settle()
+        clock.position = 5; clock.date = Date(); settle()
         assert(frame() == first && frame() != ended, "Rewind after ending did not restore lyrics")
         clock.segments = []; clock.revision += 1; settle()
         let waves = frame(); settle(0.3)
@@ -447,13 +461,14 @@ extension CompactLyricsChecks {
         clock.position = 0.3; clock.date = Date(); clock.revision += 1; settle()
         let entry = frame(); settle(0.3)
         assert(frame() == entry, "Paused entry portal advanced")
-        clock.position = 2; clock.date = Date(); settle()
+        clock.position = 5; clock.date = Date(); settle()
         assert(frame() != entry, "Entry did not reveal content")
         print("Portal runtime checks passed: pause, seek, ending rewind, waves, line dissolve, entry reveal")
     }
 }
 @MainActor private final class TestClock: ObservableObject {
-    @Published var position = 2.0
+    // Start beyond the longer entrance so runtime checks can see the lyric lane.
+    @Published var position = 5.0
     @Published var date = Date()
     @Published var playing = false
     @Published var revision: UInt64 = 1
