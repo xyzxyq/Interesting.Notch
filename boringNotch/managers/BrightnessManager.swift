@@ -29,15 +29,15 @@ final class BrightnessManager: ObservableObject {
 
 	@MainActor func setRelative(delta: Float) {
 		Task { @MainActor in
-			let starting = await client.currentScreenBrightness() ?? rawBrightness
+			guard let starting = await client.currentScreenBrightness() else { return }
 			let target = max(0, min(1, starting + delta))
 			let ok = await client.setScreenBrightness(target)
 			if ok {
 				publish(brightness: target, touchDate: true)
+				BoringViewCoordinator.shared.toggleSneakPeek(status: true, type: .brightness, value: CGFloat(target))
 			} else {
 				refresh()
 			}
-			BoringViewCoordinator.shared.toggleSneakPeek(status: true, type: .brightness, value: CGFloat(target))
 		}
 	}
 

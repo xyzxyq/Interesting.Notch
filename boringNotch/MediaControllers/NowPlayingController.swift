@@ -73,6 +73,9 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var terminatedSources = Set<String>()
     private var remotePlaybackState = PlaybackState(bundleIdentifier: "")
     private var videoAudioObserver: AnyCancellable?
+    private var metadataTask: Task<Void, Never>?
+    private var metadataURL: URL?
+    private var localizedMetadata: LocalizedMusicMetadata?
 
     // MARK: - Initialization
     init?() {
@@ -127,6 +130,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     deinit {
         streamTask?.cancel()
+        metadataTask?.cancel()
         
         if let pipeHandler = self.pipeHandler {
             Task { await pipeHandler.close()
@@ -269,15 +273,22 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             terminatedSources.remove(next.bundleIdentifier)
         }
         remotePlaybackState = next
+        refreshLocalizedMetadata()
         refreshVideoAudio(forceNative: true)
     }
 
     @MainActor
     private func refreshVideoAudio(forceNative: Bool = false) {
         let videos = VideoAudioActivity.snapshot()
-        let next = remotePlaybackState.withVideoAudioFallback(
+        var next = remotePlaybackState.withVideoAudioFallback(
             activeSources: videos.filter { $0.value }.map(\.key),
             runningSources: Set(videos.keys), previous: playbackState)
+        if next.bundleIdentifier == "com.apple.Music", !next.isAudioFallback,
+           let metadata = localizedMetadata, metadata.trackId == next.catalogID {
+            next.title = metadata.trackName
+            next.artist = metadata.artistName
+            next.album = metadata.collectionName
+        }
         // Native controls may have optimistic local updates. Polling audio must
         // not overwrite them with an unchanged MediaRemote snapshot.
         guard forceNative || next.isAudioFallback || playbackState.isAudioFallback else { return }
@@ -290,6 +301,29 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         }
     }
     
+    @MainActor
+    private func refreshLocalizedMetadata() {
+        let url = remotePlaybackState.bundleIdentifier == "com.apple.Music"
+            ? remotePlaybackState.catalogID.flatMap { LocalizedMusicMetadata.lookupURL(id: $0) } : nil
+        guard url != metadataURL else { return }
+        metadataTask?.cancel()
+        metadataURL = url
+        localizedMetadata = nil
+        guard let url, let id = remotePlaybackState.catalogID else { return }
+        metadataTask = Task { @MainActor [weak self] in
+            do {
+                let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 8))
+                guard let self, !Task.isCancelled, self.metadataURL == url,
+                      (response as? HTTPURLResponse)?.statusCode == 200,
+                      let metadata = try LocalizedMusicMetadata.decode(data, id: id) else { return }
+                self.localizedMetadata = metadata
+                self.refreshVideoAudio(forceNative: true)
+            } catch {
+                // Keep the player's metadata when offline or absent from this storefront.
+            }
+        }
+    }
+
      private func fetchFavoriteStateIfSupported() async {
          let bundleID = playbackState.bundleIdentifier
         

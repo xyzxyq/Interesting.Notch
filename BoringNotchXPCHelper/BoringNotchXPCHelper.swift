@@ -102,41 +102,58 @@ class BoringNotchXPCHelper: NSObject, BoringNotchXPCHelperProtocol {
     // MARK: - Screen Brightness (moved from client app into helper)
 
     @objc func isScreenBrightnessAvailable(with reply: @escaping (Bool) -> Void) {
-        var b: Float = 0
-        reply(displayServicesGetBrightness(displayID: CGMainDisplayID(), out: &b) || ioServiceFor(displayID: CGMainDisplayID()) != nil)
+        reply(brightnessTarget() != nil)
     }
 
     @objc func currentScreenBrightness(with reply: @escaping (NSNumber?) -> Void) {
-        var b: Float = 0
-        if displayServicesGetBrightness(displayID: CGMainDisplayID(), out: &b) {
-            reply(NSNumber(value: b))
-            return
-        }
-        if let io = ioServiceFor(displayID: CGMainDisplayID()) {
-            var level: Float = 0
-            if IODisplayGetFloatParameter(io, 0, kIODisplayBrightnessKey as CFString, &level) == kIOReturnSuccess {
-                IOObjectRelease(io)
-                reply(NSNumber(value: level))
-                return
-            }
-            IOObjectRelease(io)
-        }
-        reply(nil)
+        reply(brightnessTarget().map { NSNumber(value: $0.brightness) })
     }
 
     @objc func setScreenBrightness(_ value: Float, with reply: @escaping (Bool) -> Void) {
+        guard value.isFinite, let target = brightnessTarget() else { reply(false); return }
         let clamped = max(0, min(1, value))
-        if displayServicesSetBrightness(displayID: CGMainDisplayID(), value: clamped) {
+        if displayServicesSetBrightness(displayID: target.id, value: clamped) {
             reply(true)
             return
         }
-        if let io = ioServiceFor(displayID: CGMainDisplayID()) {
-            let ok = IODisplaySetFloatParameter(io, 0, kIODisplayBrightnessKey as CFString, clamped) == kIOReturnSuccess
-            IOObjectRelease(io)
-            reply(ok)
+        if let io = ioServiceFor(displayID: target.id) {
+            defer { IOObjectRelease(io) }
+            reply(IODisplaySetFloatParameter(io, 0, kIODisplayBrightnessKey as CFString, clamped) == kIOReturnSuccess)
             return
         }
         reply(false)
+    }
+
+    // The laptop panel remains the brightness-key target when an external screen
+    // becomes primary. In clamshell mode, use a natively controllable active screen.
+    static func selectBrightnessTarget(_ displays: [CGDirectDisplayID], main: CGDirectDisplayID,
+                                       isBuiltin: (CGDirectDisplayID) -> Bool,
+                                       read: (CGDirectDisplayID) -> Float?) -> (id: CGDirectDisplayID, brightness: Float)? {
+        let ordered = displays.filter(isBuiltin)
+            + displays.filter { !isBuiltin($0) && $0 == main }
+            + displays.filter { !isBuiltin($0) && $0 != main }
+        for id in ordered {
+            if let value = read(id), value.isFinite, (0...1).contains(value) { return (id, value) }
+        }
+        return nil
+    }
+
+    private func brightnessTarget() -> (id: CGDirectDisplayID, brightness: Float)? {
+        var count: UInt32 = 0
+        guard CGGetOnlineDisplayList(0, nil, &count) == .success else { return nil }
+        var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
+        guard CGGetOnlineDisplayList(count, &displays, &count) == .success else { return nil }
+        return Self.selectBrightnessTarget(Array(displays.prefix(Int(count))).filter { CGDisplayIsActive($0) != 0 },
+                                           main: CGMainDisplayID(), isBuiltin: { CGDisplayIsBuiltin($0) != 0 },
+                                           read: readBrightness)
+    }
+
+    private func readBrightness(_ id: CGDirectDisplayID) -> Float? {
+        var value: Float = 0
+        if displayServicesGetBrightness(displayID: id, out: &value) { return value }
+        guard let io = ioServiceFor(displayID: id) else { return nil }
+        defer { IOObjectRelease(io) }
+        return IODisplayGetFloatParameter(io, 0, kIODisplayBrightnessKey as CFString, &value) == kIOReturnSuccess ? value : nil
     }
 
     // MARK: - Private helpers for DisplayServices / IOKit access

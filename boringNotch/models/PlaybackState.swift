@@ -29,6 +29,7 @@ struct PlaybackState {
     var volume: Double = 0.5
     var isFavorite: Bool = false
     var isAudioFallback: Bool = false
+    var catalogID: Int?
 }
 
 extension PlaybackState {
@@ -73,6 +74,7 @@ extension PlaybackState: Equatable {
     static func == (lhs: PlaybackState, rhs: PlaybackState) -> Bool {
         return lhs.bundleIdentifier == rhs.bundleIdentifier
             && lhs.isPlaying == rhs.isPlaying
+            && lhs.catalogID == rhs.catalogID
             && lhs.title == rhs.title
             && lhs.artist == rhs.artist
             && lhs.album == rhs.album
@@ -92,6 +94,7 @@ struct NowPlayingUpdate: Codable {
 }
 
 struct NowPlayingPayload: Codable {
+    let uniqueIdentifier: MediaItemIdentifier?
     let title: String?
     let artist: String?
     let album: String?
@@ -118,6 +121,12 @@ extension PlaybackState {
         let diff = update.diff == true && (source == nil || source == bundleIdentifier)
         var state = diff ? self : PlaybackState(bundleIdentifier: source ?? "")
         state.bundleIdentifier = source ?? (diff ? bundleIdentifier : "")
+        // A title change without an ID must not retain the previous catalog identity.
+        if let identifier = payload.uniqueIdentifier {
+            state.catalogID = identifier.catalogID
+        } else {
+            state.catalogID = diff && (payload.title == nil || payload.title == title) ? catalogID : nil
+        }
         state.title = payload.title ?? (diff ? title : "")
         state.artist = payload.artist ?? (diff ? artist : "")
         state.album = payload.album ?? (diff ? album : "")
@@ -176,5 +185,58 @@ extension PlaybackState {
         ended.bundleIdentifier = ""
         ended.isAudioFallback = false
         return ended
+    }
+}
+
+// MediaRemote identifiers can be numeric catalog IDs or opaque strings.
+enum MediaItemIdentifier: Codable {
+    case number(Int)
+    case string(String)
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer()
+        if let id = try? value.decode(Int.self) { self = .number(id) }
+        else { self = .string(try value.decode(String.self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var value = encoder.singleValueContainer()
+        switch self {
+        case .number(let id): try value.encode(id)
+        case .string(let id): try value.encode(id)
+        }
+    }
+
+    var catalogID: Int? {
+        switch self {
+        case .number(let id): return id > 0 ? id : nil
+        case .string(let id): return Int(id).flatMap { $0 > 0 ? $0 : nil }
+        }
+    }
+}
+
+struct LocalizedMusicMetadata: Decodable {
+    let trackId: Int
+    let trackName: String
+    let artistName: String
+    let collectionName: String
+
+    static func lookupURL(id: Int, languages: [String] = Locale.preferredLanguages) -> URL? {
+        guard id > 0, let preferred = languages.first else { return nil }
+        let language = Locale(identifier: preferred).language
+        guard language.languageCode?.identifier == "zh" else { return nil }
+        let traditional = language.script?.identifier == "Hant"
+        var url = URLComponents(string: "https://itunes.apple.com/lookup")!
+        url.queryItems = [URLQueryItem(name: "id", value: String(id)),
+                          URLQueryItem(name: "country", value: traditional ? "tw" : "cn"),
+                          URLQueryItem(name: "lang", value: traditional ? "zh_tw" : "zh_cn")]
+        return url.url
+    }
+
+    static func decode(_ data: Data, id: Int) throws -> Self? {
+        struct Response: Decodable { let results: [LocalizedMusicMetadata] }
+        return try JSONDecoder().decode(Response.self, from: data).results.first {
+            $0.trackId == id && !$0.trackName.isEmpty && !$0.artistName.isEmpty
+        }
     }
 }

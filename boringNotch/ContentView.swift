@@ -460,7 +460,7 @@ struct ContentView: View {
     }
 
     private var closedPlaybackContent: some View {
-        let fuelVisible = rocketPresented && !vm.hideOnClosed
+        let fuelVisible = rocketPresented && !vm.hideOnClosed && !musicPresented
         let width = musicPresented || fuelVisible
             ? 2 * musicSideWidth + fuelGap
             : vm.closedNotchSize.width - 20
@@ -478,7 +478,7 @@ struct ContentView: View {
         // continuously, even while the outgoing content is being removed.
         .frame(width: max(0, width), height: vm.effectiveClosedNotchHeight)
         .overlay(alignment: .leading) {
-            // One persistent gauge: stopping music must not recreate or fade it.
+            // Music owns the artwork slot; the quota gauge is only shown without music.
             if fuelVisible { fuelSlot }
         }
         .animation(reducedMotion ? .easeInOut(duration: 0.18)
@@ -519,14 +519,11 @@ struct ContentView: View {
                 albumArt: musicManager.albumArt, sideWidth: musicSideWidth,
                 gap: max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top + 16),
                 height: max(0, vm.effectiveClosedNotchHeight - 12),
-                lyricOffset: compactLyricsOffset, hidesArtwork: rocketPresented
+                lyricOffset: compactLyricsOffset
             )
             .frame(height: vm.effectiveClosedNotchHeight)
         } else {
         HStack {
-            if rocketPresented {
-                Color.clear.frame(width: musicSideWidth)
-            } else {
             Image(nsImage: musicManager.albumArt)
                 .resizable()
                 .clipped()
@@ -540,7 +537,6 @@ struct ContentView: View {
                     height: max(0, vm.effectiveClosedNotchHeight - 12)
                 )
                 .frame(width: musicSideWidth, alignment: .trailing)
-            }
 
             Rectangle()
                 .fill(.black)

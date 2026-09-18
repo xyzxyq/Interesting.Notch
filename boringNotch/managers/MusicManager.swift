@@ -286,16 +286,16 @@ class MusicManager: ObservableObject {
         let repeatModeChanged = state.repeatMode != self.repeatMode
         let volumeChanged = state.volume != self.volume
         
-        if state.title != self.songTitle {
-            self.songTitle = state.title
+        if CompactLyrics.displayText(state.title) != self.songTitle {
+            self.songTitle = CompactLyrics.displayText(state.title)
         }
 
-        if state.artist != self.artistName {
-            self.artistName = state.artist
+        if CompactLyrics.displayText(state.artist) != self.artistName {
+            self.artistName = CompactLyrics.displayText(state.artist)
         }
 
-        if state.album != self.album {
-            self.album = state.album
+        if CompactLyrics.displayText(state.album) != self.album {
+            self.album = CompactLyrics.displayText(state.album)
         }
 
         if timeChanged {
