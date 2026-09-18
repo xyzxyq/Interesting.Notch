@@ -73,6 +73,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var terminatedSources = Set<String>()
     private var remotePlaybackState = PlaybackState(bundleIdentifier: "")
     private var videoAudioObserver: AnyCancellable?
+    private var videoLifecycleObservers = Set<AnyCancellable>()
+    private var videoApplications: [String: pid_t] = [:]
     private var metadataTask: Task<Void, Never>?
     private var metadataURL: URL?
     private var localizedMetadata: LocalizedMusicMetadata?
@@ -119,13 +121,23 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
                     self.playbackState = self.playbackState.endingPlayback()
                 }
             }
-        // ponytail: one low-frequency poll; process IO notifications are not
-        // reliable on every macOS release. Replace with listeners when reliable.
-        videoAudioObserver = Timer.publish(every: 1, on: .main, in: .common)
-            .autoconnect().sink { [weak self] _ in
-                Task { @MainActor [weak self] in self?.refreshVideoAudio() }
-            }
-        Task { await setupNowPlayingObserver() }
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didLaunchApplicationNotification)
+            .merge(with: NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didTerminateApplicationNotification))
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshVideoApplications() }
+            }.store(in: &videoLifecycleObservers)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            NotchMotionEnvironment.shared.$suspended.removeDuplicates()
+                .sink { [weak self] _ in
+                    // @Published emits before its stored value changes.
+                    Task { @MainActor [weak self] in self?.refreshVideoAudio(forceNative: true) }
+                }.store(in: &self.videoLifecycleObservers)
+            self.refreshVideoApplications()
+            await self.setupNowPlayingObserver()
+        }
+
     }
 
     deinit {
@@ -247,19 +259,12 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         do {
             try process.run()
             streamTask = Task { [weak self] in
-                await self?.processJSONStream()
+                await pipeHandler.readJSONLines(as: NowPlayingUpdate.self) { [weak self] update in
+                    await self?.handleAdapterUpdate(update)
+                }
             }
         } catch {
             assertionFailure("Failed to launch mediaremote-adapter.pl: \(error)")
-        }
-    }
-
-    // MARK: - Async Stream Processing
-    private func processJSONStream() async {
-        guard let pipeHandler = self.pipeHandler else { return }
-        
-        await pipeHandler.readJSONLines(as: NowPlayingUpdate.self) { [weak self] update in
-            await self?.handleAdapterUpdate(update)
         }
     }
 
@@ -279,7 +284,10 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     @MainActor
     private func refreshVideoAudio(forceNative: Bool = false) {
-        let videos = VideoAudioActivity.snapshot()
+        updateVideoPolling()
+        guard forceNative || !NotchMotionEnvironment.shared.suspended else { return }
+        let videos = remotePlaybackState.isPlaying
+            ? [:] : VideoAudioActivity.snapshot(applications: videoApplications)
         var next = remotePlaybackState.withVideoAudioFallback(
             activeSources: videos.filter { $0.value }.map(\.key),
             runningSources: Set(videos.keys), previous: playbackState)
@@ -301,6 +309,26 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
         }
     }
     
+    @MainActor
+    private func refreshVideoApplications() {
+        videoApplications = VideoAudioActivity.applications()
+        refreshVideoAudio()
+    }
+
+    @MainActor
+    private func updateVideoPolling() {
+        let needed = !videoApplications.isEmpty && !remotePlaybackState.isPlaying
+            && !NotchMotionEnvironment.shared.suspended
+        guard needed else { videoAudioObserver = nil; return }
+        guard videoAudioObserver == nil else { return }
+        // ponytail: poll output IO only for cached video processes lacking native
+        // playback events; replace with IO listeners when reliable on all targets.
+        videoAudioObserver = Timer.publish(every: 1, tolerance: 0.3, on: .main, in: .common)
+            .autoconnect().sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshVideoAudio() }
+            }
+    }
+
     @MainActor
     private func refreshLocalizedMetadata() {
         let url = remotePlaybackState.bundleIdentifier == "com.apple.Music"
@@ -431,18 +459,22 @@ actor JSONLinesPipeHandler {
 // MARK: - Audio-only video presence
 // No audio recording or tap: only query whether a video app's main process has output IO.
 enum VideoAudioActivity {
-    @MainActor static func snapshot() -> [String: Bool] {
+    @MainActor static func applications() -> [String: pid_t] {
         guard #available(macOS 14.2, *) else { return [:] }
-        var sources: [String: Bool] = [:]
+        var sources: [String: pid_t] = [:]
         for app in NSWorkspace.shared.runningApplications where app.activationPolicy == .regular {
             guard let id = app.bundleIdentifier, let url = app.bundleURL,
                   Bundle(url: url)?.object(forInfoDictionaryKey: "LSApplicationCategoryType") as? String == "public.app-category.video",
                   !PlaybackState(bundleIdentifier: id).isMusicSource else { continue }
-            // Helpers may keep output IO open while paused (verified with Youku).
-            // Only the actual application's process can activate this fallback.
-            sources[id] = isOutputRunning(pid: app.processIdentifier)
+            sources[id] = app.processIdentifier
         }
         return sources
+    }
+
+    @MainActor static func snapshot(applications: [String: pid_t]? = nil) -> [String: Bool] {
+        guard #available(macOS 14.2, *) else { return [:] }
+        // Helpers may keep output IO open while paused; query only main processes.
+        return (applications ?? Self.applications()).mapValues { isOutputRunning(pid: $0) }
     }
 
     @available(macOS 14.2, *)

@@ -74,3 +74,9 @@
 "The system pointer interface is unavailable." = "The system pointer interface is unavailable.";
 "Paper-plane pointer enabled; app-specific cursors remain controlled by their apps." = "Paper-plane pointer enabled; app-specific cursors remain controlled by their apps.";
 "Original pointer restored." = "Original pointer restored.";
+
+"Automatically check for updates" = "Automatically check for updates";
+
+"Automatically download and install updates" = "Automatically download and install updates";
+
+"Checks GitHub releases daily. Automatic installation finishes when the app quits; you can also restart to update." = "Checks GitHub releases daily. Automatic installation finishes when the app quits; you can also restart to update.";

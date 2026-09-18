@@ -656,7 +656,7 @@ struct CodexFuelGauge: View {
             : Color(white: 0.85)
     }
     var body: some View {
-        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 15 : 1.0 / 30, paused: !onScreen || motion.suspended || reduced || fuel == nil)) { tick in
+        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 6 : 1.0 / 12, paused: !onScreen || motion.suspended || reduced || fuel == nil)) { tick in
             CodexFuelFrame(level: (fuel?.remainingPercent ?? 0) / 100,
                            phase: reduced ? 0 : tick.date.timeIntervalSinceReferenceDate,
                            tint: tint, available: fuel != nil)
@@ -701,10 +701,12 @@ private struct CodexFuelFrame: View, Animatable {
                 fill.fill(liquid, with: .color(tint.opacity(0.8)))
             }
             context.stroke(shell, with: .color(tint.opacity(available ? 0.85 : 0.5)), lineWidth: 1)
-            var symbol = context.resolve(Image(systemName: available ? "fuelpump.fill" : "questionmark"))
-            symbol.shading = .color(.white.opacity(0.95))
-            context.draw(symbol,
-                         in: CGRect(x: size.width / 2 - 4.5, y: size.height / 2 - 4.5, width: 9, height: 9))
+        }
+        .overlay {
+            Image(systemName: available ? "fuelpump.fill" : "questionmark")
+                .resizable().scaledToFit()
+                .foregroundStyle(.white.opacity(0.95))
+                .frame(width: 9, height: 9)
         }
     }
 }

@@ -35,8 +35,8 @@ enum CompactLyricsLayout {
         return distance + gap / 2
     }
 
-    static func textX(_ text: String, width: CGFloat, sideWidth: CGFloat, progress: Double) -> CGFloat {
-        let lastWidth = (String(text.trimmingCharacters(in: .whitespacesAndNewlines).last ?? " ") as NSString)
+    static func textX(_ text: String, width: CGFloat, sideWidth: CGFloat, progress: Double, lastCharacterWidth: CGFloat? = nil) -> CGFloat {
+        let lastWidth = lastCharacterWidth ?? (String(text.trimmingCharacters(in: .whitespacesAndNewlines).last ?? " ") as NSString)
             .size(withAttributes: [.font: font]).width
         let end = sideWidth / 2 - width + lastWidth / 2
         return sideWidth + (end - sideWidth) * min(1, max(0, progress))
@@ -70,7 +70,7 @@ struct CompactLyricsView: View {
 
     var body: some View {
         // Keep local day/night selection live even when music is paused.
-        TimelineView(.periodic(from: .now, by: 1)) { clock in
+        TimelineView(.everyMinute) { clock in
         let period: CompactLyrics.TimeOfDay = {
             #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("--preview-sun") { return .day }
@@ -180,7 +180,7 @@ struct PortalLyricsFrame: View, Animatable {
                 // No separate entrance impulse: the last character still ends at the center.
                 let p = min(1, max(0, ((lyricTime ?? elapsed) - cue.start) / max(0.1, cue.end - cue.start)))
                 let motion = reduced ? floor(p * 3) / 3 : p
-                let x = right.minX + CompactLyricsLayout.textX(cue.text, width: width, sideWidth: sideWidth, progress: motion)
+                let x = right.minX + CompactLyricsLayout.textX(cue.text, width: width, sideWidth: sideWidth, progress: motion, lastCharacterWidth: glyph?.lastCharacterWidth)
                 for rect in [right] {
                     var lane = context
                     lane.clip(to: Path(rect))
@@ -209,7 +209,7 @@ struct PortalLyricsFrame: View, Animatable {
             }
             if let outgoing, let asset = outgoingGlyph {
                 let p = min(1, max(0, ((lyricTime ?? elapsed) - outgoing.end) / 0.4))
-                let x = right.minX + CompactLyricsLayout.textX(outgoing.text, width: asset.size.width, sideWidth: sideWidth, progress: 1)
+                let x = right.minX + CompactLyricsLayout.textX(outgoing.text, width: asset.size.width, sideWidth: sideWidth, progress: 1, lastCharacterWidth: asset.lastCharacterWidth)
                 var old = context
                 old.clip(to: Path(right))
                 old.opacity = pow(1 - p, 2) * (1 - dissolve)
@@ -482,10 +482,12 @@ struct PortalLyricsFrame: View, Animatable {
                 layer.fill(dot, with: .color(.white.opacity(0.38 + motion.light)))
             }
         }
-        layer.opacity = visibility * star * pow(1 - dissolve, 2)
-        layer.draw(Text(Image(systemName: "star.fill"))
-            .font(.system(size: 14, weight: .regular)).foregroundColor(Color(white: 0.9)), at: center)
-        celestialDust(at: center, progress: dissolve, visibility: visibility * star, lane: lane, context: context)
+        if star > 0 {
+            layer.opacity = visibility * star * pow(1 - dissolve, 2)
+            layer.draw(Text(Image(systemName: "star.fill"))
+                .font(.system(size: 14, weight: .regular)).foregroundColor(Color(white: 0.9)), at: center)
+            celestialDust(at: center, progress: dissolve, visibility: visibility * star, lane: lane, context: context)
+        }
     }
 
     private func celestialDust(at center: CGPoint, progress: Double, visibility: Double, lane: CGRect, context: GraphicsContext) {
@@ -520,6 +522,7 @@ struct PortalGlyph {
     let text: String
     let size: CGSize
     let points: [Point]
+    let lastCharacterWidth: CGFloat
 
     init(text: String) {
         let measured = (text as NSString).size(withAttributes: [.font: CompactLyricsLayout.font])
@@ -535,6 +538,8 @@ struct PortalGlyph {
     private init(text: String, size: CGSize, draw: (CGRect) -> Void) {
         self.text = text
         self.size = size
+        lastCharacterWidth = (String(text.trimmingCharacters(in: .whitespacesAndNewlines).last ?? " ") as NSString)
+            .size(withAttributes: [.font: CompactLyricsLayout.font]).width
         let width = Int(size.width * 2), height = Int(size.height * 2)
         guard let bitmap = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: width, pixelsHigh: height,
                                             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,

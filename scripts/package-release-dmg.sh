@@ -64,3 +64,21 @@ MOUNT_POINT="$(hdiutil attach -readonly -nobrowse "$DMG_OUTPUT" | awk -F '\t' '$
 require_standard_installer_layout
 codesign --verify --deep --strict "$MOUNT_POINT/$APP_NAME"
 echo "Validated drag-to-Applications DMG: $DMG_OUTPUT"
+
+# New fork builds must ship the signed feed alongside their GitHub Release DMG.
+if /usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$APP_PATH/Contents/Info.plist" >/dev/null 2>&1; then
+  if [ -z "${SPARKLE_BIN:-}" ]; then
+    for CANDIDATE in "$ROOT_DIR"/build/*/SourcePackages/artifacts/sparkle/Sparkle/bin; do
+      if [ -x "$CANDIDATE/generate_appcast" ]; then
+        SPARKLE_BIN="$CANDIDATE"
+        break
+      fi
+    done
+  fi
+  [ -n "${SPARKLE_BIN:-}" ] || die "Set SPARKLE_BIN to Sparkle's bin directory to sign the update feed"
+  VERSION="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP_PATH/Contents/Info.plist")"
+  DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}" \
+    python3 "$ROOT_DIR/scripts/prepare-update.py" "$DMG_OUTPUT" "v$VERSION" "${DMG_OUTPUT}.update" \
+      --sparkle-bin "$SPARKLE_BIN"
+  echo "Upload ${DMG_OUTPUT}.update/appcast.xml with the DMG to the same GitHub Release."
+fi

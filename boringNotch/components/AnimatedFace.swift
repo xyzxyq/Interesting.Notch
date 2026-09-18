@@ -8,6 +8,8 @@ import SwiftUI
 
 struct MinimalFaceFeatures: View {
     @State private var isBlinking = false
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @Environment(\.accessibilityReduceMotion) private var reduced
     @State var height:CGFloat = 20;
     @State var width:CGFloat = 30;
     
@@ -40,23 +42,17 @@ struct MinimalFaceFeatures: View {
             }
         }
         .frame(width: self.width, height: self.height) // Maximum size of face
-        .onAppear {
-            startBlinking()
-        }
-    }
-    
-    func startBlinking() {
-        Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in
-            withAnimation(.spring(duration: 0.2)) {
-                isBlinking = true
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.spring(duration: 0.2)) {
-                    isBlinking = false
-                }
+        .task(id: motion.suspended || reduced) {
+            guard !motion.suspended, !reduced else { isBlinking = false; return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(3)) } catch { return }
+                withAnimation(.spring(duration: 0.2)) { isBlinking = true }
+                do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+                withAnimation(.spring(duration: 0.2)) { isBlinking = false }
             }
         }
     }
+
 }
 
 struct Eye: View {

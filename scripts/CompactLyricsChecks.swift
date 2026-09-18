@@ -258,6 +258,15 @@ extension CompactLyricsChecks {
         let final = LyricSegment(id: 1, start: 25, end: 30, text: "一直唱到最后")
         let glyph = PortalGlyph(text: cue.text)
         assert(!glyph.points.isEmpty && glyph.points.count <= 320)
+        for text in [cue.text, "ending  ", "月亮🌙", ""] {
+            let cached = PortalGlyph(text: text)
+            for progress in [0.0, 0.5, 1.0] {
+                let measured = CompactLyricsLayout.textX(text, width: cached.size.width, sideWidth: 54, progress: progress)
+                let reused = CompactLyricsLayout.textX(text, width: cached.size.width, sideWidth: 54, progress: progress,
+                    lastCharacterWidth: cached.lastCharacterWidth)
+                assert(measured == reused, "Cached glyph width must preserve lyric position")
+            }
+        }
         let coverGlyph = PortalGlyph(image: cover)
         let lastWidth = ("凡" as NSString).size(withAttributes: [.font: CompactLyricsLayout.font]).width
         let endX = CompactLyricsLayout.textX(cue.text, width: glyph.size.width, sideWidth: 54, progress: 1)

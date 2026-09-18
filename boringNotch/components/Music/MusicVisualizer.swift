@@ -10,9 +10,7 @@ import SwiftUI
 
 class AudioSpectrum: NSView {
     private var barLayers: [CAShapeLayer] = []
-    private var barScales: [CGFloat] = []
-    private var isPlaying: Bool = true
-    private var animationTimer: Timer?
+    private var animating = false
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -20,7 +18,6 @@ class AudioSpectrum: NSView {
         setupBars()
     }
     
-    deinit { animationTimer?.invalidate() }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
@@ -51,54 +48,41 @@ class AudioSpectrum: NSView {
                                     yRadius: barWidth / 2)
             barLayer.path = path.cgPath
             barLayers.append(barLayer)
-            barScales.append(0.35)
             layer?.addSublayer(barLayer)
         }
     }
     
     private func startAnimating() {
-        guard animationTimer == nil else { return }
-        animationTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { [weak self] _ in
-            self?.updateBars()
+        guard !animating else { return }
+        animating = true
+        // ponytail: repeat a decorative 3.6s pattern; use sampled audio if a real spectrum is needed.
+        for bar in barLayers {
+            let animation = CAKeyframeAnimation(keyPath: "transform.scale.y")
+            let values = (0..<12).map { _ in CGFloat.random(in: 0.35...1) }
+            animation.values = values + [values[0]]
+            animation.duration = 3.6
+            animation.repeatCount = .infinity
+            animation.calculationMode = .cubic
+            animation.preferredFrameRateRange = CAFrameRateRange(minimum: 24, maximum: 24, preferred: 24)
+            bar.add(animation, forKey: "scaleY")
         }
     }
-    
+
     private func stopAnimating() {
-        animationTimer?.invalidate()
-        animationTimer = nil
+        guard animating else { return }
+        animating = false
         resetBars()
     }
-    
-    private func updateBars() {
-        for (i, barLayer) in barLayers.enumerated() {
-            let currentScale = barScales[i]
-            let targetScale = CGFloat.random(in: 0.35 ... 1.0)
-            barScales[i] = targetScale
-            let animation = CABasicAnimation(keyPath: "transform.scale.y")
-            animation.fromValue = currentScale
-            animation.toValue = targetScale
-            animation.duration = 0.3
-            animation.autoreverses = true
-            animation.fillMode = .forwards
-            animation.isRemovedOnCompletion = false
-            if #available(macOS 13.0, *) {
-                animation.preferredFrameRateRange = CAFrameRateRange(minimum: 24, maximum: 24, preferred: 24)
-            }
-            barLayer.add(animation, forKey: "scaleY")
-        }
-    }
-    
+
     private func resetBars() {
-        for (i, barLayer) in barLayers.enumerated() {
+        for barLayer in barLayers {
             barLayer.removeAllAnimations()
             barLayer.transform = CATransform3DMakeScale(1, 0.35, 1)
-            barScales[i] = 0.35
         }
     }
     
     func setPlaying(_ playing: Bool) {
-        isPlaying = playing
-        if isPlaying {
+        if playing {
             startAnimating()
         } else {
             stopAnimating()
@@ -108,15 +92,21 @@ class AudioSpectrum: NSView {
 
 struct AudioSpectrumView: NSViewRepresentable {
     @Binding var isPlaying: Bool
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @Environment(\.accessibilityReduceMotion) private var reduced
     
     func makeNSView(context: Context) -> AudioSpectrum {
         let spectrum = AudioSpectrum()
-        spectrum.setPlaying(isPlaying)
+        spectrum.setPlaying(isPlaying && !motion.suspended && !reduced)
         return spectrum
     }
     
+    static func dismantleNSView(_ nsView: AudioSpectrum, coordinator: ()) {
+        nsView.setPlaying(false)
+    }
+
     func updateNSView(_ nsView: AudioSpectrum, context: Context) {
-        nsView.setPlaying(isPlaying)
+        nsView.setPlaying(isPlaying && !motion.suspended && !reduced)
     }
 }
 

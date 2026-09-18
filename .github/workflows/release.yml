@@ -22,7 +22,8 @@ jobs:
   # helper job to test for the release command in the comment; env is safe to use here
   check_release:
     name: Check for release command
-    if: ${{ github.event.issue.pull_request }}
+    # The inherited pipeline publishes upstream URLs and Homebrew casks.
+    if: ${{ github.event.issue.pull_request && github.repository == 'TheBoredTeam/boring.notch' }}
     runs-on: ubuntu-latest
     outputs:
       is_release: ${{ steps.check.outputs.is_release }}

@@ -279,9 +279,10 @@ struct MusicEdgeEffect: View, Animatable {
     @Environment(\.accessibilityReduceMotion) private var reduced
     @ObservedObject private var motion = NotchMotionEnvironment.shared
     @State private var onScreen = false
+    @State private var audioConsumer = UUID()
     @State private var phase = MusicEdgePhase()
     private var musicPlaying: Bool { music.isMusicSource && music.isPlaying }
-    private var captureKey: String { "\(style != "off" && reactive && musicPlaying && !reduced && !motion.suspended)-\(music.bundleIdentifier ?? "")" }
+    private var captureKey: String { "\(onScreen && style != "off" && reactive && musicPlaying && !reduced && !motion.suspended)-\(music.bundleIdentifier ?? "")" }
     var body: some View {
         let playback = MusicEdgePlayback(style: style, alwaysOn: alwaysOn, playing: musicPlaying, energy: reactive ? audio.energy : 0)
         let paused = !onScreen || motion.suspended || !playback.visible || reduced
@@ -297,12 +298,16 @@ struct MusicEdgeEffect: View, Animatable {
                 .animation(.easeInOut(duration: 0.8), value: alwaysOn)
         }
         .onAppear { onScreen = true }
-        .onDisappear { onScreen = false; phase.update(target: playback.speed, paused: true, at: .now) }
+        .onDisappear {
+            onScreen = false
+            phase.update(target: playback.speed, paused: true, at: .now)
+            audio.setDemand(audioConsumer, bundleID: nil, active: false)
+        }
         .onChange(of: paused) { _, value in phase.update(target: playback.speed, paused: value, at: .now) }
         .onChange(of: playback.speed) { _, value in phase.update(target: value, paused: paused, at: .now) }
         .padding(-24 - 48 * shape.rocket)
         .allowsHitTesting(false)
-        .task(id: captureKey) { audio.configure(bundleID: music.bundleIdentifier, active: style != "off" && reactive && musicPlaying && !reduced && !motion.suspended) }
+        .task(id: captureKey) { audio.setDemand(audioConsumer, bundleID: music.bundleIdentifier, active: onScreen && style != "off" && reactive && musicPlaying && !reduced && !motion.suspended) }
     }
 }
 

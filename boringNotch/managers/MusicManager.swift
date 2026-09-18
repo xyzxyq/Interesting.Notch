@@ -7,6 +7,7 @@
 import AppKit
 import Combine
 import Defaults
+import ImageIO
 import SwiftUI
 
 let defaultImage: NSImage = .init(
@@ -159,8 +160,8 @@ class MusicManager: ObservableObject {
         if let controller = newController {
             controller.playbackStatePublisher
                 .receive(on: DispatchQueue.main)
-                .sink { [weak self] state in
-                    guard let self = self,
+                .sink { [weak self, weak controller] state in
+                    guard let self = self, let controller,
                           self.activeController === controller else { return }
                     self.updateFromPlaybackState(state)
                 }
@@ -220,7 +221,7 @@ class MusicManager: ObservableObject {
             lyricsStatus = "Lyrics idle"
             return
         }
-        isMusicSource = state.isMusicSource
+        if isMusicSource != state.isMusicSource { isMusicSource = state.isMusicSource }
         // Check for playback state changes (playing/paused)
         if state.isPlaying != self.isPlaying {
             NSLog("Playback state changed: \(state.isPlaying ? "Playing" : "Paused")")
@@ -264,13 +265,11 @@ class MusicManager: ObservableObject {
             }
             self.artworkData = state.artwork
 
-            if artworkChanged || state.artwork == nil || !state.isMusicSource {
-                // Update last artwork change values
-                self.lastArtworkTitle = state.title
-                self.lastArtworkArtist = state.artist
-                self.lastArtworkAlbum = state.album
-                self.lastArtworkBundleIdentifier = state.bundleIdentifier
-            }
+            // Remember metadata even when two tracks share the same artwork.
+            self.lastArtworkTitle = state.title
+            self.lastArtworkArtist = state.artist
+            self.lastArtworkAlbum = state.album
+            self.lastArtworkBundleIdentifier = state.bundleIdentifier
 
             // Only update sneak peek if there's actual content and something changed
             if !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
@@ -331,7 +330,7 @@ class MusicManager: ObservableObject {
             self.volume = state.volume
         }
         
-        self.timestampDate = state.lastUpdated
+        if self.timestampDate != state.lastUpdated { self.timestampDate = state.lastUpdated }
         refreshLyrics()
     }
 
@@ -563,7 +562,15 @@ class MusicManager: ObservableObject {
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
 
-            if let artworkImage = NSImage(data: artworkData) {
+            if let source = CGImageSourceCreateWithData(artworkData as CFData, nil),
+               let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                   kCGImageSourceCreateThumbnailFromImageAlways: true,
+                   kCGImageSourceCreateThumbnailWithTransform: true,
+                   kCGImageSourceThumbnailMaxPixelSize: 512,
+                   kCGImageSourceShouldCacheImmediately: true
+               ] as CFDictionary) {
+                let artworkImage = NSImage(size: NSSize(width: thumbnail.width, height: thumbnail.height))
+                artworkImage.addRepresentation(NSBitmapImageRep(cgImage: thumbnail))
                 DispatchQueue.main.async { [weak self] in
                     guard let self, self.isMusicSource, self.artworkData == artworkData else { return }
                     self.usingAppIconForArtwork = false

@@ -20,6 +20,7 @@ struct EdgeEnergy {
     private var stream: SCStream?
     private var task: Task<Void, Never>?
     private var key: String?
+    private var consumers: [UUID: String] = [:]
     private var meter = EdgeEnergy()
     private var lastSample = Date.distantPast
     private var lastPublished = Date.distantPast
@@ -35,7 +36,14 @@ struct EdgeEnergy {
         }
     }
 
-    func configure(bundleID: String?, active: Bool) {
+    // Each notch window owns its demand; closing one display must not stop another.
+    func setDemand(_ consumer: UUID, bundleID: String?, active: Bool) {
+        consumers[consumer] = active ? bundleID : nil
+        let requested = active ? bundleID : consumers.values.first
+        configure(bundleID: requested, active: requested != nil)
+    }
+
+    private func configure(bundleID: String?, active: Bool) {
         let next = active ? bundleID : nil
         guard next != key else { return }
         key = next
@@ -60,7 +68,8 @@ struct EdgeEnergy {
                 let config = SCStreamConfiguration()
                 config.capturesAudio = true
                 config.excludesCurrentProcessAudio = true
-                config.sampleRate = 48000; config.channelCount = 2
+                // Amplitude envelope only; use full-band stereo if spectral analysis is added.
+                config.sampleRate = 16000; config.channelCount = 1
                 config.width = 2; config.height = 2
                 config.minimumFrameInterval = CMTime(seconds: 1, preferredTimescale: 600)
                 let capture = SCStream(filter: filter, configuration: config, delegate: self)
@@ -74,8 +83,8 @@ struct EdgeEnergy {
                 while !Task.isCancelled {
                     try await Task.sleep(for: .seconds(1))
                     if Date.now.timeIntervalSince(lastSample) > 2 {
-                        energy = 0
-                        status = "暂未收到音频，保持轻柔动效"
+                        if energy != 0 { energy = 0 }
+                        if status != "暂未收到音频，保持轻柔动效" { status = "暂未收到音频，保持轻柔动效" }
                     }
                 }
             } catch {
@@ -102,6 +111,9 @@ struct EdgeEnergy {
               let info = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee,
               info.mFormatID == kAudioFormatLinearPCM, info.mBitsPerChannel == 32,
               info.mFormatFlags & kAudioFormatFlagIsFloat != 0 else { return }
+        // Meter only at the visual cadence, before allocating or walking samples.
+        let now = Date.now
+        guard now.timeIntervalSince(lastPublished) >= NotchMotionEnvironment.decorativeFrameInterval(lowPower: NotchMotionEnvironment.shared.lowPower) else { return }
         var required = 0
         var retained: CMBlockBuffer?
         CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(sampleBuffer, bufferListSizeNeededOut: &required,
@@ -124,13 +136,13 @@ struct EdgeEnergy {
             }
         }
         guard count > 0 else { return }
-        let now = Date.now
         let rms = sqrt(sum / Double(count))
         let level = meter.update(rms: rms, dt: now.timeIntervalSince(lastSample))
         lastSample = now
-        if now.timeIntervalSince(lastPublished) >= 1.0 / 30 {
-            energy = level; lastPublished = now
-            status = rms > 0.0001 ? "正在随播放器音量强弱响应" : "音频静音或不可捕获，保持轻柔动效"
-        }
+        let quantized = (level * 100).rounded() / 100
+        if energy != quantized { energy = quantized }
+        lastPublished = now
+        let nextStatus = rms > 0.0001 ? "正在随播放器音量强弱响应" : "音频静音或不可捕获，保持轻柔动效"
+        if status != nextStatus { status = nextStatus }
     }
 }

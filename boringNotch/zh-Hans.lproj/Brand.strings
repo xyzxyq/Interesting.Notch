@@ -74,3 +74,9 @@
 "The system pointer interface is unavailable." = "当前系统的指针接口不可用。";
 "Paper-plane pointer enabled; app-specific cursors remain controlled by their apps." = "纸飞机指针已开启；部分应用的自定义指针仍由应用控制。";
 "Original pointer restored." = "已恢复原指针。";
+
+"Automatically check for updates" = "自动检查更新";
+
+"Automatically download and install updates" = "自动下载并安装更新";
+
+"Checks GitHub releases daily. Automatic installation finishes when the app quits; you can also restart to update." = "每天检查 GitHub 正式版。自动安装在退出应用时完成，也可以重启以更新。";
