@@ -11,8 +11,8 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-222222?style=flat-square" alt="GPL-3.0"></a>
 </p>
 <p align="center">
-  <a href="https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.9/interesting-notch-3.0.9-arm64.dmg"><strong>下载 3.0.9</strong></a> &nbsp;·&nbsp;
-  <a href="docs/releases/3.0.9.md">更新日志</a> &nbsp;·&nbsp;
+  <a href="https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.10/interesting-notch-3.0.10-arm64.dmg"><strong>下载 3.0.10</strong></a> &nbsp;·&nbsp;
+  <a href="docs/releases/3.0.10.md">更新日志</a> &nbsp;·&nbsp;
   <a href="docs/guide.md">使用指南</a> &nbsp;·&nbsp;
   <a href="https://github.com/xyzxyq/Interesting.Notch/issues">反馈问题</a>
 </p>
@@ -30,7 +30,7 @@
 
 基于 [TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch) 二次开发，由 [xyzxyq](https://github.com/xyzxyq) 维护。**这是独立衍生项目，不是上游或 OpenAI 的官方版本。**
 
-## 3.0.9 · Super Rocket 🚀
+## 3.0.10 · Super Rocket 🚀
 
 这一版围绕流畅度、个性化和减少重复计算展开。
 
@@ -40,7 +40,7 @@
 - **常驻桥接改用 Swift。** 日常运行不依赖 Python；减少无效唤醒，关闭 Codex 功能或屏幕休眠时暂停应用端查询。
 - **复用已经算好的内容。** 缓存歌词绘制、几何系数与固定角度数据，彩虹不增加独立动画定时器。
 
-[完整更新说明](docs/releases/3.0.9.md) · [构建与验证](docs/releases/3.0.9-validation.md)
+[完整更新说明](docs/releases/3.0.10.md) · [构建与验证](docs/releases/3.0.10-validation.md)
 
 ## 看见变化
 
@@ -86,7 +86,7 @@
 
 ## 安装与开始使用
 
-1. 下载 [3.0.9 Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.9/interesting-notch-3.0.9-arm64.dmg)，退出旧版。
+1. 下载 [3.0.10 Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.10/interesting-notch-3.0.10-arm64.dmg)，退出旧版。
 2. 打开 DMG，将 `Interesting Notch.app` 拖到 `Applications`，再从应用程序文件夹打开。
 3. 在 **设置 → 媒体** 选择“自动跟随正在播放的应用”，开启滚动歌词，并选择字体颜色和音乐边缘效果。
 
@@ -98,7 +98,7 @@
 
 ### 开启 Codex 联动
 
-下载可选的 [原生桥接附件](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.9/interesting-notch-3.0.9-codex-bridge.zip)，解压后在该目录执行：
+下载可选的 [原生桥接附件](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.10/interesting-notch-3.0.10-codex-bridge.zip)，解压后在该目录执行：
 
 ```bash
 python3 scripts/codex-notch-bridge-install.py --binary ./codex-notch-bridge

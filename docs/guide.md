@@ -16,7 +16,7 @@
 
 ## Codex 状态桥接
 
-发布附件已包含原生二进制：从 [3.0.9 Release](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.9) 下载桥接 ZIP，解压后运行 `python3 scripts/codex-notch-bridge-install.py --binary ./codex-notch-bridge` 即可安装或迁移旧 Python 桥接；应用内更新不会同步替换独立桥接。下面的默认命令适用于源码构建。
+发布附件已包含原生二进制：从 [3.0.10 Release](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.10) 下载桥接 ZIP，解压后运行 `python3 scripts/codex-notch-bridge-install.py --binary ./codex-notch-bridge` 即可安装或迁移旧 Python 桥接；应用内更新不会同步替换独立桥接。下面的默认命令适用于源码构建。
 
 桥接服务现使用 **Swift 原生可执行文件**，日常运行不依赖 Python。它保持原有本地状态与回答接口，当前 Debug/正式版均可连接。
 
