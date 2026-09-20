@@ -1,6 +1,23 @@
 import AppKit
 import SwiftUI
 
+enum LyricColorStyle: String {
+    case automatic, custom, rainbow
+
+    static let rainbowColors = Gradient(colors: [.pink, .orange, .yellow, .mint, .cyan,
+                                                 Color(red: 0.75, green: 0.65, blue: 1)])
+    private static let rainbowGradient = LinearGradient(gradient: rainbowColors,
+                                                        startPoint: .leading, endPoint: .trailing)
+
+    func foreground(tint: Color, custom: Color) -> AnyShapeStyle {
+        switch self {
+        case .automatic: AnyShapeStyle(tint)
+        case .custom: AnyShapeStyle(custom)
+        case .rainbow: AnyShapeStyle(Self.rainbowGradient)
+        }
+    }
+}
+
 enum CompactLyricsLayout {
     static let font = NSFont.systemFont(ofSize: 13, weight: .medium)
     static let slotWidth: CGFloat = 54
@@ -19,10 +36,20 @@ enum CompactLyricsLayout {
                 sin(elapsed * 1.1) * 0.06 * remaining)
     }
     static func moonBoundary(progress: Double, angle: Double) -> Double {
+        moonBoundary(progress: progress, arc: cos(angle))
+    }
+    static func moonBoundary(progress: Double, arc: Double) -> Double {
         let p = min(1, max(0, progress))
-        let arc = cos(angle)
         // Stylized curved terminator: retain curvature at half progress as well.
         return (2 * p - 1) * arc + 1.4 * p * (1 - p) * arc * arc
+    }
+    static let moonArc = (0...40).map { i -> CGPoint in
+        let angle = -.pi / 2 + Double(i) * .pi / 40
+        return CGPoint(x: cos(angle), y: sin(angle))
+    }
+    static let moonTerminator = (0...40).map { i -> CGPoint in
+        let angle = .pi / 2 - Double(i) * .pi / 40
+        return CGPoint(x: cos(angle), y: sin(angle))
     }
     static func entranceDuration(sideWidth: CGFloat, gap: CGFloat) -> Double {
         // Keep one second per visible side; cross the hidden gap at twice that speed.
@@ -58,6 +85,8 @@ struct CompactLyricsView: View {
     let height: CGFloat
     var lyricOffset: Double = 0
     var hidesArtwork = false
+    var lyricColorStyle: LyricColorStyle = .automatic
+    var lyricColor: Color = .white
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var glyph: PortalGlyph?
     @State private var cover: PortalGlyph?
@@ -83,7 +112,8 @@ struct CompactLyricsView: View {
             let lyricTime = max(0, elapsed + lyricOffset)
             let phase = elapsed >= duration - 0.2 && duration > 0 ? LyricPhase.finished : CompactLyrics.phase(at: min(lyricTime, max(0, duration - 0.201)), cues: segments, duration: duration)
             let text: String = { if case .lyrics(let cue) = phase { return cue.text }; return "" }()
-            let outgoing = segments.last { $0.end <= lyricTime && lyricTime < $0.end + 0.4 }
+            let neighbors = CompactLyrics.neighbors(at: lyricTime, cues: segments)
+            let outgoing = neighbors.outgoing
             PortalLyricsFrame(phase: phase, elapsed: elapsed, duration: duration,
                               sideWidth: sideWidth, gap: gap, tint: tint, reduced: reduceMotion,
                               glyph: glyph?.text == text ? glyph : nil, cover: cover, albumArt: albumArt, lyricTime: lyricTime,
@@ -91,7 +121,8 @@ struct CompactLyricsView: View {
                               entrance: min(1, max(0, elapsed / (reduceMotion ? 2 : CompactLyricsLayout.entranceDuration(sideWidth: sideWidth, gap: gap)))),
                               daylight: period == .day ? 1 : 0, dawn: period == .dawn ? 1 : 0, dusk: period == .dusk ? 1 : 0,
                               weather: shownWeather, previousWeather: previousWeather, weatherBlend: weatherBlend,
-                              weatherPresence: min(1, max(0, ((segments.first { $0.start > lyricTime }?.start ?? (lyricTime + 1)) - lyricTime) / 0.3)))
+                              weatherPresence: min(1, max(0, ((neighbors.nextStart ?? (lyricTime + 1)) - lyricTime) / 0.3)),
+                              lyricColorStyle: lyricColorStyle, lyricColor: lyricColor)
                 .animation(.easeInOut(duration: 1), value: period)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(text)
@@ -145,6 +176,8 @@ struct PortalLyricsFrame: View, Animatable {
     var previousWeather: NotchWeatherSnapshot? = nil
     var weatherBlend: Double = 1
     var weatherPresence: Double = 1
+    var lyricColorStyle: LyricColorStyle = .automatic
+    var lyricColor: Color = .white
     var animatableData: AnimatablePair<AnimatablePair<Double, Double>, AnimatablePair<Double, Double>> {
         get { .init(.init(daylight, dawn), .init(dusk, weatherBlend)) }
         set { daylight = newValue.first.first; dawn = newValue.first.second; dusk = newValue.second.first; weatherBlend = newValue.second.second }
@@ -194,11 +227,13 @@ struct PortalLyricsFrame: View, Animatable {
                     var textContext = lane
                     let appearing = outgoing == nil ? 1 : min(1, max(0.15, ((lyricTime ?? elapsed) - cue.start) / 0.25))
                     textContext.opacity = pow(1 - dissolve, 2) * appearing
-                    textContext.draw(Text(cue.text).font(Font(CompactLyricsLayout.font)).foregroundColor(tint),
-                                     at: CGPoint(x: x, y: size.height / 2), anchor: .leading)
+                    if let text = textContext.resolveSymbol(id: 0) {
+                        textContext.draw(text, at: CGPoint(x: x, y: size.height / 2), anchor: .leading)
+                    }
                     if !reduced, let glyph, dissolve > 0 {
                         dust(glyph, origin: CGPoint(x: x, y: (size.height - glyph.size.height) / 2),
-                             progress: dissolve, tint: tint, context: lane)
+                             progress: dissolve, tint: lyricColorStyle == .custom ? lyricColor : tint,
+                             rainbow: lyricColorStyle == .rainbow, context: lane)
                     }
                 }
             case .outro, .waves:
@@ -213,11 +248,13 @@ struct PortalLyricsFrame: View, Animatable {
                 var old = context
                 old.clip(to: Path(right))
                 old.opacity = pow(1 - p, 2) * (1 - dissolve)
-                old.draw(Text(outgoing.text).font(Font(CompactLyricsLayout.font)).foregroundColor(tint),
-                         at: CGPoint(x: x, y: size.height / 2), anchor: .leading)
+                if let text = old.resolveSymbol(id: 1) {
+                    old.draw(text, at: CGPoint(x: x, y: size.height / 2), anchor: .leading)
+                }
                 if !reduced {
                     dust(asset, origin: CGPoint(x: x, y: (size.height - asset.size.height) / 2),
-                         progress: p, tint: tint, context: old)
+                         progress: p, tint: lyricColorStyle == .custom ? lyricColor : tint,
+                         rainbow: lyricColorStyle == .rainbow, context: old)
                 }
             }
             if !reduced, reveal > 0, reveal < 1 {
@@ -234,6 +271,18 @@ struct PortalLyricsFrame: View, Animatable {
                     let y = size.height * Double(i) / 42 + sin(Double(i) * 2.4) * phase * 4
                     portal.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 0.9, height: 0.9)), with: .color(tint.opacity(1 - phase)))
                 }
+            }
+        } symbols: {
+            // SwiftUI retains the text display lists; the animation only moves them.
+            if case .lyrics(let cue) = phase {
+                Text(cue.text).font(Font(CompactLyricsLayout.font))
+                    .foregroundStyle(lyricColorStyle.foreground(tint: tint, custom: lyricColor))
+                    .fixedSize().tag(0)
+            }
+            if let outgoing {
+                Text(outgoing.text).font(Font(CompactLyricsLayout.font))
+                    .foregroundStyle(lyricColorStyle.foreground(tint: tint, custom: lyricColor))
+                    .fixedSize().tag(1)
             }
         }
     }
@@ -459,15 +508,13 @@ struct PortalLyricsFrame: View, Animatable {
         let disc = Path(ellipseIn: CGRect(x: center.x - radius, y: center.y - radius, width: radius * 2, height: radius * 2))
         layer.fill(disc, with: .color(Color(white: 0.12)))
         var shape = Path()
-        for i in 0...40 {
-            let angle = -.pi / 2 + Double(i) * .pi / 40
-            let point = CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
+        for (i, arc) in CompactLyricsLayout.moonArc.enumerated() {
+            let point = CGPoint(x: center.x + radius * arc.x, y: center.y + radius * arc.y)
             if i == 0 { shape.move(to: point) } else { shape.addLine(to: point) }
         }
-        for i in 0...40 {
-            let angle = .pi / 2 - Double(i) * .pi / 40
-            shape.addLine(to: CGPoint(x: center.x + radius * CompactLyricsLayout.moonBoundary(progress: progress, angle: angle),
-                                     y: center.y + radius * sin(angle)))
+        for arc in CompactLyricsLayout.moonTerminator {
+            shape.addLine(to: CGPoint(x: center.x + radius * CompactLyricsLayout.moonBoundary(progress: progress, arc: arc.x),
+                                     y: center.y + radius * arc.y))
         }
         shape.closeSubpath()
         layer.fill(shape, with: .radialGradient(
@@ -504,14 +551,18 @@ struct PortalLyricsFrame: View, Animatable {
         }
     }
 
-    private func dust(_ asset: PortalGlyph, origin: CGPoint, progress: Double, tint: Color?, context: GraphicsContext) {
+    private func dust(_ asset: PortalGlyph, origin: CGPoint, progress: Double, tint: Color?, rainbow: Bool = false, context: GraphicsContext) {
         var layer = context
         layer.opacity = sin(.pi * progress) * 0.85
+        let rainbowShading: GraphicsContext.Shading? = rainbow ? .linearGradient(
+            LyricColorStyle.rainbowColors, startPoint: origin,
+            endPoint: CGPoint(x: origin.x + asset.size.width, y: origin.y)) : nil
         for (index, point) in asset.points.enumerated() {
             let drift = CGFloat(4 + index % 7) * progress
             let x = origin.x + point.position.x - drift
             let y = origin.y + point.position.y + sin(Double(index) * 2.4) * drift
-            layer.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1)), with: .color(tint ?? point.color))
+            layer.fill(Path(ellipseIn: CGRect(x: x, y: y, width: 1, height: 1)),
+                       with: rainbowShading ?? .color(tint ?? point.color))
         }
     }
 }

@@ -5,11 +5,20 @@ import AppKit
     static func main() throws {
         assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: false) == 1.0 / 24)
         assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: true) == 1.0 / 15)
-        assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: false) == 1.0 / 30)
+        assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: false) == 1.0 / 35)
         assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: true) == 1.0 / 15)
         assert(CodexThrust.frameInterval(lowPower: false) == 1.0 / 24)
         assert(CodexThrust.frameInterval(lowPower: true) == 1.0 / 15)
         assert(MusicEdgeFrame.waterSampleCount == 120)
+        for phase in [-10.0, 0, 0.1, 1.2, 1234, 10_000] {
+            let values = MusicEdgeFrame.waterUndulations(phase: phase)
+            assert(values.count == 120)
+            for i in values.indices {
+                let f = Double(i) / 120
+                let expected = sin(f * .pi * 10 - phase * 3) * 0.65 + sin(f * .pi * 18 + phase * 2) * 0.35
+                assert(abs(values[i] - expected) < 1e-9, "Cached harmonics changed wave phase or amplitude")
+            }
+        }
         for style in ["water", "waterWhite", "waterColor"] {
             let idle = MusicEdgePlayback(style: style, alwaysOn: true, playing: false, energy: 1)
             let playing = MusicEdgePlayback(style: style, alwaysOn: true, playing: true, energy: 0)
@@ -34,10 +43,51 @@ import AppKit
         let displaced = contour.point(0.37, outward: 3)
         assert(hypot(displaced.x - (sample.point.x + sample.normal.x * 3), displaced.y - (sample.point.y + sample.normal.y * 3)) < 0.0001)
         for i in 0..<100 { let p = contour.point(Double(i)/100, outward: 3); assert(p.x.isFinite && p.y.isFinite) }
+        func checkSmooth(_ points: [CGPoint]) {
+            let path = EdgeContour.smoothClosedPath(points)
+            var current = CGPoint.zero
+            var tangents: [(start: CGPoint, end: CGPoint)] = []
+            var start = CGPoint.zero
+            path.forEach { element in
+                switch element {
+                case .move(to: let p): start = p; current = p
+                case .quadCurve(to: let end, control: let control):
+                    tangents.append((CGPoint(x: control.x - current.x, y: control.y - current.y),
+                                     CGPoint(x: end.x - control.x, y: end.y - control.y)))
+                    current = end
+                case .closeSubpath: assert(current == start, "Curve seam must close exactly")
+                default: assertionFailure("Wave must not contain straight corner joins")
+                }
+            }
+            assert(tangents.count == points.count)
+            for i in tangents.indices {
+                let a = tangents[i].end, b = tangents[(i + 1) % tangents.count].start
+                // SwiftUI's materialized path elements introduce subpixel rounding.
+                assert(hypot(a.x - b.x, a.y - b.y) < 0.0001, "Corner tangent is discontinuous")
+            }
+            let bounds = path.boundingRect
+            assert(bounds.minX >= points.map(\.x).min()! - 0.0001 && bounds.maxX <= points.map(\.x).max()! + 0.0001)
+            assert(bounds.minY >= points.map(\.y).min()! - 0.0001 && bounds.maxY <= points.map(\.y).max()! + 0.0001)
+        }
+        assert(EdgeContour.smoothClosedPath([]).isEmpty)
+        checkSmooth([CGPoint(x: 0, y: 0), CGPoint(x: 10, y: 0), CGPoint(x: 10, y: 10), CGPoint(x: 0, y: 10)])
+        for rocket in [0.0, 0.3, 1] { for liquid in [0.0, 16] {
+            let shape = NotchShape(topCornerRadius: 6, bottomCornerRadius: 12, rocket: rocket, liquid: liquid)
+            let path = EdgeContour(path: shape.path(in: CGRect(x: 0, y: 0, width: 300, height: 32)))
+            var cursor = 1
+            let forward = (0...120).map { Double($0) / 120 }
+            checkSmooth((0..<120).map { path.point(Double($0) / 120, outward: 4) })
+            for f in forward + forward.reversed() + [-0.1, 2.3, 0, 1] {
+                let old = path.sample(f), next = path.sample(f, cursor: &cursor)
+                assert(old.point == next.point && old.normal == next.normal, "Ordered contour sampling changed geometry")
+            }
+        } }
         let styles = ["water", "waterWhite", "waterColor", "ripple", "dust", "meteor", "mist"]
-        func render(_ style: String, energy: Double, reduced: Bool = false, phase: Double = 0.7, sky: Bool = true) -> Data {
-            let content = MusicEdgeFrame(shape: shape, style: style, strength: 1, energy: energy, phase: phase, color: .white, reduced: reduced, sky: sky)
-                .frame(width: 352, height: 80)
+        func render(_ style: String, energy: Double, reduced: Bool = false, phase: Double = 0.7, sky: Bool = true,
+                    rocket: Double = 0, width: Double = 352, strength: Double = 1) -> Data {
+            let contourShape = NotchShape(topCornerRadius: 6, bottomCornerRadius: 12, rocket: rocket)
+            let content = MusicEdgeFrame(shape: contourShape, style: style, strength: strength, energy: energy, phase: phase, color: .white, reduced: reduced, sky: sky)
+                .frame(width: width + 96 * rocket, height: 80 + 96 * rocket)
             let renderer = ImageRenderer(content: content); renderer.scale = 2
             return NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!
         }
@@ -54,6 +104,10 @@ import AppKit
         for style in styles {
             assert(!samePixels(render(style, energy: 0), render(style, energy: 1)), "Strong music did not change effect")
             assert(samePixels(render(style, energy: 0, reduced: true), render(style, energy: 1, reduced: true)), "Reduced motion still reacted: \(style)")
+            for (rocket, width, phase, strength) in [(0.0, 220.0, 0.1, 0.4), (0, 600, 1.2, 1.6), (0.4, 352, 0.7, 1), (1, 352, 0.1, 1.6)] {
+                let pixels = NSBitmapImageRep(data: render(style, energy: 1, phase: phase, rocket: rocket, width: width, strength: strength))!
+                assert(pixels.colorAt(x: pixels.pixelsWide / 2, y: pixels.pixelsHigh / 2)!.alphaComponent == 0, "Effect covers contents during resize/rocket transition")
+            }
         }
         let water = NSBitmapImageRep(data: render("water", energy: 1))!
         var darkPixels = 0

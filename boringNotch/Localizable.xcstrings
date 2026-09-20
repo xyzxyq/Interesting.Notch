@@ -1,6 +1,12 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Lyric font color" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "滚动歌词字体颜色"}}}},
+    "Automatic lyric color" : {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Automatic (original color)"}}, "zh-Hans": {"stringUnit": {"state": "translated", "value": "自动（保持原配色）"}}}},
+    "Custom solid color" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "自选单色"}}}},
+    "Rainbow gradient" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "彩虹渐变"}}}},
+    "Custom lyric color" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "选择歌词颜色"}}}},
+    "Lyric color preview" : {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Lyrics · Color preview"}}, "zh-Hans": {"stringUnit": {"state": "translated", "value": "滚动歌词 · 色彩预览"}}}},
     "Lyrics idle" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "歌词未启用或暂无歌曲"}}}},
     "Loading lyrics…" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "正在加载歌词…"}}}},
     "Plain lyrics available" : {"localizations": {"zh-Hans": {"stringUnit": {"state": "translated", "value": "仅有文本歌词"}}}},

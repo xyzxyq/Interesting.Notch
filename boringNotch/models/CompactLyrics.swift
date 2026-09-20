@@ -299,12 +299,28 @@ enum CompactLyrics {
         return result
     }
 
+    // timeline() produces chronological, non-overlapping intervals. Stateless lookup
+    // also handles backward seeks, offsets and replacement lyrics without a stale cursor.
+    static func neighbors(at position: Double, cues: [LyricSegment]) -> (current: LyricSegment?, outgoing: LyricSegment?, nextStart: Double?) {
+        guard position.isFinite else { return (nil, nil, nil) }
+        var low = 0, high = cues.count
+        while low < high {
+            let middle = (low + high) / 2
+            if cues[middle].start <= position { low = middle + 1 } else { high = middle }
+        }
+        let candidate = low > 0 ? cues[low - 1] : nil
+        let current = candidate.flatMap { position < $0.end ? $0 : nil }
+        let previous = current == nil ? candidate : (low > 1 ? cues[low - 2] : nil)
+        let outgoing = previous.flatMap { $0.end <= position && position < $0.end + 0.4 ? $0 : nil }
+        return (current, outgoing, low < cues.count ? cues[low].start : nil)
+    }
+
     static func phase(at position: Double, cues: [LyricSegment], duration: Double) -> LyricPhase {
         guard position.isFinite, duration.isFinite, duration > 0 else { return .waves }
         guard let last = cues.last else { return .waves }
         if position >= max(0, duration - 0.2) { return .finished }
         // Current vocals always take priority over the album-cover ending.
-        if let cue = cues.last(where: { $0.start <= position && position < $0.end }) {
+        if let cue = neighbors(at: position, cues: cues).current {
             return .lyrics(cue)
         }
         if position >= max(last.end, duration - 5) { return .outro }

@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 struct CodexQuestion: Decodable, Equatable {
@@ -83,7 +84,12 @@ struct CodexTaskStability {
 @MainActor final class CodexActivity: ObservableObject {
     static let shared = CodexActivity()
     @Published var enabled = UserDefaults.standard.object(forKey: "codexRocketEnabled") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(enabled, forKey: "codexRocketEnabled"); if !enabled { tasks = []; preview = nil; stability.reset() }; dismissResolvedRequests() }
+        didSet {
+            guard enabled != oldValue else { return }
+            UserDefaults.standard.set(enabled, forKey: "codexRocketEnabled")
+            updatePolling()
+            dismissResolvedRequests()
+        }
     }
     @Published private(set) var tasks: [CodexTask] = [] { didSet { dismissResolvedRequests() } }
     @Published private(set) var completionSequence = 0
@@ -95,6 +101,9 @@ struct CodexTaskStability {
     private var stability = CodexTaskStability()
     private var lastSuccess = Date.distantPast
     private var previewTask: Task<Void, Never>?
+    private var pollTask: Task<Void, Never>?
+    private var motionObservation: AnyCancellable?
+    private var suspended = false
     private var window: NSPanel?
     private var replyToken: String?
     @Published private(set) var submitting = Set<String>()
@@ -195,44 +204,61 @@ struct CodexTaskStability {
         return running ? "Codex 正在运行 · \(effort >= 0 ? CodexThrust.labels[effort] : "思考强度未知")" : "Codex 当前没有运行中的任务"
     }
     private init() {
-        Task { [weak self] in
+        motionObservation = NotchMotionEnvironment.shared.$suspended.removeDuplicates().sink { [weak self] value in
+            guard let self else { return }
+            self.suspended = value
+            self.updatePolling()
+        }
+    }
+    private func updatePolling() {
+        pollTask?.cancel()
+        pollTask = nil
+        guard enabled && !suspended else {
+            previewTask?.cancel(); previewTask = nil
+            tasks = []; preview = nil; stability.reset()
+            connected = false; replyToken = nil
+            fuel = nil; allowances = []; lastSuccess = .distantPast
+            return
+        }
+        pollTask = Task { [weak self] in
             let configuration = URLSessionConfiguration.ephemeral
             configuration.timeoutIntervalForRequest = 2
             configuration.timeoutIntervalForResource = 3
             let session = URLSession(configuration: configuration)
+            defer { session.invalidateAndCancel() }
             while !Task.isCancelled {
-                guard let self else { return }
-                if self.enabled {
-                    do {
-                        let (data, response) = try await session.data(from: URL(string: "http://127.0.0.1:19427/state")!)
-                        guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 256_000 else { throw URLError(.badServerResponse) }
-                        let snapshot = try JSONDecoder().decode(CodexSnapshot.self, from: data)
-                        guard snapshot.connected, snapshot.fresh(at: .now) else { throw URLError(.cannotConnectToHost) }
-                        self.lastSuccess = .now
-                        self.replyToken = snapshot.replyToken
-                        let fuel = snapshot.fuel.flatMap { $0.valid(at: .now) ? $0 : nil }
-                        if self.fuel != fuel { self.fuel = fuel }
-                        let allowances = (snapshot.allowances ?? []).filter { $0.valid(at: .now) }.sorted { $0.windowMinutes < $1.windowMinutes }
-                        if self.allowances != allowances { self.allowances = allowances }
-                        let tasks = snapshot.tasks.filter { UUID(uuidString: $0.id) != nil && ["running", "waiting"].contains($0.state) }
-                        let stable = self.stability.update(tasks, at: .now)
-                        let finished = Self.didFinishWork(previous: self.tasks, current: stable,
-                                                          confirmedIdle: snapshot.idleTaskIds ?? [], continuousConnection: self.connected)
-                        if self.tasks != stable { self.tasks = stable }
-                        if finished && self.enabled && self.preview == nil { self.completionSequence += 1 }
-                        if !self.connected { self.connected = true }
-                    } catch {
-                        if self.connected { self.connected = false }
-                        // Retain the presentation for short transport failures; never indefinitely.
-                        if Date.now.timeIntervalSince(self.lastSuccess) >= 5 {
-                            if self.fuel != nil { self.fuel = nil }
-                            if !self.allowances.isEmpty { self.allowances = [] }
-                            if !self.tasks.isEmpty { self.tasks = [] }
-                            self.stability.reset()
-                        }
+                guard let self, self.enabled, !self.suspended else { return }
+                do {
+                    let (data, response) = try await session.data(from: URL(string: "http://127.0.0.1:19427/state")!)
+                    try Task.checkCancellation()
+                    guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 256_000 else { throw URLError(.badServerResponse) }
+                    let snapshot = try JSONDecoder().decode(CodexSnapshot.self, from: data)
+                    guard snapshot.connected, snapshot.fresh(at: .now) else { throw URLError(.cannotConnectToHost) }
+                    self.lastSuccess = .now
+                    self.replyToken = snapshot.replyToken
+                    let fuel = snapshot.fuel.flatMap { $0.valid(at: .now) ? $0 : nil }
+                    if self.fuel != fuel { self.fuel = fuel }
+                    let allowances = (snapshot.allowances ?? []).filter { $0.valid(at: .now) }.sorted { $0.windowMinutes < $1.windowMinutes }
+                    if self.allowances != allowances { self.allowances = allowances }
+                    let tasks = snapshot.tasks.filter { UUID(uuidString: $0.id) != nil && ["running", "waiting"].contains($0.state) }
+                    let stable = self.stability.update(tasks, at: .now)
+                    let finished = Self.didFinishWork(previous: self.tasks, current: stable,
+                                                      confirmedIdle: snapshot.idleTaskIds ?? [], continuousConnection: self.connected)
+                    if self.tasks != stable { self.tasks = stable }
+                    if finished && self.enabled && self.preview == nil { self.completionSequence += 1 }
+                    if !self.connected { self.connected = true }
+                } catch {
+                    guard !Task.isCancelled else { return }
+                    if self.connected { self.connected = false }
+                    // Retain the presentation for short transport failures; never indefinitely.
+                    if Date.now.timeIntervalSince(self.lastSuccess) >= 5 {
+                        if self.fuel != nil { self.fuel = nil }
+                        if !self.allowances.isEmpty { self.allowances = [] }
+                        if !self.tasks.isEmpty { self.tasks = [] }
+                        self.stability.reset()
                     }
                 }
-                try? await Task.sleep(for: .seconds(1))
+                do { try await Task.sleep(for: .seconds(1)) } catch { return }
             }
         }
     }

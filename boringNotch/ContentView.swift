@@ -42,6 +42,8 @@ struct ContentView: View {
     @Namespace var albumArtNamespace
 
     @Default(.compactLyricsOffset) var compactLyricsOffset
+    @Default(.lyricColorStyle) var lyricColorStyle
+    @Default(.lyricColor) var lyricColor
     @Default(.enableCompactLyrics) var enableCompactLyrics
     @Default(.useMusicVisualizer) var useMusicVisualizer
 
@@ -166,6 +168,8 @@ struct ContentView: View {
                             .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
                             .animation(.smooth, value: gestureProgress)
                     }
+                    .animation(NotchMotionEnvironment.transientAnimation, value: transientHeader)
+                    .animation(NotchMotionEnvironment.transientAnimation, value: coordinator.sneakPeek.show)
                     .contentShape(Rectangle())
                     .onHover { hovering in
                         handleHover(hovering)
@@ -321,6 +325,15 @@ struct ContentView: View {
         }
     }
 
+    private var transientHeader: Int {
+        if vm.notchState == .open { return 3 }
+        if coordinator.expandingView.show && coordinator.expandingView.type == .battery
+            && Defaults[.showPowerStatusNotifications] { return 2 }
+        if coordinator.sneakPeek.show && Defaults[.inlineHUD]
+            && coordinator.sneakPeek.type != .music && coordinator.sneakPeek.type != .battery { return 1 }
+        return 0
+    }
+
     @ViewBuilder
     func NotchLayout() -> some View {
         VStack(alignment: .leading) {
@@ -336,6 +349,7 @@ struct ContentView: View {
                     .padding(.top, 40)
                     Spacer()
                 } else {
+                    TransientHeaderLayout(active: transientHeader) {
                     if coordinator.expandingView.type == .battery && coordinator.expandingView.show
                         && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
                     {
@@ -363,18 +377,26 @@ struct ContentView: View {
                             .frame(width: 76, alignment: .trailing)
                         }
                         .frame(height: vm.effectiveClosedNotchHeight, alignment: .center)
+                        .layoutValue(key: TransientHeaderID.self, value: 2)
+                        .transition(playbackTransition)
                       } else if coordinator.sneakPeek.show && Defaults[.inlineHUD] && (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && vm.notchState == .closed {
                           InlineHUD(type: $coordinator.sneakPeek.type, value: $coordinator.sneakPeek.value, icon: $coordinator.sneakPeek.icon, hoverAnimation: $isHovering, gestureProgress: $gestureProgress)
-                              .transition(.opacity)
+                              .layoutValue(key: TransientHeaderID.self, value: 1)
+                              .transition(playbackTransition)
                       } else if vm.notchState == .closed {
                           closedPlaybackContent
+                              .layoutValue(key: TransientHeaderID.self, value: 0)
+                              .transition(playbackTransition)
                        } else if vm.notchState == .open {
                            BoringHeader()
                                .frame(height: max(24, vm.effectiveClosedNotchHeight))
                                .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
+                               .layoutValue(key: TransientHeaderID.self, value: 3)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
+
+                    }
 
                       if coordinator.sneakPeek.show {
                           if (coordinator.sneakPeek.type != .music) && (coordinator.sneakPeek.type != .battery) && !Defaults[.inlineHUD] && vm.notchState == .closed {
@@ -396,6 +418,7 @@ struct ContentView: View {
                               .padding(.bottom, 10)
                               .padding(.leading, 4)
                               .padding(.trailing, 8)
+                              .transition(playbackTransition)
                           }
                           // Old sneak peek music
                           else if coordinator.sneakPeek.type == .music {
@@ -413,10 +436,8 @@ struct ContentView: View {
                       }
                   }
               }
-              .conditionalModifier((coordinator.sneakPeek.show && (coordinator.sneakPeek.type == .music) && vm.notchState == .closed && !vm.hideOnClosed && Defaults[.sneakPeekStyles] == .standard) || (coordinator.sneakPeek.show && (coordinator.sneakPeek.type != .music) && (vm.notchState == .closed))) { view in
-                  view
-                      .fixedSize()
-              }
+              // Keep the same view identity when a transient HUD appears or disappears.
+              .fixedSize(horizontal: vm.notchState == .closed, vertical: true)
               .zIndex(2)
             if vm.notchState == .open {
                 VStack {
@@ -519,7 +540,9 @@ struct ContentView: View {
                 albumArt: musicManager.albumArt, sideWidth: musicSideWidth,
                 gap: max(0, vm.closedNotchSize.width - cornerRadiusInsets.closed.top + 16),
                 height: max(0, vm.effectiveClosedNotchHeight - 12),
-                lyricOffset: compactLyricsOffset
+                lyricOffset: compactLyricsOffset,
+                lyricColorStyle: LyricColorStyle(rawValue: lyricColorStyle) ?? .automatic,
+                lyricColor: lyricColor
             )
             .frame(height: vm.effectiveClosedNotchHeight)
         } else {
@@ -809,4 +832,23 @@ struct GeneralDropTargetDelegate: DropDelegate {
     return ContentView()
         .environmentObject(vm)
         .frame(width: vm.notchSize.width, height: vm.notchSize.height)
+}
+
+// Size to the incoming header while the outgoing one is still fading out.
+// ZStack's union size would otherwise hold the old width until removal completes.
+private struct TransientHeaderID: LayoutValueKey {
+    static let defaultValue = 0
+}
+
+struct TransientHeaderLayout: Layout {
+    var active: Int
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        subviews.first { $0[TransientHeaderID.self] == active }?.sizeThatFits(proposal) ?? .zero
+    }
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        for subview in subviews {
+            subview.place(at: CGPoint(x: bounds.midX, y: bounds.minY), anchor: .top,
+                          proposal: ProposedViewSize(width: bounds.width, height: bounds.height))
+        }
+    }
 }

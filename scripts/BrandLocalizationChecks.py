@@ -32,6 +32,10 @@ def brand(locale: str, key: str) -> str:
 
 
 def main() -> None:
+    constants = (ROOT / "boringNotch/models/Constants.swift").read_text()
+    settings = (ROOT / "boringNotch/components/Settings/SettingsView.swift").read_text()
+    assert 'static let releaseName = "Super Rocket 🚀"' in constants
+    assert 'Text(Brand.releaseName)' in settings and 'Defaults[.releaseName]' not in settings
     project = (ROOT / "boringNotch.xcodeproj/project.pbxproj").read_text()
     assert 'INFOPLIST_KEY_CFBundleDisplayName = "Interesting Notch";' in project
     assert 'INFOPLIST_KEY_CFBundleDisplayName = "Interesting Notch Preview";' in project

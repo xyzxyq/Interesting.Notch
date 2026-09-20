@@ -1,10 +1,16 @@
 import SwiftUI
 
 struct EdgeContour {
+    private static let curveWeights = (1...20).map { i -> (Double, Double, Double, Double, Double, Double, Double) in
+        let t = Double(i) / 20, u = 1 - t
+        return (u*u, 2*u*t, t*t, u*u*u, 3*u*u*t, 3*u*t*t, t*t*t)
+    }
     private var points: [CGPoint] = []
     private var distances: [Double] = []
     private(set) var length = 0.0
     init(path: Path) {
+        points.reserveCapacity(256)
+        distances.reserveCapacity(256)
         var current = CGPoint.zero
         var first = CGPoint.zero
         func append(_ p: CGPoint) {
@@ -18,17 +24,15 @@ struct EdgeContour {
             case .line(to: let p): append(p)
             case .quadCurve(to: let end, control: let control):
                 let start = current
-                for i in 1...20 {
-                    let t = Double(i) / 20; let u = 1 - t
-                    append(CGPoint(x: u*u*start.x + 2*u*t*control.x + t*t*end.x,
-                                   y: u*u*start.y + 2*u*t*control.y + t*t*end.y))
+                for w in Self.curveWeights {
+                    append(CGPoint(x: w.0*start.x + w.1*control.x + w.2*end.x,
+                                   y: w.0*start.y + w.1*control.y + w.2*end.y))
                 }
             case .curve(to: let end, control1: let a, control2: let b):
                 let start = current
-                for i in 1...20 {
-                    let t = Double(i)/20; let u = 1-t
-                    append(CGPoint(x: u*u*u*start.x + 3*u*u*t*a.x + 3*u*t*t*b.x + t*t*t*end.x,
-                                   y: u*u*u*start.y + 3*u*u*t*a.y + 3*u*t*t*b.y + t*t*t*end.y))
+                for w in Self.curveWeights {
+                    append(CGPoint(x: w.3*start.x + w.4*a.x + w.5*b.x + w.6*end.x,
+                                   y: w.3*start.y + w.4*a.y + w.5*b.y + w.6*end.y))
                 }
             case .closeSubpath: append(first)
             }
@@ -40,9 +44,21 @@ struct EdgeContour {
         let distance = f * length
         var low = 1; var high = distances.count - 1
         while low < high { let mid = (low + high) / 2; if distances[mid] < distance { low = mid + 1 } else { high = mid } }
-        let a = points[low - 1]; let b = points[low]
-        let segment = max(0.0001, distances[low] - distances[low - 1])
-        let t = (distance - distances[low - 1]) / segment
+        return interpolate(distance: distance, index: low)
+    }
+    // Reuse the previous segment for ordered perimeter samples. Also handles wrap/reversal.
+    func sample(_ fraction: Double, cursor: inout Int) -> (point: CGPoint, normal: CGPoint) {
+        guard length > 0, points.count > 1 else { return (.zero, .zero) }
+        let distance = (fraction - floor(fraction)) * length
+        cursor = min(max(1, cursor), distances.count - 1)
+        while cursor > 1 && distances[cursor - 1] >= distance { cursor -= 1 }
+        while cursor < distances.count - 1 && distances[cursor] < distance { cursor += 1 }
+        return interpolate(distance: distance, index: cursor)
+    }
+    private func interpolate(distance: Double, index: Int) -> (point: CGPoint, normal: CGPoint) {
+        let a = points[index - 1]; let b = points[index]
+        let segment = max(0.0001, distances[index] - distances[index - 1])
+        let t = (distance - distances[index - 1]) / segment
         return (CGPoint(x: a.x + (b.x-a.x)*t, y: a.y + (b.y-a.y)*t),
                 CGPoint(x: -(b.y-a.y)/segment, y: (b.x-a.x)/segment))
     }
@@ -50,6 +66,19 @@ struct EdgeContour {
         let sample = sample(fraction)
         return CGPoint(x: sample.point.x + sample.normal.x * outward,
                        y: sample.point.y + sample.normal.y * outward)
+    }
+    // Midpoint quadratics have matching tangents at every join, including the seam.
+    // Controls stay inside the sampled polygon's bounds: no spline overshoot at corners.
+    static func smoothClosedPath(_ points: [CGPoint]) -> Path {
+        guard points.count >= 3, let first = points.first, let last = points.last else { return Path() }
+        var path = Path()
+        path.move(to: CGPoint(x: (last.x + first.x) * 0.5, y: (last.y + first.y) * 0.5))
+        for index in points.indices {
+            let point = points[index], next = points[index + 1 == points.count ? 0 : index + 1]
+            path.addQuadCurve(to: CGPoint(x: (point.x + next.x) * 0.5, y: (point.y + next.y) * 0.5), control: point)
+        }
+        path.closeSubpath()
+        return path
     }
 }
 
@@ -85,6 +114,19 @@ struct MusicEdgePlayback {
 
 struct MusicEdgeFrame: View {
     static let waterSampleCount = 120
+    private static let waterHarmonics = (0..<waterSampleCount).map { i -> (Double, Double, Double, Double) in
+        let f = Double(i) / Double(waterSampleCount)
+        return (sin(f * .pi * 10), cos(f * .pi * 10), sin(f * .pi * 18), cos(f * .pi * 18))
+    }
+    private static let rippleHarmonics = (0..<180).map { i -> (Double, Double) in
+        let angle = Double(i) / 180 * .pi * 12
+        return (sin(angle), cos(angle))
+    }
+    // Angle addition preserves the travelling wave while evaluating trig only once per frame.
+    static func waterUndulations(phase: Double) -> [Double] {
+        let a = (sin(phase * 3), cos(phase * 3)), b = (sin(phase * 2), cos(phase * 2))
+        return waterHarmonics.map { ($0.0 * a.1 - $0.1 * a.0) * 0.65 + ($0.2 * b.1 + $0.3 * b.0) * 0.35 }
+    }
     let shape: NotchShape
     let style: String
     let strength: Double
@@ -111,21 +153,23 @@ struct MusicEdgeFrame: View {
             }
             if isWater {
                 // All water palettes share the same geometry; content stays fixed inside the mask.
+                let undulations = Self.waterUndulations(phase: phase)
+                var points: [CGPoint] = []
+                points.reserveCapacity(Self.waterSampleCount)
                 func surface(distance: Double, amplitude: Double) -> Path {
                     let expanded = EdgeContour(path: shape.path(in: rect.insetBy(dx: -distance, dy: -distance)))
-                    var path = Path()
+                    points.removeAll(keepingCapacity: true)
+                    var cursor = 1
                     for i in 0..<Self.waterSampleCount {
                         let f = Double(i) / Double(Self.waterSampleCount)
-                        let undulation = sin(f * .pi * 10 - phase * 3) * 0.65
-                            + sin(f * .pi * 18 + phase * 2) * 0.35
-                        let sample = expanded.sample(f)
+                        let undulation = undulations[i]
+                        let sample = expanded.sample(f, cursor: &cursor)
                         let taper = min(1, max(0, (sample.point.y - rect.minY) / 12))
                         let point = CGPoint(x: sample.point.x + sample.normal.x * undulation * amplitude * taper,
                                             y: sample.point.y + sample.normal.y * undulation * amplitude * taper)
-                        if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
+                        points.append(point)
                     }
-                    path.closeSubpath()
-                    return path
+                    return EdgeContour.smoothClosedPath(points)
                 }
                 let reach = min(17, (isColorWater ? 14 + e * 4 : 10 + e * 8) * strength)
                 // Three waves travel outwards and disappear before their phase wraps.
@@ -148,16 +192,22 @@ struct MusicEdgeFrame: View {
                 return
             }
             if style == "ripple" {
+                let ripplePhase = (sin(phase * 4), cos(phase * 4))
+                let offsets = Self.rippleHarmonics.map { ($0.0 * ripplePhase.1 + $0.1 * ripplePhase.0) * (0.4 + e * 1.0) }
+                var points: [CGPoint] = []
+                points.reserveCapacity(180)
                 for ring in 0..<3 {
                     let t = (phase * 0.9 + Double(ring) / 3).truncatingRemainder(dividingBy: 1)
                     let expanded = EdgeContour(path: shape.path(in: rect.insetBy(dx: -0.7 - t * (5 + e * 6) * strength, dy: -0.7 - t * (5 + e * 6) * strength)))
-                    var wave = Path()
-                    for i in 0...180 {
+                    points.removeAll(keepingCapacity: true)
+                    var cursor = 1
+                    for i in 0..<180 {
                         let f = Double(i) / 180
-                        let offset = sin(f * .pi * 12 + phase * 4) * (0.4 + e * 1.0) * min(1, max(0, (expanded.point(f).y - rect.minY) / 12))
-                        let p = expanded.point(f == 1 ? 0 : f, outward: offset)
-                        if i == 0 { wave.move(to: p) } else { wave.addLine(to: p) }
+                        let sample = expanded.sample(f, cursor: &cursor)
+                        let offset = offsets[i] * min(1, max(0, (sample.point.y - rect.minY) / 12))
+                        points.append(CGPoint(x: sample.point.x + sample.normal.x * offset, y: sample.point.y + sample.normal.y * offset))
                     }
+                    let wave = EdgeContour.smoothClosedPath(points)
                     context.stroke(wave, with: .color(color.opacity((1-t) * 0.22)), style: StrokeStyle(lineWidth: 4 * strength, lineJoin: .round))
                     context.stroke(wave, with: .color(color.opacity((1-t) * (0.72+e*0.25))), style: StrokeStyle(lineWidth: 1.7 * strength, lineJoin: .round))
                 }

@@ -5,13 +5,10 @@ import IOKit.ps
 import SwiftUI
 
 /// A view model that manages and monitors the battery status of the device
+@MainActor
 class BatteryStatusViewModel: ObservableObject {
 
-    private var wasCharging: Bool = false
-    private var powerSourceChangedCallback: IOPowerSourceCallbackType?
-    private var runLoopSource: Unmanaged<CFRunLoopSource>?
-
-    @ObservedObject var coordinator = BoringViewCoordinator.shared
+    private let coordinator = BoringViewCoordinator.shared
 
     @Published private(set) var levelBattery: Float = 0.0
     @Published private(set) var maxCapacity: Float = 0.0
@@ -40,90 +37,34 @@ class BatteryStatusViewModel: ObservableObject {
         updateBatteryInfo(batteryInfo)
     }
 
-    /// Sets up the monitor to observe battery events
     private func setupMonitor() {
-        managerBatteryId = managerBattery.addObserver { [weak self] event in
-            guard let self = self else { return }
-            self.handleBatteryEvent(event)
+        managerBatteryId = managerBattery.addObserver { [weak self] info in
+            self?.updateBatteryInfo(info, notify: true)
         }
     }
 
-    /// Handles battery events and updates the corresponding properties
-    /// - Parameter event: The battery event to handle
-    private func handleBatteryEvent(_ event: BatteryActivityManager.BatteryEvent) {
-        switch event {
-        case .powerSourceChanged(let isPluggedIn):
-            print("🔌 Power source: \(isPluggedIn ? "Connected" : "Disconnected")")
-            withAnimation {
-                self.isPluggedIn = isPluggedIn
-                self.statusText = isPluggedIn ? "Plugged In" : "Unplugged"
-                self.notifyImportanChangeStatus()
+    private func updateBatteryInfo(_ info: BatteryInfo, notify: Bool = false) {
+        let importantChange = isPluggedIn != info.isPluggedIn || isCharging != info.isCharging
+            || isInLowPowerMode != info.isInLowPowerMode
+        let powerModeChanged = isInLowPowerMode != info.isInLowPowerMode
+        withAnimation(NotchMotionEnvironment.transientAnimation) {
+            if levelBattery != info.currentCapacity { levelBattery = info.currentCapacity }
+            if maxCapacity != info.maxCapacity { maxCapacity = info.maxCapacity }
+            if isPluggedIn != info.isPluggedIn { isPluggedIn = info.isPluggedIn }
+            if isCharging != info.isCharging { isCharging = info.isCharging }
+            if isInLowPowerMode != info.isInLowPowerMode { isInLowPowerMode = info.isInLowPowerMode }
+            if timeToFullCharge != info.timeToFullCharge { timeToFullCharge = info.timeToFullCharge }
+            if importantChange || !notify {
+                statusText = powerModeChanged && notify
+                    ? "Low Power: \(info.isInLowPowerMode ? "On" : "Off")"
+                    : !info.isPluggedIn ? "Unplugged"
+                    : info.isCharging ? "Charging battery"
+                    : info.maxCapacity > 0 && info.currentCapacity >= info.maxCapacity ? "Full charge"
+                    : "Not charging"
             }
-
-        case .batteryLevelChanged(let level):
-            print("🔋 Battery level: \(Int(level))%")
-            withAnimation {
-                self.levelBattery = level
+            if notify && importantChange && Defaults[.showPowerStatusNotifications] {
+                coordinator.toggleExpandingView(status: true, type: .battery)
             }
-
-        case .lowPowerModeChanged(let isEnabled):
-            print("⚡ Low power mode: \(isEnabled ? "Enabled" : "Disabled")")
-            self.notifyImportanChangeStatus()
-            withAnimation {
-                self.isInLowPowerMode = isEnabled
-                self.statusText = "Low Power: \(self.isInLowPowerMode ? "On" : "Off")"
-            }
-
-        case .isChargingChanged(let isCharging):
-            print("🔌 Charging: \(isCharging ? "Yes" : "No")")
-            print("maxCapacity: \(self.maxCapacity)")
-            print("levelBattery: \(self.levelBattery)")
-            self.notifyImportanChangeStatus()
-            withAnimation {
-                self.isCharging = isCharging
-                self.statusText =
-                    isCharging
-                    ? "Charging battery"
-                    : (self.levelBattery < self.maxCapacity ? "Not charging" : "Full charge")
-            }
-
-        case .timeToFullChargeChanged(let time):
-            print("🕒 Time to full charge: \(time) minutes")
-            withAnimation {
-                self.timeToFullCharge = time
-            }
-
-        case .maxCapacityChanged(let capacity):
-            print("🔋 Max capacity: \(capacity)")
-            withAnimation {
-                self.maxCapacity = capacity
-            }
-
-        case .error(let description):
-            print("⚠️ Error: \(description)")
-        }
-    }
-
-    /// Updates the battery information with the given BatteryInfo instance
-    /// - Parameter batteryInfo: The BatteryInfo instance containing the battery data
-    private func updateBatteryInfo(_ batteryInfo: BatteryInfo) {
-        withAnimation {
-            self.levelBattery = batteryInfo.currentCapacity
-            self.isPluggedIn = batteryInfo.isPluggedIn
-            self.isCharging = batteryInfo.isCharging
-            self.isInLowPowerMode = batteryInfo.isInLowPowerMode
-            self.timeToFullCharge = batteryInfo.timeToFullCharge
-            self.maxCapacity = batteryInfo.maxCapacity
-            self.statusText = batteryInfo.isPluggedIn ? "Plugged In" : "Unplugged"
-        }
-    }
-
-    /// Notifies important changes in the battery status with an optional delay
-    /// - Parameter delay: The delay before notifying the change, default is 0.0
-    private func notifyImportanChangeStatus(delay: Double = 0.0) {
-        Task {
-            try? await Task.sleep(for: .seconds(delay))
-            self.coordinator.toggleExpandingView(status: true, type: .battery)
         }
     }
 

@@ -43,6 +43,20 @@ import SwiftUI
         assert(long[0].end == 20, "Long vocal was truncated by character count")
         assert(CompactLyrics.phase(at: 19.9, cues: long, duration: 30) == .lyrics(long[0]))
         assert(CompactLyrics.phase(at: 20, cues: long, duration: 30) == .lyrics(long[1]))
+        // Compare chronological lookup to the original scans, including instrumental
+        // gaps, exact boundaries, reverse seeks, replacement lyrics and empty tracks.
+        let timed = CompactLyrics.timeline((0..<300).map { LyricLine(time: Double($0) * 0.7, text: $0 % 4 == 0 ? "" : "line \($0)") }, duration: 210)
+        for cues in [timed, long, outro, []] {
+            let positions = stride(from: -1.0, through: 211.0, by: 0.013).map { $0 }
+                + cues.flatMap { [$0.start, $0.end, $0.end + 0.4] }
+            for position in positions + positions.reversed() {
+                let found = CompactLyrics.neighbors(at: position, cues: cues)
+                assert(found.current == cues.last { $0.start <= position && position < $0.end })
+                assert(found.outgoing == cues.last { $0.end <= position && position < $0.end + 0.4 })
+                assert(found.nextStart == cues.first { $0.start > position }?.start)
+            }
+        }
+        assert(CompactLyrics.neighbors(at: .nan, cues: long).current == nil)
         var state = PlaybackState(bundleIdentifier: "com.apple.Music")
         state.currentTime = 10; state.lastUpdated = Date(timeIntervalSince1970: 100); state.isPlaying = true
         let pause = state.clockUpdate(elapsed: nil, timestamp: nil, diff: true, playing: false, rate: nil, now: Date(timeIntervalSince1970: 105))
@@ -427,7 +441,73 @@ extension CompactLyricsChecks {
         }
         times.sort()
         print(String(format: "Portal offscreen renderer: median %.3f ms; p95 %.3f ms (not display FPS)", times[60], times[114]))
+        colorChecks(cover)
         runtimeChecks(cover)
+    }
+
+    static func colorChecks(_ cover: NSImage) {
+        let cue = LyricSegment(id: 0, start: 0, end: 5, text: "彩虹歌词 Colorful lyrics")
+        let glyph = PortalGlyph(text: cue.text)
+        let artwork = PortalGlyph(image: cover)
+        let styles: [LyricColorStyle] = [.automatic, .custom, .rainbow]
+        func frame(_ style: LyricColorStyle, time: Double, outgoing: Bool = false) -> some View {
+            PortalLyricsFrame(phase: outgoing ? .waves : .lyrics(cue), elapsed: time, duration: 30,
+                sideWidth: 54, gap: 150, tint: .white, reduced: false, glyph: glyph,
+                cover: artwork, albumArt: cover, outgoing: outgoing ? cue : nil,
+                outgoingGlyph: outgoing ? glyph : nil, lyricColorStyle: style, lyricColor: .green)
+                .frame(width: 258, height: 26)
+        }
+        func pixels(_ image: CGImage, rect: CGRect) -> Data {
+            let bitmap = NSBitmapImageRep(cgImage: image.cropping(to: rect)!)
+            var result = Data()
+            for y in 0..<bitmap.pixelsHigh {
+                result.append(bitmap.bitmapData! + y * bitmap.bytesPerRow, count: bitmap.pixelsWide * 4)
+            }
+            return result
+        }
+        // Both the scrolling line and outgoing text/dust use the selected palette;
+        // artwork, moon and their geometry stay byte-identical.
+        for outgoing in [false, true] {
+            let images = styles.map { style in
+                ImageRenderer(content: frame(style, time: outgoing ? 5.15 : 2.5, outgoing: outgoing)).cgImage!
+            }
+            let left = CGRect(x: 0, y: 0, width: 54, height: 26)
+            let right = CGRect(x: 204, y: 0, width: 54, height: 26)
+            for i in 1..<images.count {
+                assert(pixels(images[0], rect: left) == pixels(images[i], rect: left))
+                assert(pixels(images[0], rect: right) != pixels(images[i], rect: right))
+            }
+            assert(pixels(images[1], rect: right) != pixels(images[2], rect: right))
+        }
+        let preview = VStack(alignment: .leading, spacing: 16) {
+            ForEach(styles, id: \.rawValue) { style in
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(style.rawValue).font(.caption).foregroundStyle(.gray)
+                    Text(cue.text).font(Font(CompactLyricsLayout.font))
+                        .foregroundStyle(style.foreground(tint: .white, custom: .green))
+                    frame(style, time: 2.5)
+                }
+            }
+        }.padding(16).background(.black)
+        let previewRenderer = ImageRenderer(content: preview)
+        previewRenderer.scale = 3
+        let bitmap = NSBitmapImageRep(cgImage: previewRenderer.cgImage!)
+        try! bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/tmp/lyrics-color-preview.png"))
+        for style in styles {
+            var samples: [Double] = []
+            for i in 0..<160 {
+                let elapsed = autoreleasepool {
+                    let start = Date()
+                    let renderer = ImageRenderer(content: frame(style, time: 1 + Double(i) / 160))
+                    renderer.scale = 2
+                    guard renderer.cgImage != nil else { fatalError("Missing lyric color render") }
+                    return Date().timeIntervalSince(start) * 1000
+                }
+                if i >= 40 { samples.append(elapsed) }
+            }
+            samples.sort()
+            print(String(format: "Lyric color %@: median %.3f ms; p95 %.3f ms (offscreen only)", style.rawValue, samples[60], samples[114]))
+        }
     }
 
     static func runtimeChecks(_ cover: NSImage) {

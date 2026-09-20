@@ -1,174 +1,154 @@
-<p align="center"><img src="docs/assets/interesting-botch-icon.png" width="160" alt="Interesting Notch 图标"></p>
-
+<p align="center">
+  <img src="docs/assets/interesting-botch-icon.png" width="112" alt="Interesting Notch 图标">
+</p>
 <h1 align="center">Interesting Notch</h1>
-<p align="center">让 macOS 灵动岛呈现音乐、Codex 任务与日常状态。</p>
+<p align="center"><strong>音乐有色彩，任务有动静。</strong><br>让 macOS 顶部的一小块空间，容纳歌词、任务与日常状态。</p>
 
 <p align="center">
-  <a href="https://github.com/xyzxyq/Interesting.Notch">本项目</a> ·
-  <a href="https://github.com/TheBoredTeam/boring.notch">上游 Boring Notch</a> ·
-  <a href="LICENSE">GPL-3.0</a>
+  <a href="https://github.com/xyzxyq/Interesting.Notch/releases/latest"><img src="https://img.shields.io/github/v/release/xyzxyq/Interesting.Notch?style=flat-square&amp;color=3979F6&amp;label=release" alt="最新版本"></a>
+  <img src="https://img.shields.io/badge/macOS-14%2B-222222?style=flat-square" alt="macOS 14 或更新版本">
+  <img src="https://img.shields.io/badge/Apple_Silicon-arm64-222222?style=flat-square" alt="Apple Silicon arm64">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-GPL--3.0-222222?style=flat-square" alt="GPL-3.0"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.9/interesting-notch-3.0.9-arm64.dmg"><strong>下载 3.0.9</strong></a> &nbsp;·&nbsp;
+  <a href="docs/releases/3.0.9.md">更新日志</a> &nbsp;·&nbsp;
+  <a href="docs/guide.md">使用指南</a> &nbsp;·&nbsp;
+  <a href="https://github.com/xyzxyq/Interesting.Notch/issues">反馈问题</a>
 </p>
 
-## 项目来源
+<p align="center"><img src="docs/assets/codex-completion.gif" width="720" alt="Codex 执行期间灵动岛变为火箭，任务结束后熄火并播放彩带"></p>
+<p align="center"><sub>原生组件演示：任务执行、尾焰熄灭与结束彩带。</sub></p>
 
-**Interesting Notch 是基于 [TheBoredTeam/boring.notch（Boring Notch）](https://github.com/TheBoredTeam/boring.notch) fork 后进行二次开发的独立衍生项目，由 [xyzxyq](https://github.com/xyzxyq) 维护。**
+## 一个灵动岛，几种日常
 
-原项目及其贡献者提供了灵动岛窗口、音乐控制、文件暂存、日历与系统 HUD 等基础能力。本仓库在这些工作的基础上，继续开发 Codex 状态联动、火箭与液态水滴动画、音乐边缘动效、歌词展示以及相关稳定性修复。感谢上游作者和所有贡献者。
+| 听音乐 | 看任务 | 处理日常 |
+| :--- | :--- | :--- |
+| 逐句滚动歌词、封面与昼夜日月装饰 | Codex 运行化作火箭，待回答问题化作水滴 | 音量、亮度、充电状态自然接入当前布局 |
+| 自选歌词颜色，或使用彩虹渐变 | 展开查看问题、选项、模型与剩余额度 | 保留上游音乐控制、文件暂存与日历能力 |
+| 黑、白、彩色水波，以及涟漪、星尘、流星、光雾 | 所有运行任务结束后，尾焰熄灭并播放彩带 | 可选纸飞机指针，提供大小调节与恢复入口 |
 
-本项目不是 TheBoredTeam 的官方版本，也不是 OpenAI 的官方产品。此 README 描述本 fork；上游的安装包、Homebrew 配方、社区与构建状态不代表本版本。
+基于 [TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch) 二次开发，由 [xyzxyq](https://github.com/xyzxyq) 维护。**这是独立衍生项目，不是上游或 OpenAI 的官方版本。**
 
-## 下载与安装
+## 3.0.9 · Super Rocket 🚀
 
-当前版本：**3.0.8（build 308）** · [更新说明](docs/releases/3.0.8.md) · [Release 页面](https://github.com/xyzxyq/Interesting.Notch/releases/tag/v3.0.8)
+这一版围绕流畅度、个性化和减少重复计算展开。
 
-1. 下载 [Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.8/interesting-notch-3.0.8-arm64.dmg)。
-2. 退出旧版，打开 DMG，将 `Interesting Notch.app` 拖到 `Applications` 图标；应用会复制到系统 `/Applications` 文件夹。
-3. 在设置 → 媒体中选择“自动跟随正在播放的应用”，开启“右侧滚动歌词”。
+- **歌词有了新配色。** 自动原配色、自选单色、彩虹渐变，支持设置预览与自动保存；正常模式 35 FPS，低电量模式 15 FPS。
+- **水波拐角更圆滑。** 黑、白、彩色水波及涟漪使用连续曲线路径，保留原有颜色与强弱响应。
+- **状态过渡更连贯。** 音量、亮度及充电提示与当前灵动岛布局一起变化，减少突兀切换。
+- **常驻桥接改用 Swift。** 日常运行不依赖 Python；减少无效唤醒，关闭 Codex 功能或屏幕休眠时暂停应用端查询。
+- **复用已经算好的内容。** 缓存歌词绘制、几何系数与固定角度数据，彩虹不增加独立动画定时器。
 
-安装包仅支持 Apple Silicon（M 系列芯片），最低部署目标 macOS 14，未提供 Intel 包。DMG 仅展示应用和 `Applications` 拖拽目标；Release 同时提供 `SHA256SUMS.txt` 与可选的 `interesting-notch-3.0.8-codex-bridge.zip` 附件。
+[完整更新说明](docs/releases/3.0.9.md) · [构建与验证](docs/releases/3.0.9-validation.md)
 
-**本安装包使用本地开发证书签名，尚未经过 Apple Developer ID 公证。** 首次打开可能被 macOS 阻止，请在核对来源后使用系统提供的“仍要打开”入口。内部标识暂沿用上游，不建议与上游原版同时运行；测试版使用独立的 Preview 标识。
+## 看见变化
 
-## 本版本的主要改动
+<table>
+<tr>
+<td width="50%" valign="top">
+<h3>水波与流星</h3>
+<img src="docs/assets/music-edge.gif" width="420" alt="彩色水波与流星围绕灵动岛运动">
+<p>音乐边缘提供七种风格。水波的拐角更平滑，仍保留各圈颜色和传播节奏。</p>
+</td>
+<td width="50%" valign="top">
+<h3>提醒落成水滴</h3>
+<img src="docs/assets/codex-droplet.gif" width="420" alt="新的交互提醒下落并与已有水滴融合">
+<p>多个待回答请求合并呈现；展开后选择选项或输入回复，收到确认后提醒消散。</p>
+</td>
+</tr>
+</table>
 
-| 功能 | 表现 |
-| --- | --- |
-| 任务结束彩带 | 桥接确认所有运行任务结束后，尾焰熄灭，再播放 1.5 秒的分层彩带与彩纸；等待输入、断线或状态丢失不会当作完成。 |
-| Codex 火箭状态 | 执行任务时将灵动岛呈现为火箭，尾焰与速度效果随思考强度变化。 |
-| 交互提醒水滴 | 等待用户交互时显示水滴；展开后可直接选择异步问题的选项，或输入文字并回车回复。收到 Codex 确认后对应提醒粒子消散；支持逐项删除、收起和清空本地提醒，长选项完整换行。 |
-| 额度与模型信息 | 以燃油表现剩余额度；展开栏显示额度、模型名称及思考强度。Plus 优先展示 5 小时额度，Pro 及以上优先展示周额度。 |
-| 音乐与歌词 | 支持 Apple Music 与网易云的紧凑歌词，提供多源获取、本地缓存、候选预览和 LRC 导入；播放、暂停及退出播放器时衔接音乐布局。 |
-| 权限与稳定性 | HUD 使用主程序的辅助功能权限；音频响应在后台先检查权限，并提供显式授权与重连入口。 |
+### 给歌词一点颜色
 
-Codex 信息由本机桥接脚本读取，包括待回答问题的题目和选项；回答通过受令牌保护的本机接口送回原任务。提交失败会保留提醒。收起保留未回答问题，清空只隐藏本地提醒，不代替回答或取消任务。需要完整核对的批准类请求仍在 Codex 中处理。客户端私有接口变化可能影响兼容性。
+<p align="center"><img src="docs/assets/lyrics-colors.png" width="580" alt="自动白色、自选绿色和彩虹渐变歌词，以及它们在紧凑灵动岛中的显示效果"></p>
 
-## 效果展示
+在 **设置 → 媒体 → 滚动歌词字体颜色** 中选择。渐变附着在文字上，随歌词一起滚动；当前句、退场文字和歌词粒子共用所选配色，封面及日月装饰保持原样。
 
-以下 GIF 由项目原生 SwiftUI／Canvas 组件逐帧生成，可在 GitHub README 中循环播放；使用演示状态和时间采样，**不是桌面录屏，也不证明真实任务、音乐或跨应用指针联动**。实际效果随设置、屏幕与“减少动态效果”选项变化。
+<details>
+<summary><strong>更多细节：火箭、燃油与纸飞机</strong></summary>
 
-### 任务结束：熄火 → 彩带
+<p><img src="docs/assets/codex-rocket-states.png" width="760" alt="普通刘海、火箭过渡与不同思考强度的形态"></p>
 
-<img src="docs/assets/codex-completion.gif" width="640" alt="火箭出现，尾焰熄灭后喷出持续 1.5 秒的彩纸与长飘带，再收回普通刘海">
+思考强度影响尾焰与速度效果；仍有任务运行时，火箭与提醒水滴可同时显示。
 
-彩带阶段为 1.5 秒，包含长飘带、翻转彩纸与细小闪光。当前桥接确认的是运行回到空闲，不能区分成功、失败或取消；多个任务并行时，全部运行任务结束才触发。设置中只保留 Codex 模式开关与状态，已移除火箭／水滴预览按钮。
+<p><img src="docs/assets/codex-fuel-levels.png" width="560" alt="不同 Codex 剩余额度下的燃油图标"></p>
 
-### 液态水滴：下落与融合
+燃油表示剩余额度，不是 token 输出速度。Plus 优先展示 5 小时额度，Pro 及以上优先展示周额度。
 
-<img src="docs/assets/codex-droplet.gif" width="640" alt="液态提醒水滴从刘海分离下落，新提醒落入后融合变大">
+<p><img src="docs/assets/paper-plane.gif" width="560" alt="黑色折纸指针及大小调节预览"></p>
 
-### 音乐边缘：彩色水波与流星
+纸飞机是默认关闭的实验性选项：替换普通箭头，大小可在 75%–175% 之间调整。依赖私有系统接口，兼容范围及恢复方式见[使用指南](docs/guide.md#纸飞机指针实验性)。
 
-<img src="docs/assets/music-edge.gif" width="640" alt="彩色水波和流星边缘随演示时间与模拟音频能量运动">
+</details>
 
-这里使用模拟能量展示绘制效果；真实播放时可选择音乐边缘风格，并搭配右侧滚动歌词、左侧封面及昼夜太阳／月球装饰。歌词来源和播放器兼容性见下文。
+<sub>以上图片由项目原生 SwiftUI / Canvas 组件生成，使用演示状态及模拟音乐能量，并非桌面录屏。它们展示绘制效果，不作为真实任务、音频响应或跨应用兼容性的验证依据。GIF 可通过 <code>./scripts/render-readme-demos.sh</code> 重建。</sub>
 
-### 纸飞机：折面与尺寸
+## 安装与开始使用
 
-<img src="docs/assets/paper-plane.gif" width="640" alt="黑色折纸指针外观在 75% 到 175% 范围内变化">
+1. 下载 [3.0.9 Apple Silicon 安装包](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.9/interesting-notch-3.0.9-arm64.dmg)，退出旧版。
+2. 打开 DMG，将 `Interesting Notch.app` 拖到 `Applications`，再从应用程序文件夹打开。
+3. 在 **设置 → 媒体** 选择“自动跟随正在播放的应用”，开启滚动歌词，并选择字体颜色和音乐边缘效果。
 
-此图展示指针图像与缩放，不修改系统指针；实际功能为默认关闭的实验性选项，详见下文限制。
+**系统要求：Apple Silicon（M 系列）· macOS 14 或更新版本。** 当前没有 Intel 安装包。
 
-演示可通过 `./scripts/render-readme-demos.sh` 从源码重新生成。下面保留静态状态图供对照。
+> **关于签名**：安装包使用本地开发证书签名，尚未经过 Apple Developer ID 公证。首次打开可能被 macOS 阻止；请核对下载来源，再使用系统提供的“仍要打开”入口。Release 提供 `SHA256SUMS.txt` 供校验。
 
-### 火箭与交互提醒
+3.0.7 及以后的版本可在设置中检查更新；自动下载安装由用户选择，默认关闭。3.0.6 及更早版本需要手动升级一次。内部标识仍沿用上游，不建议与上游原版同时运行；Debug 使用独立的 Preview 标识。
 
-普通刘海随 Codex 执行状态过渡为黑色火箭；“高”及以上增加速度参照线，Ultra 使用更大的尾焰。待处理请求显示为可点击的灯泡水滴；仍有任务运行时，火箭与水滴同时显示。
+### 开启 Codex 联动
 
-<p align="center"><img src="docs/assets/codex-rocket-states.png" width="800" alt="普通刘海、火箭过渡、高强度及 Ultra 火箭，以及灯泡水滴的形态预览"></p>
-
-### 多个提醒合并
-
-新水滴落下后与原水滴融合，合并后的水滴增大。点击水滴可查看多个待处理提示；处理完毕后，面板自动关闭，水滴回到灵动岛。
-
-<p align="center"><img src="docs/assets/codex-droplet-merge.png" width="800" alt="从零秒到零点八五秒，新水滴落下并融入已有水滴，最终体积增大的五帧过程"></p>
-
-### 额度变成燃油
-
-燃油图标表示剩余 Codex 额度，接近耗尽时改变颜色。播放音乐和不播放音乐时均可显示；它表示额度，不是实际 token 输出速率。
-
-<p align="center"><img src="docs/assets/codex-fuel-levels.png" width="600" alt="不同剩余额度及暂无额度数据时的燃油图标预览"></p>
-
-## 纸飞机指针（实验性）
-
-在设置 → 外观 → 鼠标指针中开启“纸飞机指针”。普通箭头会换成黑色折纸轮廓，三个尖角采用圆滑过渡，搭配深色立体折面、细描边和机尖点击位置；大小滑块可在 75%–175% 之间调整；不修改文本光标、缩放指针或拖拽标记。功能默认关闭，无鼠标跟踪定时器，不需要新增权限。
-
-关闭功能、正常退出、锁屏及休眠时恢复原箭头。异常退出后，恢复记录保留在应用的 Application Support/InterestingNotch/Pointer/originals.plist；下次启动会先恢复，再按开关状态应用。恢复失败时设置中会显示错误和重试按钮。恢复只覆盖仍属于本功能的图像，以避免覆盖其他指针主题工具后续的更改。
-
-如果开启后只有 Dock 显示纸飞机，请检查系统设置 → 辅助功能 → 显示 → 指针中的自定义颜色。自定义颜色会绕过普通应用的箭头主题；新版在开启前检测此冲突，并提供前往系统设置的按钮。还原颜色会把系统指针改回黑色填充、白色描边；应用不会自动修改该系统设置。
-
-此功能使用动态加载的私有 WindowServer 指针接口，受 macOS 版本和应用自定义指针影响，不保证所有应用都使用该主题。macOS 26 的 Arrow 与 ArrowS 必须成组写入后统一校验；仅检查接口返回成功不足以证明生效。构建和独立校验命令见 [实现与验证记录](docs/superpowers/plans/2026-09-12-paper-plane-pointer.md)。
-
-## 源码构建
-
-工程的最低部署目标为 **macOS 14**。源码构建沿用上游的工具要求：**macOS 15.6 或更新版本、Xcode 26 或更新版本**。不同系统版本的音频捕获和媒体能力可能存在差异。
-
-1. 克隆本 fork：
-   ```bash
-   git clone https://github.com/xyzxyq/Interesting.Notch.git
-   cd Interesting.Notch
-   ```
-2. 打开工程，等待 Swift Package Manager 解析依赖：
-   ```bash
-   open boringNotch.xcodeproj
-   ```
-3. 在 Xcode 选择 `boringNotch` scheme，配置自己的签名身份后按 `⌘R` 构建运行。
-
-`Interesting Notch` 是当前项目展示名称。工程名、内部标识与部分开发构建名称暂时保留 `boringNotch` / `Interesting Notch Preview`，以避免重命名影响已有设置和授权。项目图标采用蓝白笑脸与顶部黑色刘海的设计。
-
-如需查找本 fork 的发布包，请查看[本仓库 Releases](https://github.com/xyzxyq/Interesting.Notch/releases)，并核对对应提交及说明；不要使用上游下载链接来获取本 fork 的新增功能。
-
-### 歌词获取与纠错
-
-音乐来源选择“自动跟随正在播放的应用”（原 Now Playing），同步歌词不再限定 Apple Music；网易云音乐及其他提供 macOS Now Playing 信息的播放器共用这条歌词链路。播放器负责提供歌名、歌手、时长和播放进度，歌词仍来自本地缓存、LRCLIB／网易云或手动导入，并非直接提取播放器内显示的歌词。网易云音乐 3.1.9 已在本机验证。QQ 音乐、酷狗的专项适配与实机验证暂缓；不发布完整播放信息的客户端版本不能通过这条接口同步。
-
-开启“媒体 → 右侧滚动歌词”后，优先读取本机保存的歌词；没有有效缓存时并行请求 LRCLIB 和网易云，收集通过歌曲版本和正文文字校验的结果，优先匹配专辑，再按固定来源顺序选择并保存（等待上限 12 秒）。一个来源失败不会阻断另一个来源。
-
-自动匹配失败或歌词版本不正确时，打开“选择或导入歌词…”：可以修改歌曲与歌手关键词、预览候选并点击“使用并记住”，也可以导入 UTF-8 编码、带时间戳且小于 2 MB 的 LRC 文件。切歌后旧窗口的结果不能应用到新歌。“重新获取歌词”会跳过缓存重新自动匹配，成功后更新保存的结果。
-
-缓存位于 `~/Library/Application Support/InterestingNotch/Lyrics`，按播放器、歌名、歌手、专辑和时长区分；手动选定的版本在后续播放中优先复用。外部歌词服务可能缺少记录或发生接口变化，目前仍为逐句同步，未引入逐字歌词格式。
-
-中文标题及歌手信息的歌曲，自动匹配还要求存在足够的汉字歌词正文，署名行不计入；不能确认正文的拼音、译文或其他版本需手动选择。此规则是保守的文字校验，不是完整语言识别。中文名称的外语歌曲也可能需要手动选择，已手动保存的版本保持不变。旧规则的自动缓存会重新获取；显示语言仅控制中文简繁，不自动翻译原歌词。
-
-### Codex 状态桥接
-
-安装本机桥接需要 Python 3，以及可访问的本机 Codex 客户端环境。在仓库根目录执行：
+下载可选的 [原生桥接附件](https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.9/interesting-notch-3.0.9-codex-bridge.zip)，解压后在该目录执行：
 
 ```bash
-python3 scripts/codex-notch-bridge-install.py
+python3 scripts/codex-notch-bridge-install.py --binary ./codex-notch-bridge
 ```
 
-安装脚本会为当前用户注册 LaunchAgent，使桥接独立于终端运行。移除自动启动：
+Python 3 只用于这一步安装；附件已包含 arm64 Swift 可执行文件，无需自行编译。安装成功后，在应用的媒体设置中开启 Codex 模式。桥接通过当前用户的 LaunchAgent 自动运行，安装前校验签名并试运行，启动失败会恢复旧配置。**已安装旧 Python 桥接的用户也需执行此步骤，才能迁移至原生版；应用内更新不会替你更新桥接。**
+
+桥接读取本机 Codex 任务状态、待回答问题与额度，通过带令牌保护的回环接口发送回答；需要完整核对的批准类请求仍在 Codex 中处理。清空提醒只隐藏本地提示，不会回答问题或取消任务。客户端私有接口变化可能影响兼容性。
+
+### 播放器与权限
+
+| 项目 | 支持范围 / 用途 |
+| :--- | :--- |
+| Apple Music、网易云音乐 | 使用系统播放信息同步歌词；网易云 3.1.9 曾在本机验证 |
+| 其他播放器 | 需提供歌名、歌手、时长和播放进度；QQ 音乐、酷狗尚未专项验证 |
+| 歌词来源 | 本地缓存、LRCLIB、网易云及手动 LRC 导入；逐句同步，不是逐字歌词 |
+| 辅助功能 | 替换系统音量、亮度等 HUD；按需授权 |
+| 录屏与系统录音、日历等 | 音频响应及对应功能按需申请；不授权音频捕获仍可使用普通动效 |
+
+自动匹配不准确时，使用 **“选择或导入歌词…”** 预览候选或导入 LRC，选定后会记住。详细匹配规则、缓存位置、权限处理与指针恢复方法见[使用指南](docs/guide.md)。
+
+## 从源码构建
+
+开发工具要求：**macOS 15.6+、Xcode 26+**；应用部署目标为 macOS 14。
 
 ```bash
-python3 scripts/codex-notch-bridge-install.py --uninstall
+git clone https://github.com/xyzxyq/Interesting.Notch.git
+cd Interesting.Notch
+open boringNotch.xcodeproj
 ```
 
-## 权限说明
+等待 Swift Package Manager 解析依赖，选择 `boringNotch` scheme，配置自己的签名身份，按 `⌘R` 运行。工程名和部分内部标识保留上游名称，以保持设置与授权兼容。
 
-| 功能 | 所需权限 |
-| --- | --- |
-| 替换音量、亮度等系统 HUD | 辅助功能 |
-| 音乐动效跟随音频强弱 | 录屏与系统录音；不授权时仍可使用普通动效 |
-| 日历、提醒事项等功能 | 按所用功能分别授权 |
+<details>
+<summary><strong>开发与性能资料</strong></summary>
 
-请为实际运行的应用授权。开发版更换签名身份后，系统中已有的开关可能仍对应旧版本；如果开关已开但 HUD 仍提示授权，可在辅助功能列表中移除旧条目，再添加当前应用并重新授权。
+- [原生桥接：方案、接口与验证](docs/native-codex-bridge.md)
+- [HUD 与文字绘制优化](docs/performance-2026-09-20.md)
+- [几何、歌词定位与后台查询优化](docs/performance-round2-2026-09-20.md)
+- [水波拐角与离屏渲染对照](docs/water-corner-smoothing-2026-09-20.md)
+- [签名更新通道与发布流程](docs/automatic-updates.md)
 
-持续开发时应保持签名身份与安装路径稳定。本仓库提供 [本机开发签名脚本](scripts/sign-development.py)，用于复用本地私有签名身份；它不会自动授予系统权限或安装证书信任，也不等同于 Apple Developer ID 公证发布。首次使用须自行配置对应的代码签名信任，签名私钥和钥匙串密码不得上传到仓库。
+性能记录区分现场观察、独立计算基准和离屏绘制；它们不能直接推导整机 CPU 降幅或续航提升。未测量整机功耗。常驻桥接迁移为 Swift，构建、安装和测试工具继续使用 Python。
 
-## 贡献与问题反馈
+</details>
 
-本 fork 的问题请提交到[本仓库 Issues](https://github.com/xyzxyq/Interesting.Notch/issues)，附上 macOS 版本、构建提交、复现步骤及相关日志。提交代码前可阅读 [CONTRIBUTING.md](CONTRIBUTING.md)；其中沿用的上游流程请结合本 fork 的实际情况使用。
+## 贡献与致谢
 
-## 许可与致谢
+问题请提交至[本仓库 Issues](https://github.com/xyzxyq/Interesting.Notch/issues)，附上 macOS 版本、应用版本和复现步骤；贡献说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。本 fork 的安装包与更新通道独立于上游。
 
-歌词的本地缓存、多源获取与手动纠错流程参考 [LyricsX](https://github.com/ddddxxx/LyricsX)。网易云适配参考其 LyricsKit 组件，相关来源、修改及 MPL-2.0 许可证说明见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+感谢 [Boring Notch](https://github.com/TheBoredTeam/boring.notch) 及其贡献者提供窗口、音乐控制、文件暂存、日历与 HUD 基础；感谢 [LyricsX / LyricsKit](https://github.com/ddddxxx/LyricsX)、[MediaRemoteAdapter](https://github.com/ungive/mediaremote-adapter) 与 [NotchDrop](https://github.com/Lakr233/NotchDrop) 的开源工作。上游原始图标由 [@maxtron95](https://github.com/maxtron95) 设计，网站由 [@himanshhhhuv](https://github.com/himanshhhhuv) 设计；本 fork 使用另行制作的蓝白笑脸图标。
 
-本项目保留上游的 **GNU GPL v3** 许可证，完整文本见 [LICENSE](LICENSE)。原项目与第三方代码的版权和归属声明予以保留，第三方许可见 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES)。
-
-- [TheBoredTeam/boring.notch](https://github.com/TheBoredTeam/boring.notch)：本项目的上游基础。
-- [MediaRemoteAdapter](https://github.com/ungive/mediaremote-adapter)：媒体播放信息适配。
-- [NotchDrop](https://github.com/Lakr233/NotchDrop)：上游文件暂存功能的早期基础。
-- [@maxtron95](https://github.com/maxtron95)：上游原始图标设计。本 fork 当前使用另行制作的蓝白笑脸图标。
-- [@himanshhhhuv](https://github.com/himanshhhhuv)：上游网站设计。
-
-纸飞机指针支持 75%–175% 大小调节：拖动时预览，松手后应用并保存；点击“默认”恢复 100%。尺寸与点击热点同步缩放，不修改 macOS 的系统指针大小设置。
+本项目采用 **[GNU GPL v3](LICENSE)**，保留上游及第三方版权声明。歌词相关参考与 MPL-2.0 声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)，其他依赖许可见 [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES)。

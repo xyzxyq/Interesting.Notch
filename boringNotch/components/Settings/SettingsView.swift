@@ -606,6 +606,8 @@ struct Media: View {
 
     @Default(.enableCompactLyrics) var compactLyricsEnabled
     @Default(.compactLyricsOffset) var compactLyricsOffset
+    @Default(.lyricColorStyle) var lyricColorStyle
+    @Default(.lyricColor) var lyricColor
     @Default(.enableLyrics) var enableLyrics
 
     var body: some View {
@@ -664,6 +666,21 @@ struct Media: View {
                 }
                 .accessibilityLabel(Text("Scrolling lyrics"))
                 .accessibilityHint(Text("Scrolling lyrics on the right, artwork and a daytime sun or nighttime moon on the left. Chinese script follows your system language."))
+                Picker("Lyric font color", selection: $lyricColorStyle) {
+                    Text("Automatic lyric color").tag("automatic")
+                    Text("Custom solid color").tag("custom")
+                    Text("Rainbow gradient").tag("rainbow")
+                }
+                if lyricColorStyle == "custom" {
+                    ColorPicker("Custom lyric color", selection: $lyricColor, supportsOpacity: false)
+                }
+                Text("Lyric color preview")
+                    .font(Font(CompactLyricsLayout.font))
+                    .foregroundStyle((LyricColorStyle(rawValue: lyricColorStyle) ?? .automatic)
+                        .foreground(tint: .white, custom: lyricColor))
+                    .padding(8)
+                    .frame(maxWidth: .infinity)
+                    .background(.black, in: RoundedRectangle(cornerRadius: 8))
                 HStack {
                     Text(LocalizedStringKey(musicManager.lyricsStatus))
                         .font(.caption).foregroundStyle(.secondary)
@@ -887,7 +904,7 @@ struct About: View {
                     HStack {
                         Text("Release name")
                         Spacer()
-                        Text(Defaults[.releaseName])
+                        Text(Brand.releaseName)
                             .foregroundStyle(.secondary)
                     }
                     HStack {

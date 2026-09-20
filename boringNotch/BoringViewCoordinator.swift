@@ -220,13 +220,8 @@ class BoringViewCoordinator: ObservableObject {
                 return
             }
         }
-        Task { @MainActor in
-            withAnimation(.smooth) {
-                self.sneakPeek.show = status
-                self.sneakPeek.type = type
-                self.sneakPeek.value = value
-                self.sneakPeek.icon = icon
-            }
+        withAnimation(NotchMotionEnvironment.transientAnimation) {
+            sneakPeek = .init(show: status, type: type, value: value, icon: icon)
         }
 
         if type == .mic {
@@ -244,12 +239,11 @@ class BoringViewCoordinator: ObservableObject {
         sneakPeekTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(duration))
             guard let self = self, !Task.isCancelled else { return }
-            await MainActor.run {
-                withAnimation {
-                    self.toggleSneakPeek(status: false, type: .music)
-                    self.sneakPeekDuration = 1.5
-                }
+            withAnimation(NotchMotionEnvironment.transientAnimation) {
+                // Keep the outgoing HUD intact throughout its removal transition.
+                self.sneakPeek.show = false
             }
+            self.sneakPeekDuration = 1.5
         }
     }
 
@@ -269,13 +263,8 @@ class BoringViewCoordinator: ObservableObject {
         value: CGFloat = 0,
         browser: BrowserType = .chromium
     ) {
-        Task { @MainActor in
-            withAnimation(.smooth) {
-                self.expandingView.show = status
-                self.expandingView.type = type
-                self.expandingView.value = value
-                self.expandingView.browser = browser
-            }
+        withAnimation(NotchMotionEnvironment.transientAnimation) {
+            expandingView = .init(show: status, type: type, value: value, browser: browser)
         }
     }
 

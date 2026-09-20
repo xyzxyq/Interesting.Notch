@@ -19,6 +19,7 @@ let temporaryDirectory = FileManager.default.urls(for: .cachesDirectory, in: .us
 let spacing: CGFloat = 16
 
 enum Brand {
+    static let releaseName = "Super Rocket 🚀"
     static func localized(_ key: String) -> String {
         NSLocalizedString(key, tableName: "Brand", bundle: .main, value: key, comment: "")
     }
@@ -85,7 +86,6 @@ extension Defaults.Keys {
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
     static let showOnAllDisplays = Key<Bool>("showOnAllDisplays", default: false)
     static let automaticallySwitchDisplay = Key<Bool>("automaticallySwitchDisplay", default: true)
-    static let releaseName = Key<String>("releaseName", default: "Flying Rabbit 🐇🪽")
     
     // MARK: Behavior
     static let minimumHoverDuration = Key<TimeInterval>("minimumHoverDuration", default: 0.3)
@@ -141,6 +141,8 @@ extension Defaults.Keys {
     static let waitInterval = Key<Double>("waitInterval", default: 3)
     static let showShuffleAndRepeat = Key<Bool>("showShuffleAndRepeat", default: false)
     static let compactLyricsOffset = Key<Double>("compactLyricsOffset", default: 0)
+    static let lyricColorStyle = Key<String>("lyricColorStyle", default: "automatic")
+    static let lyricColor = Key<Color>("lyricColor", default: .white)
     static let enableCompactLyrics = Key<Bool>("enableCompactLyrics", default: false)
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
     static let musicControlSlots = Key<[MusicControlButton]>(
