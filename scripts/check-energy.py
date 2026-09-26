@@ -88,7 +88,12 @@ import Combine
         assert(bars.allSatisfy { ($0.animationKeys() ?? []).isEmpty })
         spectrum.setPlaying(true)
         assert(bars.allSatisfy { $0.animation(forKey: "scaleY") != nil })
+        spectrum.setPlaying(true, lowPower: true)
+        assert(bars.allSatisfy { ($0.animation(forKey: "scaleY") as? CAKeyframeAnimation)?.preferredFrameRateRange.maximum == 15 })
+        spectrum.setPlaying(true, lowPower: false)
+        assert(bars.allSatisfy { ($0.animation(forKey: "scaleY") as? CAKeyframeAnimation)?.preferredFrameRateRange.maximum == 24 })
         spectrum.setPlaying(false)
+        assert(bars.allSatisfy { ($0.animationKeys() ?? []).isEmpty })
         print("Energy checks passed: timer lifecycle, native priority, sleep/wake, multi-display capture, bounded/corrupt artwork, spectrum pause/resume")
     }
 }

@@ -7,14 +7,31 @@
 
 import SwiftUI
 import Lottie
-import ObjectiveC
 
 struct LottieView: NSViewRepresentable {
     let url: URL
     let speed: Double
     let loopMode: LottieLoopMode
 
-    private static var associatedURLKey: UInt8 = 0
+    var isPlaying = true
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
+    @MainActor final class Coordinator {
+        var url: URL?
+        var shouldPlay = false
+        var loadTask: Task<Void, Never>?
+
+        func applyPlayback(to view: LottieAnimationView) {
+            if shouldPlay, view.animation != nil {
+                if !view.isAnimationPlaying { view.play() }
+            } else {
+                view.pause()
+            }
+        }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeNSView(context: Context) -> NSView {
         let animationView = LottieAnimationView()
@@ -32,21 +49,32 @@ struct LottieView: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let animationView = nsView.subviews.first as? LottieAnimationView else { return }
-        let lastURL = objc_getAssociatedObject(animationView, &Self.associatedURLKey) as? URL
-        if lastURL != url {
-            LottieAnimation.loadedFrom(url: url) { animation in
-                animationView.animation = animation
-                animationView.loopMode = loopMode
-                animationView.animationSpeed = CGFloat(speed)
-                animationView.play()
-                objc_setAssociatedObject(animationView, &Self.associatedURLKey, url, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-            }
-        } else {
-            animationView.loopMode = loopMode
-            animationView.animationSpeed = CGFloat(speed)
-            if !animationView.isAnimationPlaying {
-                animationView.play()
-            }
+        let coordinator = context.coordinator
+        coordinator.shouldPlay = isPlaying && !motion.suspended && !reduced
+        animationView.loopMode = loopMode
+        animationView.animationSpeed = CGFloat(speed)
+        guard coordinator.url != url else {
+            coordinator.applyPlayback(to: animationView)
+            return
         }
+
+        // Mark in flight before loading: unrelated view updates must not load again.
+        coordinator.loadTask?.cancel()
+        coordinator.url = url
+        animationView.pause()
+        animationView.animation = nil
+        coordinator.loadTask = Task { @MainActor [weak animationView, weak coordinator] in
+            let animation = await LottieAnimation.loadedFrom(url: url)
+            guard !Task.isCancelled, let animationView, let coordinator, coordinator.url == url else { return }
+            animationView.animation = animation
+            coordinator.applyPlayback(to: animationView)
+        }
+    }
+
+    static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) {
+        coordinator.loadTask?.cancel()
+        coordinator.loadTask = nil
+        coordinator.shouldPlay = false
+        if let view = nsView.subviews.first as? LottieAnimationView { view.pause() }
     }
 }

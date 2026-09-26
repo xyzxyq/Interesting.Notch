@@ -134,11 +134,25 @@ func ipcRequest(home: URL, method: String, version: Int, params: Object, owner: 
     }
 }
 
-func readFuel(home: URL) -> (Object?, [Object]) {
-    let candidates = ProcessInfo.processInfo.environment["CODEX_BRIDGE_CODEX_PATH"].map { [$0] } ?? (["/Applications/ChatGPT.app/Contents/Resources/codex", "/Applications/Codex.app/Contents/Resources/codex"]
-        + (ProcessInfo.processInfo.environment["PATH"] ?? "").split(separator: ":").map { "\($0)/codex" }
+func codexBinary(environment: [String: String], applications: String = "/Applications") -> String? {
+    // Current desktop bundles nest the CLI in CodexCLI.app; retain older layouts.
+    let bundled = ["ChatGPT", "Codex"].flatMap { app in
+        ["codex-cli/CodexCLI.app/Contents/MacOS/codex", "codex"].map {
+            "\(applications)/\(app).app/Contents/Resources/\($0)"
+        }
+    }
+    let candidates = environment["CODEX_BRIDGE_CODEX_PATH"].map { [$0] } ?? (bundled
+        + (environment["PATH"] ?? "").split(separator: ":").map { "\($0)/codex" }
     )
-    guard let binary = candidates.first(where: { FileManager.default.isExecutableFile(atPath: $0) }) else { return (nil, []) }
+    return candidates.first { path in
+        var directory: ObjCBool = false
+        return FileManager.default.fileExists(atPath: path, isDirectory: &directory)
+            && !directory.boolValue && FileManager.default.isExecutableFile(atPath: path)
+    }
+}
+
+func readFuel(home: URL) -> (Object?, [Object]) {
+    guard let binary = codexBinary(environment: ProcessInfo.processInfo.environment) else { return (nil, []) }
     let process = Process(), input = Pipe(), output = Pipe(), exited = DispatchSemaphore(value: 0)
     process.executableURL = URL(fileURLWithPath: binary)
     process.arguments = ["app-server"]

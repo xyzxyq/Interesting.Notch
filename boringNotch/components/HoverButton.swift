@@ -38,7 +38,7 @@ struct HoverButton: View {
         }
         .buttonStyle(PlainButtonStyle())
         .onHover { hovering in
-            withAnimation(.smooth(duration: 0.3)) {
+            withAnimation(NotchMotionEnvironment.interactionAnimation) {
                 isHovering = hovering
             }
         }

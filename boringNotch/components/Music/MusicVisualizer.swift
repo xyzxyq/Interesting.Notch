@@ -11,6 +11,7 @@ import SwiftUI
 class AudioSpectrum: NSView {
     private var barLayers: [CAShapeLayer] = []
     private var animating = false
+    private var lowPower = false
     
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -50,6 +51,7 @@ class AudioSpectrum: NSView {
             barLayers.append(barLayer)
             layer?.addSublayer(barLayer)
         }
+        resetBars()
     }
     
     private func startAnimating() {
@@ -63,7 +65,7 @@ class AudioSpectrum: NSView {
             animation.duration = 3.6
             animation.repeatCount = .infinity
             animation.calculationMode = .cubic
-            animation.preferredFrameRateRange = CAFrameRateRange(minimum: 24, maximum: 24, preferred: 24)
+            animation.preferredFrameRateRange = CAFrameRateRange(minimum: lowPower ? 15 : 24, maximum: lowPower ? 15 : 24, preferred: lowPower ? 15 : 24)
             bar.add(animation, forKey: "scaleY")
         }
     }
@@ -75,13 +77,20 @@ class AudioSpectrum: NSView {
     }
 
     private func resetBars() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
         for barLayer in barLayers {
             barLayer.removeAllAnimations()
             barLayer.transform = CATransform3DMakeScale(1, 0.35, 1)
         }
     }
     
-    func setPlaying(_ playing: Bool) {
+    func setPlaying(_ playing: Bool, lowPower: Bool = false) {
+        if self.lowPower != lowPower {
+            self.lowPower = lowPower
+            stopAnimating()
+        }
         if playing {
             startAnimating()
         } else {
@@ -97,7 +106,7 @@ struct AudioSpectrumView: NSViewRepresentable {
     
     func makeNSView(context: Context) -> AudioSpectrum {
         let spectrum = AudioSpectrum()
-        spectrum.setPlaying(isPlaying && !motion.suspended && !reduced)
+        spectrum.setPlaying(isPlaying && !motion.suspended && !reduced, lowPower: motion.lowPower)
         return spectrum
     }
     
@@ -106,7 +115,7 @@ struct AudioSpectrumView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: AudioSpectrum, context: Context) {
-        nsView.setPlaying(isPlaying && !motion.suspended && !reduced)
+        nsView.setPlaying(isPlaying && !motion.suspended && !reduced, lowPower: motion.lowPower)
     }
 }
 

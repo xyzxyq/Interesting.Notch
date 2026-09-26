@@ -9,7 +9,7 @@ import Defaults
 
 struct BouncingButtonStyle: ButtonStyle {
     let vm: BoringViewModel
-    @State private var isPressed = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
     
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -19,12 +19,8 @@ struct BouncingButtonStyle: ButtonStyle {
                     .fill(Color(red: 20/255, green: 20/255, blue: 20/255))
                     .strokeBorder(.white.opacity(0.04), lineWidth: 1)
             )
-            .scaleEffect(isPressed ? 0.9 : 1.0)
-            .onChange(of: configuration.isPressed) { _, _ in
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.3, blendDuration: 0.3)) {
-                    isPressed.toggle()
-                }
-            }
+            .scaleEffect(configuration.isPressed && !reduced ? 0.96 : 1)
+            .animation(NotchMotionEnvironment.interactionAnimation, value: configuration.isPressed)
     }
 }
 

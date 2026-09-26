@@ -63,11 +63,14 @@ struct CodexFlame: View {
     @ObservedObject private var motion = NotchMotionEnvironment.shared
     @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
+    @State private var phase = MusicEdgePhase()
+    private var speed: Double { effort < 0 ? 1 : CodexThrust.speed(effort) }
+    private var paused: Bool { !onScreen || motion.suspended || !active || reduced }
     var body: some View {
-        TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || motion.suspended || !active || reduced)) { timeline in
+        TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: paused)) { timeline in
             Canvas { context, size in
                 let h = size.height
-                let time = reduced ? 0 : timeline.date.timeIntervalSinceReferenceDate * (effort < 0 ? 1 : CodexThrust.speed(effort))
+                let time = reduced ? 0 : phase.value(at: timeline.date)
                 let pulse = reduced ? 0.0 : sin(time * 7) * 0.09 + sin(time * 13) * 0.04
                 let bodyWidth = size.width - 80
                 let nozzle = NotchShape.rocketCoordinate(bodyWidth + h * 0.182, width: bodyWidth, height: h)
@@ -103,7 +106,9 @@ struct CodexFlame: View {
         .opacity(active ? 1 : 0)
         .animation(.easeOut(duration: reduced ? 0.15 : CodexCompletionCue.flameOutDuration), value: active)
         .onAppear { onScreen = true }
-        .onDisappear { onScreen = false }
+        .onDisappear { onScreen = false; phase.update(target: speed, paused: true, at: .now) }
+        .onChange(of: paused, initial: true) { _, value in phase.update(target: speed, paused: value, at: .now) }
+        .onChange(of: speed) { _, value in phase.update(target: value, paused: paused, at: .now) }
         .allowsHitTesting(false)
     }
 }
@@ -264,14 +269,16 @@ struct CodexSpeedLines: View {
     @ObservedObject private var motion = NotchMotionEnvironment.shared
     @State private var onScreen = false
     @Environment(\.accessibilityReduceMotion) private var reduced
+    @State private var phase = MusicEdgePhase()
+    private var speed: Double { CodexThrust.speed(effort) }
+    private var paused: Bool { !onScreen || motion.suspended || !active || effort < 2 || reduced }
     var body: some View {
-        TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || motion.suspended || !active || effort < 2 || reduced)) { clock in
+        TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: paused)) { clock in
             Canvas { context, size in
                 guard active, effort >= 2, !reduced else { return }
                 let rect = CGRect(origin: .zero, size: size).insetBy(dx: 48, dy: 48)
                 let outline = shape.path(in: rect)
-                let time = clock.date.timeIntervalSinceReferenceDate
-                let speed = CodexThrust.speed(effort)
+                let time = phase.value(at: clock.date)
                 let boost = Double(effort - 2) / 3
                 var mask = Path(CGRect(origin: .zero, size: size))
                 mask.addPath(outline)
@@ -282,7 +289,7 @@ struct CodexSpeedLines: View {
                 for i in 0..<(lanes * 2) {
                     let lane = i % lanes
                     let side = (i / lanes) % 2 == 0 ? -1.0 : 1.0
-                    let end = (time * speed * 0.30 + Double(i) * 0.61803398875).truncatingRemainder(dividingBy: 1)
+                    let end = (time * 0.30 + Double(i) * 0.61803398875).truncatingRemainder(dividingBy: 1)
                     let start = max(0, end - (16 + boost * 12) / (rect.width + 40))
                     let fade = pow(sin(.pi * end), 2)
                     var line = Path()
@@ -296,7 +303,13 @@ struct CodexSpeedLines: View {
                     context.stroke(line, with: ink, style: StrokeStyle(lineWidth: 0.75 + boost * 0.25, lineCap: .round))
                 }
             }
-        }.padding(-48).onAppear { onScreen = true }.onDisappear { onScreen = false }.allowsHitTesting(false)
+        }
+        .padding(-48)
+        .onAppear { onScreen = true }
+        .onDisappear { onScreen = false; phase.update(target: speed, paused: true, at: .now) }
+        .onChange(of: paused, initial: true) { _, value in phase.update(target: speed, paused: value, at: .now) }
+        .onChange(of: speed) { _, value in phase.update(target: value, paused: paused, at: .now) }
+        .allowsHitTesting(false)
     }
 }
 
@@ -458,7 +471,7 @@ struct CodexDropButton: View {
             let anchor = anchorView.window?.convertPoint(toScreen: anchorView.convert(local, to: nil)) ?? NSEvent.mouseLocation
             action(anchor)
         } label: {
-            TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || motion.suspended || idleSince == nil || reduced)) { clock in
+            TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || expanded || motion.suspended || idleSince == nil || reduced)) { clock in
                 let reminder = idleSince.map { CodexDropMotion.reminder(at: clock.date.timeIntervalSince($0)) }
                 let idleOffset = reduced ? 0 : reminder?.offset ?? 0
                 let brightness = reduced ? 1 : reminder?.brightness ?? 1
@@ -576,7 +589,7 @@ struct CodexDropButton: View {
             if reveal && progress > 0.86 { symbolVisible = true }
             if !reveal { symbolVisible = progress > 0.86 }
             if elapsed >= duration { return }
-            try await Task.sleep(for: .milliseconds(16))
+            try await Task.sleep(for: .seconds(motion.lowPower ? 1.0 / 30 : 1.0 / 60))
         }
     }
 

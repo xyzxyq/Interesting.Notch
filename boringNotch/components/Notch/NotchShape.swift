@@ -97,6 +97,15 @@ struct NotchShape: Shape {
 // One shared observer set for decorative animation across all notch windows.
 @MainActor final class NotchMotionEnvironment: NSObject, ObservableObject {
     static let shared = NotchMotionEnvironment()
+    static var interactionAnimation: Animation {
+        NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+            ? .easeOut(duration: 0.15)
+            : .spring(response: 0.28, dampingFraction: 0.9)
+    }
+    static func expansionAnimation(opening: Bool, reduced: Bool) -> Animation {
+        reduced ? .easeInOut(duration: 0.18)
+            : .spring(response: opening ? 0.42 : 0.38, dampingFraction: opening ? 0.9 : 1)
+    }
     static var transientAnimation: Animation {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
             ? .easeInOut(duration: 0.18)

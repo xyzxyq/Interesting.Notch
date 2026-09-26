@@ -50,7 +50,7 @@ struct ContentView: View {
     @Default(.showNotHumanFace) var showNotHumanFace
 
     // Shared interactive spring for movement/resizing to avoid conflicting animations
-    private let animationSpring = Animation.interactiveSpring(response: 0.38, dampingFraction: 0.8, blendDuration: 0)
+    private var animationSpring: Animation { NotchMotionEnvironment.interactionAnimation }
 
     private let extendedHoverPadding: CGFloat = 30
     private let zeroHeightHoverPadding: CGFloat = 10
@@ -145,7 +145,7 @@ struct ContentView: View {
                             .padding(.horizontal, topCornerRadius)
                     }
                     .clipShape(currentNotchShape)
-                    .overlay { MusicEdgeEffect(shape: currentNotchShape) }
+                    .overlay { MusicEdgeEffect(shape: currentNotchShape, isVisible: vm.notchState == .open || !vm.hideOnClosed) }
                     .overlay { CodexSpeedLines(shape: currentNotchShape, effort: codex.effort, active: flameActive) }
                     .overlay { CodexFlame(active: flameActive, effort: codex.effort) }
                     .overlay { CodexConfetti(active: confettiActive) }
@@ -160,14 +160,8 @@ struct ContentView: View {
                 
                 mainLayout
                     .frame(height: vm.notchState == .open ? vm.notchSize.height : nil)
-                    .conditionalModifier(true) { view in
-                        let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
-                        let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
-                        
-                        return view
-                            .animation(vm.notchState == .open ? openAnimation : closeAnimation, value: vm.notchState)
-                            .animation(.smooth, value: gestureProgress)
-                    }
+                    .animation(NotchMotionEnvironment.expansionAnimation(opening: vm.notchState == .open,
+                                                                        reduced: reducedMotion), value: vm.notchState)
                     .animation(NotchMotionEnvironment.transientAnimation, value: transientHeader)
                     .animation(NotchMotionEnvironment.transientAnimation, value: coordinator.sneakPeek.show)
                     .contentShape(Rectangle())
@@ -260,7 +254,6 @@ struct ContentView: View {
             y: gestureScale,
             anchor: .top
         )
-        .animation(.smooth, value: gestureProgress)
         .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
@@ -451,9 +444,8 @@ struct ContentView: View {
                 // The player can exceed its proposal; it must not widen the header above it.
                 .frame(minWidth: 0, maxWidth: .infinity)
                 .transition(
-                    .scale(scale: 0.8, anchor: .top)
-                    .combined(with: .opacity)
-                    .animation(.smooth(duration: 0.35))
+                    reducedMotion ? .opacity : .opacity
+                        .combined(with: .scale(scale: 0.97, anchor: .top))
                 )
                 .zIndex(1)
                 .allowsHitTesting(vm.notchState == .open)
@@ -737,14 +729,13 @@ struct ContentView: View {
     private func handleDownGesture(translation: CGFloat, phase: NSEvent.Phase) {
         guard vm.notchState == .closed else { return }
 
-        if phase == .ended {
+        if phase == .ended || phase == .cancelled {
             withAnimation(animationSpring) { gestureProgress = .zero }
             return
         }
 
-        withAnimation(animationSpring) {
-            gestureProgress = (translation / Defaults[.gestureSensitivity]) * 20
-        }
+        // Track the finger directly; only settling uses a spring.
+        gestureProgress = reducedMotion ? 0 : (translation / max(1, Defaults[.gestureSensitivity])) * 20
 
         if translation > Defaults[.gestureSensitivity] {
             if Defaults[.enableHaptics] {
@@ -760,15 +751,11 @@ struct ContentView: View {
     private func handleUpGesture(translation: CGFloat, phase: NSEvent.Phase) {
         guard vm.notchState == .open && !vm.isHoveringCalendar else { return }
 
-        withAnimation(animationSpring) {
-            gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20
+        if phase == .ended || phase == .cancelled {
+            withAnimation(animationSpring) { gestureProgress = .zero }
+            return
         }
-
-        if phase == .ended {
-            withAnimation(animationSpring) {
-                gestureProgress = .zero
-            }
-        }
+        gestureProgress = reducedMotion ? 0 : (translation / max(1, Defaults[.gestureSensitivity])) * -20
 
         if translation > Defaults[.gestureSensitivity] {
             withAnimation(animationSpring) {

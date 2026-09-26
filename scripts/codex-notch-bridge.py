@@ -13,7 +13,6 @@ import copy
 import math
 import select
 import subprocess
-import shutil
 import json
 import os
 from pathlib import Path
@@ -243,11 +242,17 @@ def fuel_snapshot(result, now, weekly=False):
     return None
 
 
+def codex_binary(environment, applications='/Applications'):
+    candidates = ([environment['CODEX_BRIDGE_CODEX_PATH']] if 'CODEX_BRIDGE_CODEX_PATH' in environment else
+                  [f'{applications}/{app}.app/Contents/Resources/{suffix}' for app in ('ChatGPT', 'Codex')
+                   for suffix in ('codex-cli/CodexCLI.app/Contents/MacOS/codex', 'codex')] +
+                  [f'{p}/codex' for p in environment.get('PATH', '').split(':') if p])
+    return next((p for p in candidates if Path(p).is_file() and os.access(p, os.X_OK)), None)
+
+
 def read_fuel(home):
     # Use the bundled read-only account RPC, never credentials or a model turn.
-    candidates = [Path('/Applications/ChatGPT.app/Contents/Resources/codex'),
-                  Path('/Applications/Codex.app/Contents/Resources/codex')]
-    binary = next((str(p) for p in candidates if p.is_file()), None) or shutil.which('codex')
+    binary = codex_binary(os.environ)
     if not binary:
         return None
     env = dict(os.environ, CODEX_HOME=str(home))

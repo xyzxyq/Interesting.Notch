@@ -44,7 +44,7 @@ private struct ScrollMonitor: NSViewRepresentable {
         context.coordinator.installMonitor(on: view)
         return view
     }
-    func updateNSView(_ nsView: NSView, context: Context) {}
+    func updateNSView(_ nsView: NSView, context: Context) { context.coordinator.action = action }
     static func dismantleNSView(_ nsView: NSView, coordinator: Coordinator) { coordinator.removeMonitor() }
 
     func makeCoordinator() -> Coordinator { 
@@ -54,11 +54,11 @@ private struct ScrollMonitor: NSViewRepresentable {
     @MainActor final class Coordinator: NSObject {
         private let direction: PanDirection
         private let threshold: CGFloat
-        private let action: (CGFloat, NSEvent.Phase) -> Void
+        var action: (CGFloat, NSEvent.Phase) -> Void
         private var monitor: Any?
         private var accumulated: CGFloat = 0
         private var active = false
-            private var endTask: Task<Void, Never>?
+        private var endTask: Task<Void, Never>?
         private let noiseThreshold: CGFloat = 0.2
 
         init(direction: PanDirection, threshold: CGFloat, action: @escaping (CGFloat, NSEvent.Phase) -> Void) {
@@ -105,7 +105,9 @@ private struct ScrollMonitor: NSViewRepresentable {
         }
 
         private func handleScroll(_ event: NSEvent) {
-            if event.phase == .ended || event.momentumPhase == .ended {
+            if event.phase == .ended || event.phase == .cancelled || event.momentumPhase == .ended {
+                endTask?.cancel()
+                endTask = nil
                 if active {
                     action(accumulated.magnitude, .ended)
                 } else {

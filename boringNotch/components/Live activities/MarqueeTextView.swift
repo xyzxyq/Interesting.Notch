@@ -33,8 +33,9 @@ struct MarqueeText: View {
     
     @State private var animate = false
     @State private var textSize: CGSize = .zero
-    @State private var offset: CGFloat = 0
-    
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
+    @Environment(\.accessibilityReduceMotion) private var reduced
+
     init(_ text: Binding<String>, font: Font = .body, nsFont: NSFont.TextStyle = .body, textColor: Color = .primary, backgroundColor: Color = .clear, minDuration: Double = 3.0, frameWidth: CGFloat = 200) {
         _text = text
         self.font = font
@@ -44,50 +45,46 @@ struct MarqueeText: View {
         self.minDuration = minDuration
         self.frameWidth = frameWidth
     }
-    
-    private var needsScrolling: Bool {
-        textSize.width > frameWidth
+
+    private var scrolling: Bool {
+        textSize.width > frameWidth && frameWidth > 0 && !reduced && !motion.suspended
     }
-    
+
     var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .leading) {
-                HStack(spacing: 20) {
-                    Text(text)
-                    Text(text)
-                        .opacity(needsScrolling ? 1 : 0)
-                }
-                .id(text)
-                .font(font)
-                .foregroundColor(textColor)
-                .fixedSize(horizontal: true, vertical: false)
-                .offset(x: self.animate ? offset : 0)
-                .animation(
-                    self.animate ?
-                        .linear(duration: Double(textSize.width / 30))
-                        .delay(minDuration)
-                        .repeatForever(autoreverses: false) : .none,
-                    value: self.animate
-                )
-                .background(backgroundColor)
+        HStack(spacing: 20) {
+            Text(text)
                 .modifier(MeasureSizeModifier())
-                .onPreferenceChange(SizePreferenceKey.self) { size in
-                    self.textSize = CGSize(width: size.width / 2, height: NSFont.preferredFont(forTextStyle: nsFont).pointSize)
-                    self.animate = false
-                    self.offset = 0
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.01){
-                        if needsScrolling {
-                            self.animate = true
-                            self.offset = -(textSize.width + 10)
-                            
-                        }
-                    }
-                }
-            }
-            .frame(width: frameWidth, alignment: .leading)
-            .clipped()
+            if scrolling { Text(text).accessibilityHidden(true) }
         }
-        .frame(height: textSize.height * 1.3)
-        
+        .font(font)
+        .foregroundColor(textColor)
+        .fixedSize(horizontal: true, vertical: false)
+        .offset(x: animate ? -(textSize.width + 20) : 0)
+        .frame(width: max(0, frameWidth), alignment: .leading)
+        .clipped()
+        .background(backgroundColor)
+        .onPreferenceChange(SizePreferenceKey.self) { size in
+            if textSize != size { textSize = size }
+        }
+        .task(id: "\(text)-\(textSize.width)-\(frameWidth)-\(minDuration)-\(scrolling)") {
+            reset()
+            guard scrolling else { return }
+            // Commit the reset before starting; cancellation discards old titles/resizes.
+            do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
+            withAnimation(.linear(duration: Double(textSize.width + 20) / 30)
+                .delay(max(0, minDuration)).repeatForever(autoreverses: false)) {
+                animate = true
+            }
+        }
+        .onDisappear { reset() }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(text)
+        .help(text)
+    }
+
+    private func reset() {
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { animate = false }
     }
 }

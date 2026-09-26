@@ -9,6 +9,23 @@ import AppKit
         assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: true) == 1.0 / 15)
         assert(CodexThrust.frameInterval(lowPower: false) == 1.0 / 24)
         assert(CodexThrust.frameInterval(lowPower: true) == 1.0 / 15)
+        // Phase stays continuous when music/rocket speed changes or a screen sleeps.
+        var phase = MusicEdgePhase()
+        let start = Date(timeIntervalSinceReferenceDate: 1234)
+        phase.update(target: 1, paused: false, at: start)
+        let changed = start.addingTimeInterval(2)
+        let before = phase.value(at: changed)
+        phase.update(target: 3, paused: false, at: changed)
+        assert(abs(phase.value(at: changed) - before) < 1e-10)
+        let epsilon = 0.0001
+        let after = phase.value(at: changed.addingTimeInterval(epsilon))
+        assert(after > before && after - before < 3 * epsilon)
+        let sleeping = changed.addingTimeInterval(1)
+        let frozen = phase.value(at: sleeping)
+        phase.update(target: 3, paused: true, at: sleeping)
+        assert(phase.value(at: sleeping.addingTimeInterval(3600)) == frozen)
+        phase.update(target: 1, paused: false, at: sleeping.addingTimeInterval(3600))
+        assert(phase.value(at: sleeping.addingTimeInterval(3600)) == frozen)
         assert(MusicEdgeFrame.waterSampleCount == 120)
         for phase in [-10.0, 0, 0.1, 1.2, 1234, 10_000] {
             let values = MusicEdgeFrame.waterUndulations(phase: phase)

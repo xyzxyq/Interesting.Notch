@@ -98,6 +98,7 @@ struct GlowingSnake<
 
 struct HelloAnimation: View {
     @State private var progress: Double = 0.0
+    @Environment(\.accessibilityReduceMotion) private var reduced
     
     var onFinish: () -> Void
     
@@ -109,20 +110,14 @@ struct HelloAnimation: View {
             blurRadius: 8.0,
             shape: { HelloShape() }
         )
-        .task {
-            // Wait for the "opening" animation (notch expansion) to complete before starting the snake
-            try? await Task.sleep(for: .seconds(0.6))
-            
-            withAnimation(
-                .easeInOut(duration: 4.0)
-            ) {
-                progress = 1.0
-            }
-            
-            // Wait for the animation to complete
-            try? await Task.sleep(for: .seconds(4.0))
-            
-            onFinish()
+        .task(id: reduced) {
+            do {
+                try await Task.sleep(for: .seconds(0.6))
+                withAnimation(reduced ? nil : .easeInOut(duration: 4)) { progress = 1 }
+                if !reduced { try await Task.sleep(for: .seconds(4)) }
+                try Task.checkCancellation()
+                onFinish()
+            } catch { /* Disappearing must not close a later presentation. */ }
         }
     }
 }

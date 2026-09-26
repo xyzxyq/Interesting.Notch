@@ -27,7 +27,7 @@ struct TabSelectionView: View {
         HStack(spacing: 0) {
             ForEach(tabs) { tab in
                     TabButton(label: tab.label, icon: tab.icon, selected: coordinator.currentView == tab.view, horizontalPadding: compact ? 7 : 15) {
-                        withAnimation(.smooth) {
+                        withAnimation(NotchMotionEnvironment.interactionAnimation) {
                             coordinator.currentView = tab.view
                         }
                     }

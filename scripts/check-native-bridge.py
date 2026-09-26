@@ -72,6 +72,32 @@ def main():
                                                  secondary=dict(usedPercent=0, windowDurationMins=10080, resetsAt=200))), 100, False)
     with tempfile.TemporaryDirectory(prefix='native-bridge-check-') as directory:
         path = Path(directory)
+        # LaunchAgents have a minimal PATH. Exercise real executable discovery
+        # without touching /Applications or using the machine's installed Codex.
+        modern = 'codex-cli/CodexCLI.app/Contents/MacOS/codex'
+        layouts = [(app, suffix, old) for app in ('ChatGPT', 'Codex')
+                   for suffix, old in ((modern, False), (modern, True), ('codex', False))]
+        for index, (app, suffix, include_old) in enumerate(layouts):
+            applications = path / str(index)
+            binary = applications / f'{app}.app/Contents/Resources/{suffix}'
+            binary.parent.mkdir(parents=True)
+            binary.write_text('#!/bin/sh\nexit 0\n'); binary.chmod(0o700)
+            cases = [({}, str(binary)), ({'CODEX_BRIDGE_CODEX_PATH': '/nonexistent'}, None)]
+            if include_old:
+                old = applications / f'{app}.app/Contents/Resources/codex'
+                old.write_text('#!/bin/sh\nexit 0\n'); old.chmod(0o700)
+            for environment, expected in cases:
+                args = [environment, str(applications)]
+                fixtures.append((dict(function='codex_binary', args=args), expected))
+        fallback = path / 'bin/codex'
+        fallback.parent.mkdir(); fallback.write_text('#!/bin/sh\nexit 0\n'); fallback.chmod(0o700)
+        for environment, expected in [({'PATH': str(fallback.parent)}, str(fallback)),
+                                      ({'CODEX_BRIDGE_CODEX_PATH': str(fallback)}, str(fallback)),
+                                      ({}, None), ({'CODEX_BRIDGE_CODEX_PATH': str(path)}, None)]:
+            fixtures.append((dict(function='codex_binary', args=[environment, str(path / 'absent')]), expected))
+        for request, expected in fixtures:
+            if request['function'] == 'codex_binary':
+                assert legacy.codex_binary(*request['args']) == expected, ('Python resolver', request, expected)
         runner = path / 'Check.swift'
         runner.write_text('''import Foundation
 @main struct Check {
@@ -89,6 +115,7 @@ def main():
             case "update_effort": result = Projection.effort(args[0], change: args[1] as! [String: Any])
             case "update_model": result = Projection.model(args[0], change: args[1] as! [String: Any])
             case "fuel_snapshot": result = Projection.fuel(args[0] as! [String: Any], now: args[1] as! Double, weekly: args[2] as! Bool) as Any? ?? NSNull()
+            case "codex_binary": result = codexBinary(environment: args[0] as! [String: String], applications: args[1] as! String) as Any? ?? NSNull()
             default: fatalError("Unknown fixture")
             }
             let data = try JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed, .sortedKeys, .withoutEscapingSlashes])
@@ -99,6 +126,7 @@ def main():
 ''')
         env = dict(os.environ, DEVELOPER_DIR='/Applications/Xcode.app/Contents/Developer')
         subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', str(ROOT / 'CodexBridge/Projection.swift'),
+                        str(ROOT / 'CodexBridge/Transport.swift'), str(ROOT / 'CodexBridge/Bridge.swift'),
                         str(runner), '-o', str(path / 'check')], env=env, check=True)
         result = subprocess.run([str(path / 'check')], input=''.join(json.dumps(f[0], ensure_ascii=False)+'\n' for f in fixtures),
                                 text=True, capture_output=True)
@@ -107,7 +135,7 @@ def main():
         assert len(actual) == len(fixtures)
         for (request, expected), value in zip(fixtures, actual):
             assert value == expected, (request, expected, value)
-        print(f'PASS: {len(fixtures)} native/Python projection parity cases')
+        print(f'PASS: {len(fixtures)} native/Python projection and executable discovery cases')
 
 
 if __name__ == '__main__':

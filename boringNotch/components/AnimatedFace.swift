@@ -44,11 +44,13 @@ struct MinimalFaceFeatures: View {
         .frame(width: self.width, height: self.height) // Maximum size of face
         .task(id: motion.suspended || reduced) {
             guard !motion.suspended, !reduced else { isBlinking = false; return }
+            isBlinking = false
+            defer { isBlinking = false }
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(3)) } catch { return }
-                withAnimation(.spring(duration: 0.2)) { isBlinking = true }
+                isBlinking = true
                 do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
-                withAnimation(.spring(duration: 0.2)) { isBlinking = false }
+                isBlinking = false
             }
         }
     }

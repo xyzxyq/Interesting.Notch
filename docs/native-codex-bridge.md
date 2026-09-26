@@ -48,3 +48,13 @@ python3 scripts/codex-notch-bridge-install.py --binary /tmp/notch-native-bridge
 183 组 Python/Swift 投影行为对照通过。隔离 IPC/HTTP 测试覆盖分片消息、运行/等待/空闲、修订缺口、额度、隐私、鉴权、回答去重、送达不确定、明确拒绝后重试、远程回答、重连和不支持的协议版本。安装器测试模拟预检失败、启动失败回滚、成功安装和环境保留，未加载测试 LaunchAgent 或向真实任务发送回答。
 
 回退命令：`python3 scripts/codex-notch-bridge-install.py --python`。本次为本地优化及试用，没有发布新版本或改动已有 Release 附件。
+
+## 燃料图标问号修复 · 2026-09-26
+
+现场桥接的任务连接正常，但 `fuel` 为 `null`、`allowances` 为空。已安装的 Codex 把内置程序迁至 `Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex`；旧桥接仅查找 `Contents/Resources/codex`，而本机旧路径已不存在。用新路径调用只读 `account/rateLimits/read` 成功，证实是程序发现失败。
+
+Swift 桥接和保留的 Python 实现均兼容 ChatGPT.app／Codex.app 的新旧布局，优先当前嵌套布局；保留显式路径覆盖及 PATH 备用查找，跳过不可执行文件和目录。仍沿用每 60 秒一次的额度查询、150 秒新鲜度上限及重置时间校验；没有增加计时器或刷新频率，没有用过期缓存掩盖读取失败。
+
+`check-native-bridge.py` 共 199 项通过，包含 183 项原投影对照及 16 项路径发现回归检查；`check-native-bridge-integration.py` 和原生构建、严格签名校验通过。新桥接已安装到本机，Preview 无需重启便恢复燃料图标；实际界面显示“Codex · 周剩余 8%”。本次仍为本地修复，未发布。
+
+随后连续观察 70.1 秒、15 个样本，任务连接与额度始终有效，覆盖两份不同刷新时间的额度快照；下一次自动刷新后界面正确更新为周剩余 7%，燃料图标仍正常。原始精简记录位于临时文件 `/private/tmp/notch-fuel-20260926/live-validation.json`。这是现场恢复与刷新验证，不是长期可用性或能耗测试。
