@@ -99,17 +99,27 @@ struct Frames {
     }
 }
 
-func recentIDs(home: URL) throws -> [String] {
+func recentTasks(home: URL) throws -> [TaskKey] {
     var db: OpaquePointer?, query: OpaquePointer?
     guard sqlite3_open_v2(home.appendingPathComponent("state_5.sqlite").path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
         if let db { sqlite3_close(db) }; throw BridgeError.invalid("Task database unavailable")
     }
     defer { sqlite3_finalize(query); sqlite3_close(db) }
     guard sqlite3_prepare_v2(db, "SELECT id FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT 100", -1, &query, nil) == SQLITE_OK else { throw BridgeError.invalid("Task query unavailable") }
-    var result: [String] = []
+    var result: [TaskKey] = []
     while sqlite3_step(query) == SQLITE_ROW {
-        if let id = sqlite3_column_text(query, 0) { result.append(String(cString: id)) }
+        if let id = sqlite3_column_text(query, 0) { result.append(TaskKey(host: "local", id: String(cString: id))) }
     }
+    // Desktop already records remote task hosts; only task IDs/host IDs leave this read.
+    // ponytail: bootstrap 100 known remote tasks; use a supported live catalog if this ceiling matters.
+    let data = try? Data(contentsOf: home.appendingPathComponent(".codex-global-state.json"))
+    let state = object(data.flatMap { try? JSONSerialization.jsonObject(with: $0) })
+    var hosts = object(state["thread-project-membership-host-ids"]).compactMapValues { $0 as? String }
+    for (id, value) in object(state["thread-project-assignments"]) where hosts[id] == nil {
+        hosts[id] = object(value)["hostId"] as? String
+    }
+    hosts = hosts.filter { UUID(uuidString: $0.key) != nil && !$0.value.isEmpty && $0.value != "local" && $0.value.utf8.count <= 256 }
+    result += hosts.keys.sorted().suffix(100).map { TaskKey(host: hosts[$0]!, id: $0) }
     return result
 }
 

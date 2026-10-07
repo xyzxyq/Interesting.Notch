@@ -96,6 +96,12 @@ def main():
         with sqlite3.connect(home / 'state_5.sqlite') as db:
             db.execute('CREATE TABLE threads (id TEXT, archived INTEGER, updated_at INTEGER)')
             db.execute('INSERT INTO threads VALUES (?, 0, 1)', (TASK,))
+        remote_task = '22222222-2222-4222-8222-222222222222'
+        (home / '.codex-global-state.json').write_text(json.dumps({
+            'thread-project-membership-host-ids': {remote_task: 'remote-startup'},
+            'thread-project-assignments': {'invalid-id': {'hostId': 'remote-startup'}},
+            'private-unrelated-field': 'PRIVATE',
+        }))
         fake = home / 'codex'
         fake.write_text('''#!/usr/bin/python3
 import json,sys,time
@@ -114,6 +120,7 @@ for line in sys.stdin:
         stop = threading.Event()
         sockets = []
         reply_mode = ['success']
+        discovered_remote = threading.Event()
 
         def client(peer):
             try:
@@ -123,6 +130,12 @@ for line in sys.stdin:
                         peer.sendall(frame(dict(type='response', requestId=message['requestId'], resultType='success')))
                         if message['requestId'] == 'notch-init':
                             streams.put(peer)
+                    elif message.get('method') == 'thread-stream-following-changed' and message['params']['hostId'] == 'remote-startup':
+                        if not discovered_remote.is_set():
+                            discovered_remote.set()
+                            peer.sendall(frame(dict(type='broadcast', method='thread-stream-state-changed', version=11,
+                                sourceClientId='startup-owner', params=dict(hostId='remote-startup', conversationId=remote_task,
+                                    change=dict(type='snapshot', revision=1, conversationState=dict(threadRuntimeStatus=dict(type='active')))))))
                     elif message.get('type') == 'request':
                         replies.put(message)
                         if reply_mode[0] == 'disconnect':
@@ -177,6 +190,15 @@ for line in sys.stdin:
             assert len(snapshot['allowances']) == 2
             token = snapshot['replyToken']
             assert len(token) >= 40
+            snapshot = expect(lambda v: any(t['hostId'] == 'remote-startup' for t in v['tasks']))
+            assert 'PRIVATE' not in json.dumps(snapshot), 'Discovery retained unrelated desktop data'
+            peer.sendall(frame(dict(type='broadcast', method='thread-stream-state-changed', version=11,
+                sourceClientId='startup-owner', params=dict(hostId='remote-startup', conversationId=remote_task,
+                    change=dict(type='snapshot', revision=2, conversationState=dict(threadRuntimeStatus=dict(type='idle')))))))
+            expect(lambda v: not v['tasks'])
+            peer.sendall(frame(dict(type='broadcast', method='client-status-changed',
+                params=dict(clientId='startup-owner', status='disconnected'))))
+            expect(lambda v: not v['idleTaskIds'])
             def emit(change, version=11, host='local'):
                 message = dict(type='broadcast', method='thread-stream-state-changed', version=version,
                                sourceClientId='owner', params=dict(hostId=host, conversationId=TASK, change=change))
@@ -262,7 +284,7 @@ for line in sys.stdin:
             expect(lambda v: v['tasks'])
             emit(dict(type='snapshot', revision=2, conversationState={}), version=999)
             expect(lambda v: not v['connected'] and not v['tasks'])
-            print('PASS: native fragmented IPC, runtime, approval, revision gap, quota, privacy, authenticated replies, duplicates, uncertain delivery, explicit rejection, remote replies, reconnect and unsupported version')
+            print('PASS: remote startup discovery, native fragmented IPC, runtime, approval, revision gap, quota, privacy, authenticated replies, duplicates, uncertain delivery, explicit rejection, remote replies, reconnect and unsupported version')
         finally:
             process.terminate()
             try: process.wait(timeout=5)

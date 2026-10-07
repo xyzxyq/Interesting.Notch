@@ -9,11 +9,18 @@ APP_BUNDLE="$HOME/Applications/InterestingNotch Debug.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/Interesting Notch"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
-for APP_PID in $(pgrep -f "$APP_BINARY" || true); do
-  if [ "$(ps -p "$APP_PID" -o command=)" = "$APP_BINARY" ]; then
-    kill -KILL "$APP_PID" || true
-  fi
+# Stop every copy of the main app, including /Applications and other debug paths.
+# Bridge and media adapter helpers have different executable names.
+pkill -TERM -x 'Interesting Notch' || true
+for _ in {1..50}; do
+  pgrep -x 'Interesting Notch' >/dev/null || break
+  sleep 0.1
 done
+pkill -KILL -x 'Interesting Notch' || true
+if pgrep -x 'Interesting Notch' >/dev/null; then
+  echo 'Existing application did not exit; refusing to launch a second copy.' >&2
+  exit 1
+fi
 
 cd "$ROOT_DIR"
 xcodebuild -project boringNotch.xcodeproj -scheme boringNotch -configuration Debug \
@@ -40,7 +47,7 @@ case "$MODE" in
   --verify|verify)
     /usr/bin/open -n "$APP_BUNDLE"
     sleep 1
-    pgrep -f "$APP_BINARY" >/dev/null
+    [ "$(pgrep -x 'Interesting Notch' | wc -l | tr -d ' ')" = 1 ]
     ;;
   *)
     echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2

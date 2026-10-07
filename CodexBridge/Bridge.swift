@@ -43,10 +43,12 @@ final class Bridge {
 
     func snapshot(now: Double = Date().timeIntervalSince1970) -> Object {
         lock.lock(); defer { lock.unlock() }
-        let fresh = connected && now - lastContact < 45 && !entries.values.contains { $0.state != nil && now - $0.receivedAt >= 45 }
+        let fresh = connected && now - lastContact < 45
         var tasks: [Object] = [], idle: [String] = []
         if fresh {
             for (key, entry) in entries.sorted(by: { $0.key.identity < $1.key.identity }) {
+                // A silent owner must not hide fresh work from other hosts or tasks.
+                guard now - entry.receivedAt < 45 else { continue }
                 if text(object(entry.runtime)["type"]) == "idle", now - entry.receivedAt < 35 { idle.append(key.identity) }
                 if let state = entry.state {
                     tasks.append(["id": key.id, "hostId": key.host, "title": "Codex task", "state": state,
@@ -116,7 +118,12 @@ final class Bridge {
             while true {
                 autoreleasepool {
                     let result = readFuel(home: home)
-                    lock.lock(); fuel = result.0; allowances = result.1; lock.unlock()
+                    lock.lock()
+                    // A failed read does not invalidate a still-fresh reading. Snapshot
+                    // keeps the original timestamp and enforces the 150s/reset limits.
+                    if let value = result.0 { fuel = value }
+                    if !result.1.isEmpty { allowances = result.1 }
+                    lock.unlock()
                 }
                 Thread.sleep(forTimeInterval: 60)
             }
@@ -137,8 +144,7 @@ final class Bridge {
         var subscribed = Set<TaskKey>(), frames = Frames(), nextDiscovery = 0.0, nextRefresh = monotonic() + 15
         while true {
             if monotonic() >= nextDiscovery {
-                for id in try recentIDs(home: home) {
-                    let key = TaskKey(host: "local", id: id)
+                for key in try autoreleasepool(invoking: { try recentTasks(home: home) }) {
                     if subscribed.insert(key).inserted { try follow(key) }
                 }
                 nextDiscovery = monotonic() + 10

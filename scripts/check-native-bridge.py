@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sqlite3
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,6 +99,35 @@ def main():
         for request, expected in fixtures:
             if request['function'] == 'codex_binary':
                 assert legacy.codex_binary(*request['args']) == expected, ('Python resolver', request, expected)
+        # Test the real locked snapshot at a deterministic clock, independently of legacy behavior.
+        for args, expected in [
+            ([100, 100, 100, 54], {"connected": True, "tasks": ["local/live"], "fuel": 75}),
+            ([100, 100, 54, 100], {"connected": True, "tasks": ["remote/stale"], "fuel": 75}),
+            ([146, 146, 100, 146], {"connected": True, "tasks": ["remote/stale"], "fuel": 75}),
+            ([251, 251, 251, 251], {"connected": True, "tasks": ["local/live", "remote/stale"], "fuel": None}),
+        ]:
+            fixtures.append((dict(function='bridge_snapshot', args=args), expected))
+        fixtures.append((dict(function='fuel_refresh', args=[]), 75))
+        remote_id = '22222222-2222-4222-8222-222222222222'
+        second_id = '33333333-3333-4333-8333-333333333333'
+        for index, state in enumerate([
+            {'thread-project-membership-host-ids': {remote_id: 'remote-test', 'invalid': 'remote-test'},
+             'thread-project-assignments': {second_id: {'hostId': 'remote-other'}}, 'private': 'PRIVATE'},
+            {'thread-project-membership-host-ids': [], 'thread-project-assignments': None},
+            None, 'malformed-json',
+        ]):
+            home = path / f'discovery-{index}'
+            home.mkdir()
+            with sqlite3.connect(home / 'state_5.sqlite') as db:
+                db.execute('CREATE TABLE threads (id TEXT, archived INTEGER, updated_at INTEGER)')
+            (home / '.codex-global-state.json').write_text('{' if state == 'malformed-json' else json.dumps(state))
+            expected = [host + '/' + task for host, task in legacy.Bridge(home).keys()]
+            if index == 0:
+                assert set(expected) == {'remote-test/' + remote_id, 'remote-other/' + second_id}
+            fixtures.append((dict(function='recent_tasks', args=[str(home)]), expected))
+        bridge_source = (ROOT / 'CodexBridge/Bridge.swift').read_text().replace('private ', '')
+        (path / 'Bridge.swift').write_text(bridge_source)
+        refresh = bridge_source.split('                    let result = readFuel(home: home)', 1)[1].split('                }', 1)[0]
         runner = path / 'Check.swift'
         runner.write_text('''import Foundation
 @main struct Check {
@@ -115,7 +145,25 @@ def main():
             case "update_effort": result = Projection.effort(args[0], change: args[1] as! [String: Any])
             case "update_model": result = Projection.model(args[0], change: args[1] as! [String: Any])
             case "fuel_snapshot": result = Projection.fuel(args[0] as! [String: Any], now: args[1] as! Double, weekly: args[2] as! Bool) as Any? ?? NSNull()
+            case "fuel_refresh":
+                let lock = NSLock()
+                var fuel: Object? = ["remainingPercent": 75, "windowMinutes": 10080, "updatedAt": 100, "resetsAt": 1000]
+                var allowances: [Object] = [fuel!]
+                let refreshResult: (Object?, [Object]) = (nil, [])
+REFRESH_BODY
+                assert(allowances.count == 1, "Failed quota refresh discarded valid windows")
+                result = fuel?["remainingPercent"] ?? null
+            case "bridge_snapshot":
+                let bridge = try Bridge(home: URL(fileURLWithPath: "/tmp"))
+                bridge.connected = true; bridge.lastContact = args[1] as! Double
+                bridge.entries[TaskKey(host: "local", id: "live")] = Entry(runtime: ["type": "active"], receivedAt: args[2] as! Double)
+                bridge.entries[TaskKey(host: "remote", id: "stale")] = Entry(runtime: ["type": "active"], receivedAt: args[3] as! Double)
+                bridge.fuel = ["remainingPercent": 75, "windowMinutes": 10080, "updatedAt": 100, "resetsAt": 1000]
+                let snapshot = bridge.snapshot(now: args[0] as! Double)
+                result = ["connected": snapshot["connected"]!, "tasks": (snapshot["tasks"] as! [Object]).map { text($0["hostId"]) + "/" + text($0["id"]) },
+                          "fuel": object(snapshot["fuel"])["remainingPercent"] ?? null]
             case "codex_binary": result = codexBinary(environment: args[0] as! [String: String], applications: args[1] as! String) as Any? ?? NSNull()
+            case "recent_tasks": result = try recentTasks(home: URL(fileURLWithPath: args[0] as! String)).map(\.identity)
             default: fatalError("Unknown fixture")
             }
             let data = try JSONSerialization.data(withJSONObject: result, options: [.fragmentsAllowed, .sortedKeys, .withoutEscapingSlashes])
@@ -123,10 +171,10 @@ def main():
         }
     }
 }
-''')
+'''.replace('REFRESH_BODY', refresh.replace('result.', 'refreshResult.')))
         env = dict(os.environ, DEVELOPER_DIR='/Applications/Xcode.app/Contents/Developer')
         subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', str(ROOT / 'CodexBridge/Projection.swift'),
-                        str(ROOT / 'CodexBridge/Transport.swift'), str(ROOT / 'CodexBridge/Bridge.swift'),
+                        str(ROOT / 'CodexBridge/Transport.swift'), str(path / 'Bridge.swift'),
                         str(runner), '-o', str(path / 'check')], env=env, check=True)
         result = subprocess.run([str(path / 'check')], input=''.join(json.dumps(f[0], ensure_ascii=False)+'\n' for f in fixtures),
                                 text=True, capture_output=True)

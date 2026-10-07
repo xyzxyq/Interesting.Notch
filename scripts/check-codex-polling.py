@@ -28,11 +28,15 @@ let testDefaults = UserDefaults(suiteName: suite)!
     func data(from url: URL) async throws -> (Data, URLResponse) {
         try await withCheckedThrowingContinuation { Self.requests.append($0) }
     }
-    static func reply(_ index: Int, running: Bool) {
-        let body: [String: Any] = ["connected": true, "updatedAt": Date.now.timeIntervalSince1970,
+    static func reply(_ index: Int, running: Bool, connected: Bool = true, fuel: Bool = false) {
+        var body: [String: Any] = ["connected": connected, "updatedAt": Date.now.timeIntervalSince1970,
             "replyToken": "fixture", "tasks": running ? [["id":"11111111-1111-4111-8111-111111111111",
                 "title":"Fixture", "state":"running", "isRunning":true]] : [],
             "idleTaskIds": running ? [] : ["local/11111111-1111-4111-8111-111111111111"]]
+        if fuel {
+            body["fuel"] = ["remainingPercent": 75, "windowMinutes": 10080,
+                "resetsAt": Date.now.timeIntervalSince1970 + 600, "updatedAt": Date.now.timeIntervalSince1970]
+        }
         let response = HTTPURLResponse(url: URL(string: "http://127.0.0.1:19427/state")!,
                                        statusCode: 200, httpVersion: nil, headerFields: nil)!
         requests[index].resume(returning: (try! JSONSerialization.data(withJSONObject: body), response))
@@ -73,13 +77,21 @@ let testDefaults = UserDefaults(suiteName: suite)!
         assert(ControlledSession.requests.count == 3, "Sleeping app kept polling")
         NotchMotionEnvironment.shared.suspended = false
         await settle { ControlledSession.requests.count == 4 }
-        ControlledSession.reply(3, running: false)
+        ControlledSession.reply(3, running: false, connected: false, fuel: true)
+        await settle { activity.fuel != nil }
+        assert(!activity.connected && !activity.running, "Quota must be independent of the task connection")
+        await settle { ControlledSession.requests.count == 5 }
+        ControlledSession.reply(4, running: false, fuel: true)
         await settle { activity.connected }
+        await settle { ControlledSession.requests.count == 6 }
+        ControlledSession.requests[5].resume(throwing: URLError(.cannotConnectToHost))
+        await settle { !activity.connected }
+        assert(activity.fuel != nil, "A brief task transport failure discarded valid quota")
         assert(activity.completionSequence == 0, "Wake was misreported as task completion")
         activity.enabled = false
         await settle { ControlledSession.invalidations == 3 }
         try? await Task.sleep(for: .milliseconds(1150))
-        assert(ControlledSession.requests.count == 4 && activity.pollTask == nil, "Disabled feature kept polling")
+        assert(ControlledSession.requests.count == 6 && activity.pollTask == nil, "Disabled feature kept polling")
         print("PASS: disabled startup, enable/disable, late response rejection, single loop, sleep/wake, no false completion, session cleanup")
     }
 }

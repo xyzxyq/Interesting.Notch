@@ -258,11 +258,15 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .environmentObject(vm)
         .onAppear { handledCompletion = codex.completionSequence }
-        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.completionSequence)-\(reducedMotion)") {
+        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.completionSequence)-\(reducedMotion)-\(codex.enabled)-\(codex.preview ?? "live")") {
             let completed = codex.completionSequence > handledCompletion
-            handledCompletion = codex.completionSequence
             flameActive = false
             confettiActive = false
+            // Disabled/preview/reduced-motion cues are deliberately skipped. A busy
+            // surface merely defers the cue until it can emit, including task cancellation.
+            if !codex.enabled || codex.preview != nil || reducedMotion {
+                handledCompletion = codex.completionSequence
+            }
             if rocketRequested {
                 try? await Task.sleep(for: .milliseconds(reducedMotion ? 0 : 850))
                 guard !Task.isCancelled else { return }
@@ -273,7 +277,7 @@ struct ContentView: View {
                 return
             }
 
-            guard completed && rocketSurfaceAvailable && !reducedMotion else {
+            guard completed && codex.preview == nil && rocketSurfaceAvailable && !reducedMotion else {
                 withAnimation(.easeInOut(duration: 0.15)) { rocketProgress = 0 }
                 return
             }
@@ -284,7 +288,9 @@ struct ContentView: View {
             }
             try? await Task.sleep(for: .milliseconds(Int(CodexCompletionCue.flameOutDuration * 1_000)))
             guard !Task.isCancelled else { return }
+            handledCompletion = codex.completionSequence
             confettiActive = true
+            CodexActivity.log.info("Completion ribbons started: sequence=\(self.handledCompletion, privacy: .public)")
             try? await Task.sleep(for: .milliseconds(Int(CodexCompletionCue.ribbonDuration * 1_000)))
             guard !Task.isCancelled else { return }
             confettiActive = false

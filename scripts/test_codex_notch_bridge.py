@@ -36,8 +36,10 @@ snapshot = b.snapshot()
 assert snapshot['tasks'][0]['title'] == 'Codex task'
 assert 'PRIVATE' not in str(snapshot)
 b.runtimes[('local', 'test')]['receivedAt'] = b.last_contact - 46
-assert b.snapshot()['connected'] is False
+assert b.snapshot()['connected'] is True
 assert b.snapshot()['tasks'] == []
+b.runtimes[('remote', 'fresh')] = dict(runtime=dict(type='active'), receivedAt=b.last_contact)
+assert [task['hostId'] for task in b.snapshot()['tasks']] == ['remote']
 print('PASS: running, approval, user input, resume, completion, unavailable and privacy projection')
 
 # Exercise real framing, partial reads, revision sequencing and disconnect cleanup.

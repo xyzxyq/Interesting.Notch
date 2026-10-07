@@ -716,7 +716,7 @@ private struct CodexFuelFrame: View, Animatable {
             context.stroke(shell, with: .color(tint.opacity(available ? 0.85 : 0.5)), lineWidth: 1)
         }
         .overlay {
-            Image(systemName: available ? "fuelpump.fill" : "questionmark")
+            Image(systemName: available ? "fuelpump.fill" : "fuelpump")
                 .resizable().scaledToFit()
                 .foregroundStyle(.white.opacity(0.95))
                 .frame(width: 9, height: 9)

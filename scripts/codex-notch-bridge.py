@@ -316,12 +316,10 @@ class Bridge:
             idle_task_ids = []
             now = time.time()
             fresh = self.connected and now - self.last_contact < 45
-            # Refresh live snapshots periodically: even a silent long tool run
-            # stays fresh, while a hung owner cannot leave a phantom rocket.
-            if any(task_state(entry['runtime'], entry.get('pendingQuestions', False)) and now - entry.get('receivedAt', now) >= 45
-                   for entry in self.runtimes.values()):
-                fresh = False
             for (host, task_id), entry in self.runtimes.items():
+                # A silent owner must not hide fresh work from other hosts or tasks.
+                if now - entry.get('receivedAt', now) >= 45:
+                    continue
                 state = task_state(entry['runtime'], entry.get('pendingQuestions', False))
                 if (entry.get('runtime') or {}).get('type') == 'idle' and now - entry.get('receivedAt', 0) < 35:
                     idle_task_ids.append(f'{host}/{task_id}')
@@ -386,17 +384,39 @@ class Bridge:
             except (OSError, ValueError, TypeError, AttributeError):
                 value = None
             with self.lock:
-                self.fuel = (value or {}).get('fuel')
-                self.allowances = (value or {}).get('allowances', [])
+                # Keep only until the original reading expires in snapshot().
+                if (value or {}).get('fuel') is not None:
+                    self.fuel = value['fuel']
+                if (value or {}).get('allowances'):
+                    self.allowances = value['allowances']
             time.sleep(60)
 
-    def ids(self):
-        # ponytail: bootstrap 100 recent local tasks; runtime broadcasts discover
-        # newly active tasks. Add a supported global catalog when Codex exposes one.
+    def keys(self):
+        # ponytail: bootstrap 100 local and 100 known remote tasks; use a supported
+        # live catalog if this ceiling matters. Runtime broadcasts discover new work.
         db = self.home / 'state_5.sqlite'
         with sqlite3.connect(db.as_uri() + '?mode=ro', uri=True) as conn:
-            return [row[0] for row in conn.execute(
+            keys = [('local', row[0]) for row in conn.execute(
                 'SELECT id FROM threads WHERE archived = 0 ORDER BY updated_at DESC LIMIT 100')]
+        try:
+            state = json.loads((self.home / '.codex-global-state.json').read_text())
+        except (OSError, ValueError):
+            state = {}
+        state = state if isinstance(state, dict) else {}
+        hosts = state.get('thread-project-membership-host-ids', {})
+        hosts = dict(hosts) if isinstance(hosts, dict) else {}
+        assignments = state.get('thread-project-assignments', {})
+        for task_id, value in (assignments.items() if isinstance(assignments, dict) else []):
+            if task_id not in hosts and isinstance(value, dict):
+                hosts[task_id] = value.get('hostId')
+        remote = []
+        for task_id, host in hosts.items():
+            if not isinstance(host, str) or not host or host == 'local' or len(host.encode()) > 256:
+                continue
+            try: uuid.UUID(task_id)
+            except (ValueError, AttributeError): continue
+            remote.append((host, task_id))
+        return keys + sorted(remote, key=lambda key: key[1])[-100:]
 
     def run(self):
         while True:
@@ -428,8 +448,7 @@ class Bridge:
             next_refresh = time.monotonic() + 15
             while True:
                 if time.monotonic() >= next_discovery:
-                    for task_id in self.ids():
-                        key = ('local', task_id)
+                    for key in self.keys():
                         if key not in subscribed:
                             follow(*key)
                             subscribed.add(key)

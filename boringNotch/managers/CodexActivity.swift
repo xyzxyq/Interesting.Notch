@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import OSLog
 
 struct CodexQuestion: Decodable, Equatable {
     let id: String
@@ -83,6 +84,7 @@ struct CodexTaskStability {
 
 @MainActor final class CodexActivity: ObservableObject {
     static let shared = CodexActivity()
+    static let log = Logger(subsystem: "theboringteam.boringnotch", category: "CodexActivity")
     @Published var enabled = UserDefaults.standard.object(forKey: "codexRocketEnabled") as? Bool ?? true {
         didSet {
             guard enabled != oldValue else { return }
@@ -233,27 +235,42 @@ struct CodexTaskStability {
                     try Task.checkCancellation()
                     guard (response as? HTTPURLResponse)?.statusCode == 200, data.count < 256_000 else { throw URLError(.badServerResponse) }
                     let snapshot = try JSONDecoder().decode(CodexSnapshot.self, from: data)
+                    // Quota has its own freshness; a task-owner disconnect cannot invalidate it.
+                    let fuel = [snapshot.fuel, self.fuel].compactMap { $0 }.first { $0.valid(at: .now) }
+                    if self.fuel != fuel { self.fuel = fuel }
+                    let allowances = ((snapshot.allowances?.isEmpty == false ? snapshot.allowances : self.allowances) ?? [])
+                        .filter { $0.valid(at: .now) }.sorted { $0.windowMinutes < $1.windowMinutes }
+                    if self.allowances != allowances { self.allowances = allowances }
                     guard snapshot.connected, snapshot.fresh(at: .now) else { throw URLError(.cannotConnectToHost) }
                     self.lastSuccess = .now
                     self.replyToken = snapshot.replyToken
-                    let fuel = snapshot.fuel.flatMap { $0.valid(at: .now) ? $0 : nil }
-                    if self.fuel != fuel { self.fuel = fuel }
-                    let allowances = (snapshot.allowances ?? []).filter { $0.valid(at: .now) }.sorted { $0.windowMinutes < $1.windowMinutes }
-                    if self.allowances != allowances { self.allowances = allowances }
                     let tasks = snapshot.tasks.filter { UUID(uuidString: $0.id) != nil && ["running", "waiting"].contains($0.state) }
                     let stable = self.stability.update(tasks, at: .now)
                     let finished = Self.didFinishWork(previous: self.tasks, current: stable,
                                                       confirmedIdle: snapshot.idleTaskIds ?? [], continuousConnection: self.connected)
-                    if self.tasks != stable { self.tasks = stable }
-                    if finished && self.enabled && self.preview == nil { self.completionSequence += 1 }
-                    if !self.connected { self.connected = true }
+                    if self.tasks != stable {
+                        self.tasks = stable
+                        Self.log.info("Task state updated: active=\(stable.filter(\.working).count, privacy: .public), waiting=\(stable.filter(\.waiting).count, privacy: .public)")
+                    }
+                    if finished && self.enabled && self.preview == nil {
+                        self.completionSequence += 1
+                        Self.log.info("Completion accepted: sequence=\(self.completionSequence, privacy: .public)")
+                    }
+                    if !self.connected {
+                        self.connected = true
+                        Self.log.info("Task bridge connected")
+                    }
                 } catch {
                     guard !Task.isCancelled else { return }
-                    if self.connected { self.connected = false }
+                    if self.connected {
+                        self.connected = false
+                        Self.log.info("Task bridge unavailable")
+                    }
+                    if self.fuel?.valid(at: .now) == false { self.fuel = nil }
+                    let validAllowances = self.allowances.filter { $0.valid(at: .now) }
+                    if self.allowances != validAllowances { self.allowances = validAllowances }
                     // Retain the presentation for short transport failures; never indefinitely.
                     if Date.now.timeIntervalSince(self.lastSuccess) >= 5 {
-                        if self.fuel != nil { self.fuel = nil }
-                        if !self.allowances.isEmpty { self.allowances = [] }
                         if !self.tasks.isEmpty { self.tasks = [] }
                         self.stability.reset()
                     }
