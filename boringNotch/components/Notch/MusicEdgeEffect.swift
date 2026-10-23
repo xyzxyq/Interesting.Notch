@@ -105,6 +105,10 @@ struct MusicEdgePlayback {
     let ambient: Bool
     let visible: Bool
     let speed: Double
+    // Slow ambient waves need fewer redraws than music-reactive effects.
+    @MainActor func frameInterval(lowPower: Bool) -> Double {
+        NotchMotionEnvironment.decorativeFrameInterval(lowPower: lowPower) * (ambient ? 2 : 1)
+    }
     init(style: String, alwaysOn: Bool, playing: Bool, energy: Double) {
         ambient = alwaysOn && style.hasPrefix("water") && !playing
         visible = style != "off" && (playing || ambient)
@@ -337,7 +341,7 @@ struct MusicEdgeEffect: View, Animatable {
     var body: some View {
         let playback = MusicEdgePlayback(style: style, alwaysOn: alwaysOn, playing: musicPlaying, energy: reactive ? audio.energy : 0)
         let paused = !onScreen || !isVisible || motion.suspended || !playback.visible || reduced
-        TimelineView(.animation(minimumInterval: NotchMotionEnvironment.decorativeFrameInterval(lowPower: playback.ambient || motion.lowPower), paused: paused)) { clock in
+        TimelineView(.animation(minimumInterval: playback.frameInterval(lowPower: motion.lowPower), paused: paused)) { clock in
             let elapsed = music.elapsedTime + (musicPlaying ? max(0, clock.date.timeIntervalSince(music.timestampDate)) * max(0, music.playbackRate) : 0)
             let ending = CompactLyrics.dissolve(at: elapsed, duration: music.songDuration)
             let period = CompactLyrics.timeOfDay(at: clock.date)

@@ -18,7 +18,7 @@ let testDefaults = UserDefaults(suiteName: suite)!
 @MainActor final class NotchMotionEnvironment: ObservableObject {
     static let shared = NotchMotionEnvironment()
     @Published var suspended = false
-    static func decorativeFrameInterval(lowPower: Bool) -> Double { lowPower ? 1.0 / 15 : 1.0 / 24 }
+    static func decorativeFrameInterval(lowPower: Bool) -> Double { lowPower ? 1.0 / 10 : 1.0 / 20 }
 }
 @MainActor final class ControlledSession {
     static var requests: [CheckedContinuation<(Data, URLResponse), Error>] = []

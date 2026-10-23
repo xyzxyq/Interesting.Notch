@@ -112,7 +112,7 @@ struct NotchShape: Shape {
             : .spring(response: 0.46, dampingFraction: 0.9)
     }
     static func decorativeFrameInterval(lowPower: Bool) -> Double {
-        lowPower ? 1.0 / 15 : 1.0 / 24
+        lowPower ? 1.0 / 10 : 1.0 / 20
     }
     static func lyricsFrameInterval(lowPower: Bool) -> Double {
         lowPower ? 1.0 / 15 : 1.0 / 35

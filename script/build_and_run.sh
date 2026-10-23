@@ -2,10 +2,12 @@
 set -euo pipefail
 
 MODE="${1:-run}"
+CONFIGURATION=Debug
+if [ "$MODE" = "--release" ]; then CONFIGURATION=Release; fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DERIVED_DATA="$ROOT_DIR/build/DerivedData"
-BUILT_APP="$DERIVED_DATA/Build/Products/Debug/Interesting Notch.app"
-APP_BUNDLE="$HOME/Applications/InterestingNotch Debug.app"
+BUILT_APP="$DERIVED_DATA/Build/Products/$CONFIGURATION/Interesting Notch.app"
+APP_BUNDLE="$HOME/Applications/InterestingNotch $CONFIGURATION.app"
 APP_BINARY="$APP_BUNDLE/Contents/MacOS/Interesting Notch"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
@@ -23,7 +25,7 @@ if pgrep -x 'Interesting Notch' >/dev/null; then
 fi
 
 cd "$ROOT_DIR"
-xcodebuild -project boringNotch.xcodeproj -scheme boringNotch -configuration Debug \
+xcodebuild -project boringNotch.xcodeproj -scheme boringNotch -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA" CODE_SIGNING_ALLOWED=NO build
 # Sign on the local volume: external disks recreate AppleDouble files during signing.
 mkdir -p "$(dirname "$APP_BUNDLE")"
@@ -34,7 +36,7 @@ rsync -a --exclude='._*' "$BUILT_APP/" "$APP_BUNDLE/"
 python3 scripts/sign-development.py "$APP_BUNDLE"
 
 case "$MODE" in
-  run)
+  run|--release)
     /usr/bin/open -n "$APP_BUNDLE"
     ;;
   --debug|debug)
@@ -50,7 +52,7 @@ case "$MODE" in
     [ "$(pgrep -x 'Interesting Notch' | wc -l | tr -d ' ')" = 1 ]
     ;;
   *)
-    echo "usage: $0 [run|--debug|--logs|--telemetry|--verify]" >&2
+    echo "usage: $0 [run|--release|--debug|--logs|--telemetry|--verify]" >&2
     exit 2
     ;;
 esac

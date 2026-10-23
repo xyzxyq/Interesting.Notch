@@ -3,12 +3,12 @@ import AppKit
 
 @main @MainActor struct MusicEdgeChecks {
     static func main() throws {
-        assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: false) == 1.0 / 24)
-        assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: true) == 1.0 / 15)
+        assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: false) == 1.0 / 20)
+        assert(NotchMotionEnvironment.decorativeFrameInterval(lowPower: true) == 1.0 / 10)
         assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: false) == 1.0 / 35)
         assert(NotchMotionEnvironment.lyricsFrameInterval(lowPower: true) == 1.0 / 15)
-        assert(CodexThrust.frameInterval(lowPower: false) == 1.0 / 24)
-        assert(CodexThrust.frameInterval(lowPower: true) == 1.0 / 15)
+        assert(CodexThrust.frameInterval(lowPower: false) == 1.0 / 20)
+        assert(CodexThrust.frameInterval(lowPower: true) == 1.0 / 10)
         // Phase stays continuous when music/rocket speed changes or a screen sleeps.
         var phase = MusicEdgePhase()
         let start = Date(timeIntervalSinceReferenceDate: 1234)
@@ -40,6 +40,10 @@ import AppKit
             let idle = MusicEdgePlayback(style: style, alwaysOn: true, playing: false, energy: 1)
             let playing = MusicEdgePlayback(style: style, alwaysOn: true, playing: true, energy: 0)
             assert(idle.visible && idle.ambient && idle.speed < playing.speed)
+            for lowPower in [false, true] {
+                assert(playing.frameInterval(lowPower: lowPower) == NotchMotionEnvironment.decorativeFrameInterval(lowPower: lowPower))
+                assert(idle.frameInterval(lowPower: lowPower) == 2 * playing.frameInterval(lowPower: lowPower))
+            }
             assert(!MusicEdgePlayback(style: style, alwaysOn: false, playing: false, energy: 0).visible)
         }
         assert(!MusicEdgePlayback(style: "off", alwaysOn: true, playing: true, energy: 1).visible)

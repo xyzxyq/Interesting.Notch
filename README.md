@@ -93,7 +93,7 @@ python3 scripts/codex-notch-bridge-install.py --binary ./codex-notch-bridge
 
 **旧 Python 桥接也通过此命令迁移；应用内更新不会更新独立桥接。** 桥接读取本机任务状态、待回答问题与额度，通过带令牌保护的回环接口发送回答；客户端私有接口变化可能影响兼容性。[安装、卸载与接口说明 →](docs/guide.md#codex-状态桥接)
 
-3.0.12 修复额度暂时不可用时的问号占位、展开状态下丢失结束彩带，以及后台任务识别问题。请同时更新应用和同一发布页的 Codex 桥接附件；仅更新应用不会升级独立桥接。
+3.0.13 优化应用启动和持续动画的 CPU 开销；桥接代码与 3.0.12 相同，已安装 3.0.12 桥接的用户无需重新安装。从更早版本升级时，请同时更新桥接，以包含后台任务发现、额度保留和超时隔离修复；应用内更新不会升级独立桥接。
 
 ### 播放器与权限
 
@@ -122,6 +122,7 @@ open boringNotch.xcodeproj
 
 | 资料 | 内容 |
 | :--- | :--- |
+| [3.0.13 · 启动与 CPU 优化](docs/releases/3.0.13.md) | 设置按需加载、装饰帧率调整与[实测记录](docs/performance-2026-10-23.md) |
 | [Super Rocket · 3.0.12](docs/releases/3.0.12.md) | Codex 后台状态、额度与结束彩带修复；[发布验证](docs/releases/3.0.12-validation.md) |
 | [Super Rocket · 3.0.11](docs/releases/3.0.11.md) | 动效打磨、燃料图标修复与[发布验证](docs/releases/3.0.11-validation.md) |
 | [动效打磨与验证](docs/motion-2026-09-26.md) | 手势、过渡、滚动标题与动画生命周期的详细记录 |

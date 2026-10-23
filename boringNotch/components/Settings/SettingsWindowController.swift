@@ -15,16 +15,7 @@ class SettingsWindowController: NSWindowController {
     private var updaterController: SPUStandardUpdaterController?
     
     private init() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        
-        super.init(window: window)
-        
-        setupWindow()
+        super.init(window: nil)
     }
     
     required init?(coder: NSCoder) {
@@ -33,8 +24,7 @@ class SettingsWindowController: NSWindowController {
     
     func setUpdaterController(_ controller: SPUStandardUpdaterController) {
         self.updaterController = controller
-        // Recreate the content view with the proper updater controller
-        setupWindow()
+        if window != nil { setupWindow() }
     }
     
     private func setupWindow() {
@@ -67,6 +57,15 @@ class SettingsWindowController: NSWindowController {
     }
     
     func showWindow() {
+        if window == nil {
+            window = NSWindow(
+                contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                backing: .buffered,
+                defer: false
+            )
+            setupWindow()
+        }
         // Set app to regular mode first
         NSApp.setActivationPolicy(.regular)
         
