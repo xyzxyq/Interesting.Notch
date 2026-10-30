@@ -25,6 +25,7 @@ class CalendarManager: ObservableObject {
     @Published var reminderAuthorizationStatus: EKAuthorizationStatus = .notDetermined
     private var selectedCalendars: [CalendarModel] = []
     private let calendarService = CalendarService()
+    private var eventGeneration = 0
 
     private var eventStoreChangedObserver: NSObjectProtocol?
 
@@ -61,14 +62,12 @@ class CalendarManager: ObservableObject {
         self.reminderLists = all.filter { $0.isReminder }
         self.allCalendars = all // for legacy compatibility, can be removed if not needed
         updateSelectedCalendars()
+        await updateEvents()
     }
 
     func checkCalendarAuthorization() async {
         let status = EKEventStore.authorizationStatus(for: .event)
-        DispatchQueue.main.async {
-            print("📅 Current calendar authorization status: \(status)")
-            self.calendarAuthorizationStatus = status
-        }
+        self.calendarAuthorizationStatus = status
 
         switch status {
         case .notDetermined:
@@ -79,20 +78,12 @@ class CalendarManager: ObservableObject {
             self.calendarAuthorizationStatus = granted ? .fullAccess : .denied
             if granted {
                 await reloadCalendarAndReminderLists()
-                events = await calendarService.events(
-                    from: currentWeekStartDate,
-                    to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
-                    calendars: selectedCalendars.map { $0.id })
             }
         case .restricted, .denied:
             NSLog("Calendar access denied or restricted")
         case .fullAccess:
             NSLog("Full access")
             await reloadCalendarAndReminderLists()
-            events = await calendarService.events(
-                from: currentWeekStartDate,
-                to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
-                calendars: selectedCalendars.map { $0.id })
         case .writeOnly:
             NSLog("Write only")
         @unknown default:
@@ -102,10 +93,7 @@ class CalendarManager: ObservableObject {
     
     func checkReminderAuthorization() async {
         let status = EKEventStore.authorizationStatus(for: .reminder)
-        DispatchQueue.main.async {
-            print("📅 Current reminder authorization status: \(status)")
-            self.reminderAuthorizationStatus = status
-        }
+        self.reminderAuthorizationStatus = status
 
         switch status {
         case .notDetermined:
@@ -184,21 +172,20 @@ class CalendarManager: ObservableObject {
     }
 
     private func updateEvents() async {
+        eventGeneration += 1
+        let generation = eventGeneration
         let calendarIDs = selectedCalendars.map { $0.id }
         let eventsResult = await calendarService.events(
             from: currentWeekStartDate,
             to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
             calendars: calendarIDs
         )
+        guard generation == eventGeneration else { return }
         self.events = eventsResult
     }
     
     func setReminderCompleted(reminderID: String, completed: Bool) async {
         await calendarService.setReminderCompleted(reminderID: reminderID, completed: completed)
-        // Refresh events after updating
-        events = await calendarService.events(
-            from: currentWeekStartDate,
-            to: Calendar.current.date(byAdding: .day, value: 1, to: currentWeekStartDate)!,
-            calendars: selectedCalendars.map { $0.id })
+        await updateEvents()
     }
 }

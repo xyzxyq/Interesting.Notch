@@ -94,6 +94,14 @@ import AppKit
             .map(\.identity) == [reminders[1], remoteReminder, nextReminder].map(\.identity))
         multiQuestion.pendingQuestionIds = ["question-b"]
         assert(CodexActivity.reminders(in: [multiQuestion]).count == 1)
+        assert(CodexActivity.retainedReadReminders(seen, tasks: [multiQuestion]).isEmpty,
+               "Resolved request must not leave a permanent hidden reminder")
+        assert(CodexActivity.retainedReadReminders([task.identity], tasks: [task]) == [task.identity])
+        assert(CodexActivity.retainedReadReminders([task.identity], tasks: []).isEmpty,
+               "A later approval in the same task must be visible again")
+        let nativeQuestion = CodexQuestion(id: "approval", title: "Confirm", options: [], replyable: false)
+        assert(!nativeQuestion.canReply)
+        assert(CodexQuestion(id: "async", title: "Choose", options: ["A"]).canReply)
         var stability = CodexTaskStability()
         let base = Date(timeIntervalSince1970: 100)
         assert(stability.update([task], at: base) == [task])
@@ -118,6 +126,10 @@ import AppKit
         assert(abs(CodexDropMotion.reminder(at: 120).offset) < 0.001)
         assert(task.waiting && task.url?.absoluteString == "codex://threads/\(id)")
         assert(CodexTask(id: "../settings?x=1", title: "", state: "running", detail: nil).url == nil)
+        assert(CodexThrust.frameInterval(lowPower: false) == 1.0 / 20)
+        assert(CodexThrust.frameInterval(lowPower: true) == 1.0 / 10)
+        assert(CodexThrust.fuelFrameInterval(lowPower: false) == 1.0 / 12)
+        assert(CodexThrust.fuelFrameInterval(lowPower: true) == 1.0 / 6)
         assert(CodexThrust.levels.count == 6)
         for level in 1..<6 {
             assert(CodexThrust.length(level) > CodexThrust.length(level - 1))
@@ -155,36 +167,6 @@ import AppKit
         }
         assert(abs(CodexDropMotion.reminder(at: 3.6).offset) < 0.001)
         assert(abs(CodexDropMotion.reminder(at: 2.8).brightness - 1) < 0.001)
-        let fall = CodexDropMotion.fall
-        let rebounds = (1..<(fall.count - 1)).filter {
-            fall[$0].progress < fall[$0 - 1].progress && fall[$0].progress < fall[$0 + 1].progress
-        }
-        assert(rebounds.count == 2)
-        assert(fall[rebounds[0]].progress < fall[rebounds[1]].progress)
-        assert(fall.last!.progress == 1 && fall.last!.surface == 0)
-        assert(CodexDropMotion.returning.last!.progress == 0 && CodexDropMotion.returning.last!.surface == 0)
-        let fallDuration = fall.reduce(0) { $0 + $1.duration }
-        for t in stride(from: 0.0, through: fallDuration, by: 0.01) {
-            let forward = CodexDropMotion.sample(fall, initial: .init(progress: 0, surface: 0, duration: 0), time: fallDuration - t)
-            let reverse = CodexDropMotion.sample(CodexDropMotion.returning, initial: .init(progress: 1, surface: 0, duration: 0), time: t)
-            assert(abs(forward.progress - reverse.progress) < 0.00001)
-            assert(abs(forward.surface - reverse.surface) < 0.00001)
-        }
-        let origin = CodexDropMotion.Frame(progress: 0, surface: 0, duration: 0)
-        var boundary = 0.0
-        for frame in fall.dropLast() {
-            boundary += frame.duration
-            let epsilon = 0.0001
-            let left = CodexDropMotion.sample(fall, initial: origin, time: boundary - epsilon)
-            let center = CodexDropMotion.sample(fall, initial: origin, time: boundary)
-            let right = CodexDropMotion.sample(fall, initial: origin, time: boundary + epsilon)
-            let v1 = (center.progress - left.progress) / epsilon
-            let v2 = (right.progress - center.progress) / epsilon
-            assert(abs(v1 - v2) < 0.03, "Velocity must remain continuous across keyframes")
-        }
-        let before = CodexDropMotion.sample(fall, initial: origin, time: 0.239)
-        let after = CodexDropMotion.sample(fall, initial: origin, time: 0.241)
-        assert((after.progress - before.progress) / 0.002 > 1, "Descent must not pause at stretch node")
         let liquidRect = CGRect(x: 0, y: 0, width: 280, height: 32)
         let liquid = NotchShape(liquid: 8).path(in: liquidRect)
         assert(liquid.contains(CGPoint(x: 140, y: 38)))
@@ -286,7 +268,7 @@ import AppKit
                     .overlay { CodexRocketSurface(shape: NotchShape(rocket: progress)) }
                 MusicEdgeFrame(shape: NotchShape(rocket: progress), style: "waterColor", strength: 1,
                                energy: 0.6, phase: 2.1, color: .white, reduced: false, sky: false)
-                    .padding(-24 - 48 * progress)
+                    .padding(-MusicEdgeFrame.drawingPadding(rocket: progress))
                 if progress == 1 {
                     CodexSpeedLines(shape: NotchShape(rocket: progress), effort: effort, active: true)
                     CodexFlame(active: true, effort: effort)

@@ -571,9 +571,11 @@ final class ShelfItemViewModel: ObservableObject {
                                 // Fallback: reveal the temporary file in Finder
                                 NSWorkspace.shared.activateFileViewerSelecting([zipTempURL])
                             }
+                        } else {
+                            showErrorAlert(title: "无法创建压缩包", message: "部分文件无法读取。请确认文件仍在原位置且有访问权限后重试。")
                         }
                     } catch {
-                        print("❌ Compress failed: \(error)")
+                        showErrorAlert(title: "无法创建压缩包", message: error.localizedDescription)
                     }
                 }
                 

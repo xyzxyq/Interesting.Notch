@@ -12,17 +12,38 @@ APP_BINARY="$APP_BUNDLE/Contents/MacOS/Interesting Notch"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode.app/Contents/Developer}"
 
 # Stop every copy of the main app, including /Applications and other debug paths.
-# Bridge and media adapter helpers have different executable names.
+# Remember only media children owned by these instances before forced termination.
+MEDIA_CHILDREN=""
+for parent in $(pgrep -x 'Interesting Notch' || true); do
+  for child in $(pgrep -P "$parent" || true); do
+    case "$(ps -p "$child" -o command=)" in
+      *'/Contents/Resources/mediaremote-adapter.pl '*'/MediaRemoteAdapter.framework stream')
+        MEDIA_CHILDREN+=" $child" ;;
+    esac
+  done
+done
 pkill -TERM -x 'Interesting Notch' || true
 for _ in {1..50}; do
   pgrep -x 'Interesting Notch' >/dev/null || break
   sleep 0.1
 done
 pkill -KILL -x 'Interesting Notch' || true
+for _ in {1..20}; do
+  pgrep -x 'Interesting Notch' >/dev/null || break
+  sleep 0.05
+done
 if pgrep -x 'Interesting Notch' >/dev/null; then
   echo 'Existing application did not exit; refusing to launch a second copy.' >&2
   exit 1
 fi
+
+# SIGKILL skips app teardown; do not leave its event-stream children behind.
+for child in $MEDIA_CHILDREN; do
+  case "$(ps -p "$child" -o command=)" in
+    *'/Contents/Resources/mediaremote-adapter.pl '*'/MediaRemoteAdapter.framework stream')
+      kill -TERM "$child" 2>/dev/null || true ;;
+  esac
+done
 
 cd "$ROOT_DIR"
 xcodebuild -project boringNotch.xcodeproj -scheme boringNotch -configuration "$CONFIGURATION" \
@@ -33,6 +54,9 @@ if [ -d "$APP_BUNDLE" ]; then
   mv "$APP_BUNDLE" "${APP_BUNDLE%.app}.backup-$(date +%Y%m%d-%H%M%S).app"
 fi
 rsync -a --exclude='._*' "$BUILT_APP/" "$APP_BUNDLE/"
+mkdir -p "$APP_BUNDLE/Contents/Resources/Licenses/LICENSES"
+cp LICENSE THIRD_PARTY_LICENSES THIRD_PARTY_NOTICES.md "$APP_BUNDLE/Contents/Resources/Licenses/"
+cp LICENSES/MPL-2.0.txt "$APP_BUNDLE/Contents/Resources/Licenses/LICENSES/"
 python3 scripts/sign-development.py "$APP_BUNDLE"
 
 case "$MODE" in

@@ -1,0 +1,116 @@
+{
+  "status": "implemented; unlocked desktop performance and complete interaction regression pending",
+  "generated_at": "2026-10-30T23:43:56.835923",
+  "production_changes": [
+    "Deduplicate identical no-source MusicManager publications; release cancelled task handles",
+    "Release resolved hidden request panel and hosting view after animation completion; preserve pending and disconnected cache"
+  ],
+  "discarded_candidate": "Fixed fish-line layout reverted because its independent visible-desktop performance benefit was not established",
+  "source_sha256": {
+    "boringNotch/managers/CodexActivity.swift": "b1df7c72a42180504bb71c5df7315a64b83a18cc5a182ed847305ea816c8bf19",
+    "boringNotch/managers/MusicManager.swift": "daf031bdb168d0eda892f5f37d66fdebc6e6b902d506b33341a5df82e5b9a4bd",
+    "boringNotch/components/Notch/CodexPullCord.swift": "660fc01d2314391db31391ee1d3a25ebd81774054dee8980cba35da37e7e79c9",
+    "boringNotch/components/Notch/CodexGenieTransition.swift": "860d042916205f649169165bb5b471ce1ebcb00048798ce7f9faf91aef8ce405",
+    "scripts/check-codex-interaction.py": "61e51b82b4fe2f04a9415ba0a923f05fdf84f5616aee2a3b638b4c789be2a160",
+    "scripts/check-music-idle.py": "4d11620b28ffeb3f145b67328147d22654a9989f48cbc090c53e13428bcb07fd"
+  },
+  "fish_source_identical_to_before": true,
+  "checks": {
+    "music_idle": "PASS: 100 identical no-source events -> 0 objectWillChange; first-loss clock/cancellation/idle and pause/resume preserved",
+    "panel_lifecycle": "PASS both droplet and pullCord: warm reuse, disconnected retention, hidden release, fresh recreation, weak panel and host deallocation",
+    "full_interaction": "INCOMPLETE: Mac locked; isKeyWindow=false and NSApp.isActive=false",
+    "visual_and_fps": "Production fish and Genie code unchanged in final patch; no unlocked visual smoothness claim"
+  },
+  "preliminary_non_acceptance_runs": {
+    "baseline-1": {
+      "reason": "Lock status was not recorded during sampling; Mac subsequently confirmed locked. Optimized candidate included fish layout change now reverted. Not final performance evidence.",
+      "summary": {
+        "hidden-idle": {
+          "seconds": 9.271613875,
+          "cpu_percent": 0.027645312900465093,
+          "idle_wakeups_s": 0.5392804389192707,
+          "interrupt_wakeups_s": 0.754992614486979,
+          "process_energy_mw": 0.02540571718966241,
+          "footprint_mib": 19.594642639160156
+        },
+        "drop-idle": {
+          "seconds": 7.187823041999998,
+          "cpu_percent": 10.862236434747965,
+          "idle_wakeups_s": 37.424404917619015,
+          "interrupt_wakeups_s": 61.35376419579921,
+          "process_energy_mw": 14.073796531842893,
+          "footprint_mib": 19.813392639160156
+        },
+        "card-idle": {
+          "seconds": 6.413072625000002,
+          "cpu_percent": 0.018909292589942343,
+          "idle_wakeups_s": 0.7796574734720081,
+          "interrupt_wakeups_s": 0.9355889681664097,
+          "process_energy_mw": 0.012103558549674149,
+          "footprint_mib": 64.6104507446289
+        },
+        "hidden-again": {
+          "seconds": 6.930391209,
+          "cpu_percent": 0.012994095708436187,
+          "idle_wakeups_s": 0.2885839975963758,
+          "interrupt_wakeups_s": 0.7214599939909395,
+          "process_energy_mw": 0.0084643129415005,
+          "footprint_mib": 68.1729507446289
+        },
+        "cycles": {
+          "seconds": 33.916724083999995,
+          "cpu_percent": 18.191785419445488,
+          "idle_wakeups_s": 25.592094267425836,
+          "interrupt_wakeups_s": 41.218603439932394,
+          "process_energy_mw": 137.55901721065524,
+          "footprint_mib": 69.2823257446289
+        }
+      }
+    },
+    "optimized-1": {
+      "reason": "Lock status was not recorded during sampling; Mac subsequently confirmed locked. Optimized candidate included fish layout change now reverted. Not final performance evidence.",
+      "summary": {
+        "hidden-idle": {
+          "seconds": 9.282834792000001,
+          "cpu_percent": 0.023385008085433742,
+          "idle_wakeups_s": 0.10772571336309955,
+          "interrupt_wakeups_s": 0.6463542801785973,
+          "process_energy_mw": 0.031017680100063984,
+          "footprint_mib": 19.719642639160156
+        },
+        "drop-idle": {
+          "seconds": 7.452314458000002,
+          "cpu_percent": 10.863790543140993,
+          "idle_wakeups_s": 40.2559502407943,
+          "interrupt_wakeups_s": 61.725790369217926,
+          "process_energy_mw": 13.831576429165219,
+          "footprint_mib": 19.922767639160156
+        },
+        "card-idle": {
+          "seconds": 6.676886167000003,
+          "cpu_percent": 0.013287755866173262,
+          "idle_wakeups_s": 0.4493112395456537,
+          "interrupt_wakeups_s": 0.8986224790913074,
+          "process_energy_mw": 0.012099502369724909,
+          "footprint_mib": 64.4073257446289
+        },
+        "hidden-again": {
+          "seconds": 6.940415249999994,
+          "cpu_percent": 0.018458309585053356,
+          "idle_wakeups_s": 0.2881671957596488,
+          "interrupt_wakeups_s": 0.8645015872789463,
+          "process_energy_mw": 0.011119651666375449,
+          "footprint_mib": 54.532325744628906
+        },
+        "cycles": {
+          "seconds": 34.186303375,
+          "cpu_percent": 14.526594014934203,
+          "idle_wakeups_s": 25.156273568580882,
+          "interrupt_wakeups_s": 41.65410879262695,
+          "process_energy_mw": 131.757435531738,
+          "footprint_mib": 58.469825744628906
+        }
+      }
+    }
+  }
+}

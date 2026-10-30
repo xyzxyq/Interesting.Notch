@@ -27,6 +27,10 @@ import AppKit
         phase.update(target: 1, paused: false, at: sleeping.addingTimeInterval(3600))
         assert(phase.value(at: sleeping.addingTimeInterval(3600)) == frozen)
         assert(MusicEdgeFrame.waterSampleCount == 120)
+        assert(MusicEdgeFrame.drawingPadding(rocket: 0) == 24)
+        assert(MusicEdgeFrame.drawingPadding(rocket: 0.5) == 48)
+        assert(MusicEdgeFrame.drawingPadding(rocket: 1) == 40)
+        assert(abs(MusicEdgeFrame.drawingPadding(rocket: 1.04) - 41.92) < 0.0001)
         for phase in [-10.0, 0, 0.1, 1.2, 1234, 10_000] {
             let values = MusicEdgeFrame.waterUndulations(phase: phase)
             assert(values.count == 120)
@@ -103,12 +107,30 @@ import AppKit
                 assert(old.point == next.point && old.normal == next.normal, "Ordered contour sampling changed geometry")
             }
         } }
+        // Empty and repeated vertices must remain safe for both sampling paths.
+        let degeneratePaths = [Path(), Path { $0.move(to: CGPoint(x: 8, y: -3)) }, Path { p in
+            p.move(to: .zero); p.addLine(to: .zero)
+            p.addLine(to: CGPoint(x: 10, y: 0)); p.addLine(to: CGPoint(x: 10, y: 0)); p.closeSubpath()
+        }]
+        for path in degeneratePaths {
+            let contour = EdgeContour(path: path)
+            for initial in [-10, 0, 1, 10000] {
+                var cursor = initial
+                for fraction in [-2.3, 0, 0.25, 0.5, 0.75, 1, 0.5, -0.1] {
+                    let direct = contour.sample(fraction), ordered = contour.sample(fraction, cursor: &cursor)
+                    assert(direct.point == ordered.point && direct.normal == ordered.normal)
+                    assert(direct.point.x.isFinite && direct.point.y.isFinite && direct.normal.x.isFinite && direct.normal.y.isFinite)
+                    if contour.length == 0 { assert(direct.point == .zero && direct.normal == .zero) }
+                }
+            }
+        }
         let styles = ["water", "waterWhite", "waterColor", "ripple", "dust", "meteor", "mist"]
         func render(_ style: String, energy: Double, reduced: Bool = false, phase: Double = 0.7, sky: Bool = true,
                     rocket: Double = 0, width: Double = 352, strength: Double = 1) -> Data {
             let contourShape = NotchShape(topCornerRadius: 6, bottomCornerRadius: 12, rocket: rocket)
             let content = MusicEdgeFrame(shape: contourShape, style: style, strength: strength, energy: energy, phase: phase, color: .white, reduced: reduced, sky: sky)
-                .frame(width: width + 96 * rocket, height: 80 + 96 * rocket)
+                .frame(width: width - 48 + 2 * MusicEdgeFrame.drawingPadding(rocket: rocket),
+                       height: 32 + 2 * MusicEdgeFrame.drawingPadding(rocket: rocket))
             let renderer = ImageRenderer(content: content); renderer.scale = 2
             return NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!
         }
@@ -125,9 +147,21 @@ import AppKit
         for style in styles {
             assert(!samePixels(render(style, energy: 0), render(style, energy: 1)), "Strong music did not change effect")
             assert(samePixels(render(style, energy: 0, reduced: true), render(style, energy: 1, reduced: true)), "Reduced motion still reacted: \(style)")
-            for (rocket, width, phase, strength) in [(0.0, 220.0, 0.1, 0.4), (0, 600, 1.2, 1.6), (0.4, 352, 0.7, 1), (1, 352, 0.1, 1.6)] {
+            for (rocket, width, phase, strength) in [(0.0, 220.0, 0.1, 0.4), (0, 600, 1.2, 1.6), (0.4, 352, 0.7, 1), (1, 352, 0.1, 1.6), (1.04, 600, 1.2, 1.6)] {
                 let pixels = NSBitmapImageRep(data: render(style, energy: 1, phase: phase, rocket: rocket, width: width, strength: strength))!
                 assert(pixels.colorAt(x: pixels.pixelsWide / 2, y: pixels.pixelsHigh / 2)!.alphaComponent == 0, "Effect covers contents during resize/rocket transition")
+                if rocket >= 1 {
+                    for x in 0..<pixels.pixelsWide {
+                        assert(pixels.colorAt(x: x, y: 0)!.alphaComponent == 0 &&
+                               pixels.colorAt(x: x, y: pixels.pixelsHigh - 1)!.alphaComponent == 0,
+                               "Rocket effect reaches vertical canvas edge: \(style)")
+                    }
+                    for y in 0..<pixels.pixelsHigh {
+                        assert(pixels.colorAt(x: 0, y: y)!.alphaComponent == 0 &&
+                               pixels.colorAt(x: pixels.pixelsWide - 1, y: y)!.alphaComponent == 0,
+                               "Rocket effect reaches horizontal canvas edge: \(style)")
+                    }
+                }
             }
         }
         let water = NSBitmapImageRep(data: render("water", energy: 1))!

@@ -16,7 +16,6 @@ import SwiftUIIntrospect
 @MainActor
 struct ContentView: View {
     @EnvironmentObject var vm: BoringViewModel
-    @ObservedObject var webcamManager = WebcamManager.shared
 
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @ObservedObject var musicManager = MusicManager.shared
@@ -84,8 +83,10 @@ struct ContentView: View {
         musicManager.isMusicSource && enableCompactLyrics
     }
 
+    private var rocketSideWidth: CGFloat { max(0, vm.effectiveClosedNotchHeight - 12) }
+
     private var musicSideWidth: CGFloat {
-        let original = max(0, vm.effectiveClosedNotchHeight - 12)
+        let original = rocketSideWidth
         return compactLyricsMode ? max(original, CompactLyricsLayout.slotWidth) : original
     }
 
@@ -102,7 +103,7 @@ struct ContentView: View {
         {
             chinWidth += (2 * musicSideWidth + 20)
         } else if rocketPresented && vm.notchState == .closed && !vm.hideOnClosed {
-            chinWidth += 2 * musicSideWidth + 20
+            chinWidth += 2 * rocketSideWidth + 20
         } else if !coordinator.expandingView.show && vm.notchState == .closed
             && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
             && !vm.hideOnClosed
@@ -233,11 +234,22 @@ struct ContentView: View {
                         //                    .keyboardShortcut("E", modifiers: .command)
                     }
                     .overlay(alignment: .bottom) {
-                        CodexDropButton(waiting: codex.waiting && !vm.hideOnClosed,
-                                        expanded: vm.notchState == .open,
-                                        count: codex.preview == nil ? codex.pending.count : codex.previewCount,
-                                        action: codex.showRequests, surface: $liquidDepth)
-                            .offset(y: 82)
+                        if codex.reminderStyle == .pullCord {
+                            CodexPullCordButton(waiting: codex.waiting && !vm.hideOnClosed,
+                                                expanded: vm.notchState == .open,
+                                                count: codex.preview == nil ? codex.pending.count : codex.previewCount,
+                                                isOpen: codex.cardPresented,
+                                                style: codex.pullCordStyle,
+                                                waitingSince: codex.fishWaitingSince,
+                                                action: codex.showRequests)
+                                .offset(y: 82)
+                        } else {
+                            CodexDropButton(waiting: codex.waiting && !vm.hideOnClosed,
+                                            expanded: vm.notchState == .open,
+                                            count: codex.preview == nil ? codex.pending.count : codex.previewCount,
+                                            action: codex.showRequests, surface: $liquidDepth)
+                                .offset(y: 82)
+                        }
                     }
                 if vm.chinHeight > 0 {
                     Rectangle()
@@ -480,8 +492,8 @@ struct ContentView: View {
 
     private var closedPlaybackContent: some View {
         let fuelVisible = rocketPresented && !vm.hideOnClosed && !musicPresented
-        let width = musicPresented || fuelVisible
-            ? 2 * musicSideWidth + fuelGap
+        let width = musicPresented ? 2 * musicSideWidth + fuelGap
+            : fuelVisible ? 2 * rocketSideWidth + fuelGap
             : vm.closedNotchSize.width - 20
                 + (idleFacePresented ? max(0, vm.effectiveClosedNotchHeight - 12) + 30 + 16 : 0)
         return ZStack {
@@ -502,6 +514,7 @@ struct ContentView: View {
         }
         .animation(reducedMotion ? .easeInOut(duration: 0.18)
                    : .spring(response: 0.55, dampingFraction: 0.9), value: musicPresented)
+        .animation(NotchMotionEnvironment.interactionAnimation, value: fuelVisible)
     }
 
     @ViewBuilder
@@ -632,10 +645,8 @@ struct ContentView: View {
 
     private var fuelSlot: some View {
         CodexFuelGauge(fuel: codex.fuel)
-            .frame(width: compactLyricsMode ? 22 : max(0, vm.effectiveClosedNotchHeight - 12),
-                   height: compactLyricsMode ? 22 : max(0, vm.effectiveClosedNotchHeight - 12))
-            .padding(.leading, compactLyricsMode ? 2 : 0)
-            .frame(width: musicSideWidth, alignment: compactLyricsMode ? .leading : .trailing)
+            .frame(width: rocketSideWidth, height: rocketSideWidth)
+            .frame(width: rocketSideWidth, alignment: .trailing)
     }
 
     @ViewBuilder

@@ -59,7 +59,7 @@ import SwiftUI
         let epsilon: CGFloat = 0.001
         assert(abs(CodexCardReveal.settlingOffset(progress: 0.38 - epsilon) / epsilon) < 0.001)
         assert(abs(CodexCardReveal.settlingOffset(progress: epsilon) / epsilon) < 0.001)
-        assert(CodexCardReveal.duration == 0.65)
+        assert(CodexCardReveal.duration == 0.5)
         let revealSize = CGSize(width: 380, height: 342)
         let initial = CodexCardReveal.outline(size: revealSize, progress: 1).boundingRect
         assert(initial.width == 32 && initial.height == 32 && initial.midX == revealSize.width / 2)
@@ -72,7 +72,7 @@ import SwiftUI
             previous = outline
         }
         assert(previous.size == revealSize)
-        assert(CodexDissolve.duration == 0.8)
+        assert(CodexDissolve.duration == 0.36)
         var coverage: [Int] = []
         var centers: [Double] = []
         for progress in [0.0, 0.25, 0.5, 0.75, 1.0] {

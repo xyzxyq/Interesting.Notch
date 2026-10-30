@@ -77,6 +77,7 @@ final class SharingLifecycleDelegate: NSObject, NSSharingServiceDelegate, NSShar
 	private var pickerActive = false
 	private var serviceInProgress = false
 	private var finished = false
+	private var interactionReleased = false
 	private var timeoutTask: Task<Void, Never>?
 
 	init(id: UUID, onEnd: @escaping () -> Void, onBegin: @escaping () -> Void, onFinish: @escaping () -> Void) {
@@ -108,17 +109,22 @@ final class SharingLifecycleDelegate: NSObject, NSSharingServiceDelegate, NSShar
 		timeoutTask = Task { @MainActor [weak self] in
 			try? await Task.sleep(for: .seconds(2))
 			guard let self = self, !Task.isCancelled else { return }
-			if !self.finished {
-				self.finishIfNeeded()
-			}
+			// Unblock the notch without deleting files or releasing a transfer's access.
+			self.releaseInteraction()
 		}
+	}
+
+	private func releaseInteraction() {
+		guard !interactionReleased else { return }
+		interactionReleased = true
+		onFinish()
 	}
 
 	private func finishIfNeeded() {
 		guard !finished else { return }
 		finished = true
 		timeoutTask?.cancel()
-		onFinish()
+		releaseInteraction()
 		onEnd()
 	}
 

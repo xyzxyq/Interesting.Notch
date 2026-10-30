@@ -56,7 +56,7 @@ class CalendarService: CalendarServiceProviding {
     
     func events(from start: Date, to end: Date, calendars ids: [String]) async -> [EventModel] {
         let allCalendars = await self.calendars()
-        let filteredCalendars = allCalendars.filter { ids.isEmpty || ids.contains($0.id) }
+        let filteredCalendars = allCalendars.filter { ids.contains($0.id) }
         let ekCalendars = filteredCalendars.compactMap { calendarModel in
             store.calendars(for: .event).first { $0.calendarIdentifier == calendarModel.id } ??
             store.calendars(for: .reminder).first { $0.calendarIdentifier == calendarModel.id }
@@ -67,15 +67,19 @@ class CalendarService: CalendarServiceProviding {
         // Fetch regular events
         if hasAccess(to: .event) {
             let eventCalendars = ekCalendars.filter { store.calendars(for: .event).contains($0) }
-            let predicate = store.predicateForEvents(withStart: start, end: end, calendars: eventCalendars)
-            let ekEvents = store.events(matching: predicate)
-            events.append(contentsOf: ekEvents.compactMap { EventModel(from: $0) })
+            if !eventCalendars.isEmpty {
+                let predicate = store.predicateForEvents(withStart: start, end: end, calendars: eventCalendars)
+                let ekEvents = store.events(matching: predicate)
+                events.append(contentsOf: ekEvents.compactMap { EventModel(from: $0) })
+            }
         }
         
         // Fetch reminders
         if hasAccess(to: .reminder) {
             let reminderCalendars = ekCalendars.filter { store.calendars(for: .reminder).contains($0) }
-            events.append(contentsOf: await fetchReminders(from: start, to: end, calendars: reminderCalendars))
+            if !reminderCalendars.isEmpty {
+                events.append(contentsOf: await fetchReminders(from: start, to: end, calendars: reminderCalendars))
+            }
         }
         
         return events.sorted { $0.start < $1.start }
@@ -94,7 +98,7 @@ class CalendarService: CalendarServiceProviding {
                         return false
                     }
                     
-                    return dueDate >= start && dueDate <= end
+                    return dueDate >= start && dueDate < end
                 }
                 
                 // Convert to EventModel

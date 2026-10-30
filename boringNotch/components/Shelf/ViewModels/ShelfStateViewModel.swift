@@ -92,21 +92,14 @@ final class ShelfStateViewModel: ObservableObject {
     func cleanupInvalidItems() {
         Task { [weak self] in
             guard let self else { return }
-            var keep: [ShelfItem] = []
-            for item in self.items {
-                switch item.kind {
-                case .file(let data):
-                    let bookmark = Bookmark(data: data)
-                    if await bookmark.validate() {
-                        keep.append(item)
-                    } else {
-                        item.cleanupStoredData()
-                    }
-                default:
-                    keep.append(item)
+            // A missing external volume is not permission to discard a user's saved reference.
+            for item in self.items where item.isTemporary {
+                guard case .file(let data) = item.kind else { continue }
+                if !(await Bookmark(data: data).validate()),
+                   let current = self.items.first(where: { $0.id == item.id && $0.kind == item.kind }) {
+                    self.remove(current)
                 }
             }
-            await MainActor.run { self.items = keep }
         }
     }
 

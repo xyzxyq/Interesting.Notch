@@ -1844,7 +1844,17 @@ struct AccentCircleButton: View {
 
 struct Shortcuts: View {
     var body: some View {
+        NavigationStack {
         Form {
+            Section {
+                NavigationLink {
+                    CodexShortcutCustomization()
+                } label: {
+                    Label("快捷键自定义", systemImage: "keyboard.badge.ellipsis")
+                }
+            } footer: {
+                Text("自定义提醒与交互卡片的打开、回答、收起和忽略快捷键。")
+            }
             Section {
                 KeyboardShortcuts.Recorder("Toggle Sneak Peek:", name: .toggleSneakPeek)
             } header: {
@@ -1863,6 +1873,100 @@ struct Shortcuts: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("Shortcuts")
+        }
+    }
+}
+
+
+private struct CodexShortcutCustomization: View {
+    @ObservedObject private var shortcuts = CodexShortcuts.shared
+    @State private var previousOpen = KeyboardShortcuts.getShortcut(for: .openCodexRequests)
+    @State private var suspendedShortcuts: [KeyboardShortcuts.Name] = []
+    private let globalNames: [KeyboardShortcuts.Name] = [.openCodexRequests, .toggleNotchOpen, .toggleSneakPeek]
+
+    private func binding(_ shortcut: KeyboardShortcuts.Shortcut) -> CodexKeyBinding {
+        CodexKeyBinding(keyCode: UInt16(shortcut.carbonKeyCode), modifiers: shortcut.modifiers, characters: "")
+    }
+    private func recordingChanged(_ recording: Bool) {
+        shortcuts.isRecording = recording
+        if recording {
+            suspendedShortcuts = globalNames.filter { KeyboardShortcuts.isEnabled(for: $0) }
+            KeyboardShortcuts.disable(suspendedShortcuts)
+        } else {
+            KeyboardShortcuts.enable(suspendedShortcuts)
+            suspendedShortcuts = []
+        }
+    }
+    private func updateOpen(_ shortcut: KeyboardShortcuts.Shortcut?) {
+        if let shortcut, let conflict = CodexShortcutAction.allCases.first(where: {
+            shortcuts.binding(for: $0)?.matches(binding(shortcut)) == true
+        }) {
+            shortcuts.error = "打开卡片的组合键已用于“\(conflict.title)”，请先更改该快捷键。"
+            KeyboardShortcuts.setShortcut(previousOpen, for: .openCodexRequests)
+        } else { previousOpen = shortcut; shortcuts.error = nil }
+    }
+    private func localRow(_ action: CodexShortcutAction) -> some View {
+        HStack {
+            Text(action.title)
+            Spacer()
+            CodexLocalShortcutRecorder(label: shortcuts.label(for: action), accessibilityName: "设置" + action.title) { proposed in
+                if globalNames.contains(where: { name in
+                    KeyboardShortcuts.getShortcut(for: name).map { binding($0).matches(proposed) } == true
+                }) {
+                    shortcuts.error = "此组合键已用于应用的全局快捷键，请选择其他按键。"
+                    return false
+                }
+                return shortcuts.set(proposed, for: action)
+            } recordingChanged: { recordingChanged($0) }
+            .frame(width: 112, height: 26)
+            Button { shortcuts.set(nil, for: action) } label: {
+                Image(systemName: "xmark.circle").foregroundStyle(.secondary)
+            }.buttonStyle(.plain).help("清除此快捷键").accessibilityLabel("清除" + action.title + "快捷键")
+                .disabled(shortcuts.binding(for: action) == nil)
+        }
+    }
+    var body: some View {
+        Form {
+            Section {
+                KeyboardShortcuts.Recorder("打开交互卡片", name: .openCodexRequests, onChange: updateOpen)
+            } header: { Text("全局快捷键") } footer: {
+                Text("水滴或拉绳出现时可从任意应用打开卡片。默认 ⌥⌘↩；没有待处理提醒时不执行操作。")
+            }
+            Section {
+                ForEach([CodexShortcutAction.confirm, .close, .ignoreCurrent, .ignoreAll], id: \.self) { localRow($0) }
+            } header: { Text("卡片操作") } footer: {
+                Text("仅在卡片获得焦点时生效。纯文本问题：先按确认键进入输入，再按一次提交。空输入框再次按确认键会退出输入；Shift+Enter 保留用于换行，不能分配给其他操作。输入法选词时不会提交。收起保留提醒；忽略仅隐藏提醒，不会替你回答或批准请求。")
+            }
+            Section {
+                ForEach([CodexShortcutAction.nextRequest, .previousRequest, .nextOption, .previousOption], id: \.self) { localRow($0) }
+            } header: { Text("浏览提醒和选项") } footer: {
+                Text("多条提醒按当前高亮项操作；选项超过 10 个时也可以用上一个 / 下一个选项键选择。输入文字时保留普通按键的编辑功能。")
+            }
+            Section {
+                ForEach(CodexShortcutAction.allCases.filter { $0.optionIndex != nil }, id: \.self) { localRow($0) }
+            } header: { Text("直接选择选项") } footer: {
+                Text("默认 1–9 对应前九项，0 对应第十项；选择后按确认键回复。点击按键框后录制，移开焦点或再次点击取消；重复快捷键会提示冲突。提交、关闭和忽略等操作不接受单个字母或数字，以免打字时误触。")
+            }
+            Section {
+                Button("恢复此页默认快捷键") {
+                    recordingChanged(false)
+                    shortcuts.reset()
+                    KeyboardShortcuts.reset(.openCodexRequests)
+                    previousOpen = KeyboardShortcuts.getShortcut(for: .openCodexRequests)
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let error = shortcuts.error {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(12)
+                    .background(.regularMaterial)
+                    .accessibilityLabel("快捷键冲突：" + error)
+            }
+        }
+        .navigationTitle("快捷键自定义")
+        .onDisappear { recordingChanged(false) }
     }
 }
 

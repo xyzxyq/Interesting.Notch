@@ -97,6 +97,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             enableSkyLightOnAllWindows()
         }
+        setupDragDetectors()
     }
 
     @MainActor
@@ -107,6 +108,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             disableSkyLightOnAllWindows()
         }
+        setupDragDetectors()
     }
     
     @MainActor
@@ -176,7 +178,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupDragDetectors() {
         cleanupDragDetectors()
 
-        guard Defaults[.expandedDragDetection] else { return }
+        guard Defaults[.expandedDragDetection], !isScreenLocked || Defaults[.showOnLockScreen] else { return }
 
         if Defaults[.showOnAllDisplays] {
             for screen in NSScreen.screens {
@@ -354,6 +356,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
         }
 
+        KeyboardShortcuts.onKeyDown(for: .openCodexRequests) {
+            CodexActivity.shared.openRequestsFromKeyboard()
+        }
+
         KeyboardShortcuts.onKeyDown(for: .toggleSneakPeek) { [weak self] in
             guard let self = self else { return }
             if Defaults[.sneakPeekStyles] == .inline {
@@ -413,7 +419,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
 
-        if !Defaults[.showOnAllDisplays] {
+        // Seed startup before the first window; lock notifications only cover later changes.
+        // shortcut: the optional lock flag falls back to unlocked if macOS stops providing it.
+        isScreenLocked = (CGSessionCopyCurrentDictionary() as? [String: Any])?["CGSSessionScreenIsLocked"] as? Bool ?? false
+        if !Defaults[.showOnAllDisplays] && (!isScreenLocked || Defaults[.showOnLockScreen]) {
             let viewModel = self.vm
             let window = createBoringNotchWindow(
                 for: NSScreen.main ?? NSScreen.screens.first!, with: viewModel)
@@ -478,6 +487,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func adjustWindowPosition(changeAlpha: Bool = false) {
+        guard !isScreenLocked || Defaults[.showOnLockScreen] else {
+            cleanupWindows()
+            return
+        }
         if Defaults[.showOnAllDisplays] {
             let currentScreenUUIDs = Set(NSScreen.screens.compactMap { $0.displayUUID })
 

@@ -17,7 +17,27 @@ func number(_ value: Any?) -> Double? {
 }
 
 enum Projection {
-    private static let questionKeys: Set<String> = ["turns", "turnHistory", "history", "entitiesByKey", "items", "type", "id", "delivery", "questions", "content", "input", "text", "status"]
+    private static let questionKeys: Set<String> = ["turns", "turnHistory", "history", "entitiesByKey", "items", "type", "id", "delivery", "questions", "content", "input", "text", "status", "requests"]
+
+    // Only identity/type crosses the bridge; approval payloads stay inside Codex.
+    static func request(_ value: Any) -> Object {
+        object(value).filter { key, value in
+            if key == "id" { return value is String || number(value) != nil }
+            if key == "method" { return value is String }
+            return key == "completed" && value is Bool
+        }
+    }
+    static let requestTitles = [
+        "item/commandExecution/requestApproval": "命令执行需要你确认",
+        "item/fileChange/requestApproval": "文件修改需要你确认",
+        "item/permissions/requestApproval": "权限申请需要你确认",
+        "item/tool/requestUserInput": "Codex 正在等待你的回答",
+        "item/tool/requestOptionPicker": "Codex 正在等待你的选择",
+        "item/plan/requestImplementation": "计划已准备好，等待你的决定",
+        "mcpServer/elicitation/request": "连接的工具需要你确认",
+        "execCommandApproval": "命令执行需要你确认",
+        "applyPatchApproval": "文件修改需要你确认"
+    ]
 
     static func replyIDs(_ value: Any) -> [String] {
         guard let raw = value as? String else { return [] }
@@ -30,6 +50,7 @@ enum Projection {
 
     static func questions(_ value: Any, key: String = "") -> Any {
         if key == "text" { return replyIDs(value) }
+        if key == "requests" { return (value as? [Any] ?? []).map(request) }
         if key == "questions" {
             return (value as? [Any] ?? []).compactMap { item -> Object? in
                 let item = object(item)
@@ -79,12 +100,37 @@ enum Projection {
     }
 
     static func updateQuestions(_ previous: Any, change: Object) throws -> Any {
-        if text(change["type"]) == "snapshot" { return questions(change["conversationState"] ?? [:]) }
+        var refreshPending = false
+        return try updateQuestions(previous, change: change, refreshPending: &refreshPending)
+    }
+
+    static func updateQuestions(_ previous: Any, change: Object, refreshPending: inout Bool) throws -> Any {
+        // Only skipped patches can bypass the full pending-question traversal. Accepted
+        // patches remain conservative, including no-op changes and missing ancestors.
+        refreshPending = false
+        if text(change["type"]) == "snapshot" {
+            refreshPending = true
+            return questions(change["conversationState"] ?? [:])
+        }
         var state: Any = previous is NSNull ? Object() : previous
         for change in change["patches"] as? [Object] ?? [] {
             let path = change["path"] as? [Any] ?? []
             let raw = change["value"] ?? null
-            if path.isEmpty { state = questions(raw); continue }
+            if path.isEmpty { state = questions(raw); refreshPending = true; continue }
+            if text(path.first) == "requests" {
+                guard path.count <= 3 else { continue }
+                let value: Any
+                if path.count == 1 { value = questions(raw, key: "requests") }
+                else if path.count == 2 { value = request(raw) }
+                else {
+                    let field = text(path.last)
+                    guard ["id", "method", "completed"].contains(field) else { continue }
+                    value = request([field: raw])[field] ?? null
+                }
+                state = try patch(state, path: path[...], operation: text(change["op"]), value: value)
+                refreshPending = true
+                continue
+            }
             guard ["turns", "turnHistory"].contains(text(path.first)) else { continue }
             let key = text(path.last), operation = text(change["op"])
             var value = questions(raw, key: key)
@@ -102,6 +148,7 @@ enum Projection {
                !questionKeys.contains(key), !(inQuestions && ["title", "options"].contains(key)),
                !(path.count > 1 && text(path[path.count - 2]) == "entitiesByKey") { continue }
             state = try patch(state, path: path[...], operation: operation, value: value)
+            refreshPending = true
         }
         return state
     }
@@ -110,7 +157,7 @@ enum Projection {
         var found: [String: Object] = [:], answered = Set<String>()
         func visit(_ value: Any) {
             if let value = value as? Object {
-                if text(value["type"]) == "agentMessage", text(value["delivery"]) == "async" {
+                if text(value["type"]) == "agentMessage", text(value["delivery"]) == "async" || !(value["questions"] as? [Object] ?? []).isEmpty {
                     let list = value["questions"] as? [Object] ?? []
                     for (index, question) in list.enumerated() {
                         let idJSON = try! json(["request_user_input_async", value["id"] ?? null, index])
@@ -131,6 +178,13 @@ enum Projection {
             } else if let array = value as? [Any] { array.forEach(visit) }
         }
         visit(state)
+        for request in object(state)["requests"] as? [Object] ?? [] {
+            let method = text(request["method"])
+            guard let title = requestTitles[method], let requestID = request["id"],
+                  request["completed"] as? Bool != true, !(requestID is NSNull) else { continue }
+            let id = "request:" + String(decoding: try! json([method, requestID]), as: UTF8.self)
+            found[id] = ["id": id, "title": title, "options": [String](), "replyable": false]
+        }
         return found.keys.filter { !answered.contains($0) }.sorted().compactMap { found[$0] }
     }
 
@@ -178,6 +232,7 @@ enum Projection {
     }
     static func model(_ previous: Any, change: Object) -> Object {
         settings(object(previous), change: change).filter { key, value in
+            if key == "serviceTier" { return ["default", "priority"].contains(text(value)) }
             guard ["model", "modelProvider"].contains(key), let name = value as? String, !name.isEmpty, name.unicodeScalars.count <= 120 else { return false }
             return name.unicodeScalars.allSatisfy { CharacterSet.alphanumerics.contains($0) || "-_./: ".unicodeScalars.contains($0) }
         }

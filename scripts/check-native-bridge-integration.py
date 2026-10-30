@@ -117,6 +117,7 @@ for line in sys.stdin:
         server = socket.socket(socket.AF_UNIX)
         server.bind(str(home / 'ipc/ipc.sock')); server.listen(); server.settimeout(0.2)
         streams, replies = queue.Queue(), queue.Queue()
+        following_events, discovery_responses = queue.Queue(), queue.Queue()
         stop = threading.Event()
         sockets = []
         reply_mode = ['success']
@@ -130,12 +131,15 @@ for line in sys.stdin:
                         peer.sendall(frame(dict(type='response', requestId=message['requestId'], resultType='success')))
                         if message['requestId'] == 'notch-init':
                             streams.put(peer)
-                    elif message.get('method') == 'thread-stream-following-changed' and message['params']['hostId'] == 'remote-startup':
-                        if not discovered_remote.is_set():
+                    elif message.get('method') == 'thread-stream-following-changed':
+                        following_events.put(message)
+                        if message['params']['hostId'] == 'remote-startup' and not discovered_remote.is_set():
                             discovered_remote.set()
                             peer.sendall(frame(dict(type='broadcast', method='thread-stream-state-changed', version=11,
                                 sourceClientId='startup-owner', params=dict(hostId='remote-startup', conversationId=remote_task,
                                     change=dict(type='snapshot', revision=1, conversationState=dict(threadRuntimeStatus=dict(type='active')))))))
+                    elif message.get('type') == 'client-discovery-response':
+                        discovery_responses.put(message)
                     elif message.get('type') == 'request':
                         replies.put(message)
                         if reply_mode[0] == 'disconnect':
@@ -192,6 +196,37 @@ for line in sys.stdin:
             assert len(token) >= 40
             snapshot = expect(lambda v: any(t['hostId'] == 'remote-startup' for t in v['tasks']))
             assert 'PRIVATE' not in json.dumps(snapshot), 'Discovery retained unrelated desktop data'
+
+            def expect_local_follow(reason):
+                end = time.monotonic() + 2
+                while time.monotonic() < end:
+                    try:
+                        message = following_events.get(timeout=max(.001, end - time.monotonic()))
+                    except queue.Empty:
+                        break
+                    params = message['params']
+                    if params.get('hostId') == 'local' and params.get('conversationId') == TASK:
+                        assert params.get('following') is True
+                        return
+                raise AssertionError(reason)
+
+            # An owner may start after discovery or reload without disconnecting the IPC socket.
+            # It must be able to rediscover a follower even before that follower has any snapshot.
+            expect_local_follow('Initial discovery did not subscribe the local fixture')
+            for attempt in range(2):
+                peer.sendall(frame(dict(type='broadcast', method='thread-stream-following-status-requested', version=1,
+                    sourceClientId='owner', params=dict(hostId='local', conversationId=TASK))))
+                expect_local_follow(f'Known subscription ignored owner status request {attempt + 1}')
+
+            # A discovery response is an ordering barrier: the preceding echo has been handled.
+            # Reaffirming every following-changed notification would create a broadcast loop.
+            peer.sendall(frame(dict(type='broadcast', method='thread-stream-following-changed', version=1,
+                sourceClientId='other-follower', params=dict(hostId='local', conversationId=TASK, following=True)))
+                + frame(dict(type='client-discovery-request', requestId='following-echo-barrier')))
+            assert discovery_responses.get(timeout=2)['requestId'] == 'following-echo-barrier'
+            assert following_events.empty(), 'Following-changed echo unnecessarily reannounced the subscription'
+            print('PASS: known subscriptions answer repeated owner status requests without following-changed echo loops')
+
             peer.sendall(frame(dict(type='broadcast', method='thread-stream-state-changed', version=11,
                 sourceClientId='startup-owner', params=dict(hostId='remote-startup', conversationId=remote_task,
                     change=dict(type='snapshot', revision=2, conversationState=dict(threadRuntimeStatus=dict(type='idle')))))))
@@ -208,18 +243,30 @@ for line in sys.stdin:
             def state(runtime, revision, **values):
                 emit(dict(type='snapshot', revision=revision, conversationState=dict(threadRuntimeStatus=runtime, **values)))
 
-            state(dict(type='active'), 1, latestThreadSettings=dict(effort='high', model='gpt-6-astra', cwd='PRIVATE'))
+            state(dict(type='active'), 1, latestThreadSettings=dict(effort='high', model='gpt-6-astra', serviceTier='priority', cwd='PRIVATE'))
             snapshot = expect(lambda v: len(v['tasks']) == 1)
             assert snapshot['tasks'][0]['state'] == 'running' and 'PRIVATE' not in json.dumps(snapshot)
-            emit(dict(type='patches', baseRevision=1, revision=2, patches=[dict(op='add', path=['threadRuntimeStatus','activeFlags',0], value='waitingOnApproval')]))
-            expect(lambda v: v['tasks'] and not v['tasks'][0]['isRunning'])
+            assert snapshot['tasks'][0]['serviceTier'] == 'priority' and snapshot['tasks'][0]['model'] == 'gpt-6-astra'
+            emit(dict(type='patches', baseRevision=1, revision=2, patches=[dict(op='add', path=['threadRuntimeStatus','activeFlags',0], value='waitingOnApproval'), dict(op='remove', path=['latestThreadSettings','serviceTier'])]))
+            snapshot = expect(lambda v: v['tasks'] and not v['tasks'][0]['isRunning'])
+            assert snapshot['tasks'][0]['serviceTier'] is None
             emit(dict(type='patches', baseRevision=2, revision=3, patches=[dict(op='remove', path=['threadRuntimeStatus','activeFlags',0])]))
             expect(lambda v: v['tasks'] and v['tasks'][0]['isRunning'])
             emit(dict(type='patches', baseRevision=99, revision=100, patches=[]))
             snapshot = expect(lambda v: not v['tasks'])
             assert not snapshot['idleTaskIds'], 'A revision gap is not completion'
 
-            question = dict(type='agentMessage', id='q1', delivery='async', questions=[dict(title='Fixture question', options=['A','B'])])
+            # A live native request is independent of runtime flags and cannot be answered as an async chat question.
+            state(dict(type='active'), 4, requests=[dict(id=41, method='item/tool/requestUserInput', params=dict(prompt='PRIVATE'))])
+            native = expect(lambda v: v['tasks'] and v['tasks'][0]['pendingQuestionIds'])['tasks'][0]
+            assert native['state'] == 'waiting' and not native['isRunning']
+            assert 'PRIVATE' not in json.dumps(native) and native['questions'][0]['replyable'] is False
+            assert http('POST', '/answer', dict(hostId='local', taskId=TASK, questionId=native['pendingQuestionIds'][0], answer='A'),
+                        {'X-Notch-Token': token})[0] == 409
+            assert replies.empty(), 'Native approval/input was incorrectly sent as a chat reply'
+            emit(dict(type='patches', baseRevision=4, revision=4.5, patches=[dict(op='remove', path=['requests', 0])]))
+            expect(lambda v: v['tasks'] and v['tasks'][0]['isRunning'] and not v['tasks'][0]['pendingQuestionIds'])
+            question = dict(type='agentMessage', id='q1', questions=[dict(title='Fixture question', options=['A','B'])])
             state(dict(type='active'), 5, turns=[dict(items=[question])])
             snapshot = expect(lambda v: v['tasks'] and v['tasks'][0]['pendingQuestionIds'])
             item = snapshot['tasks'][0]
@@ -258,9 +305,12 @@ for line in sys.stdin:
             # A definite rejection permits retry; a remote task uses its host-aware RPC.
             question['id'] = 'remote-question'
             emit(dict(type='snapshot', revision=1, conversationState=dict(
-                threadRuntimeStatus=dict(type='active'), turns=[dict(items=[question])])), host='remote-test')
+                threadRuntimeStatus=dict(type='active'), latestThreadSettings=dict(model='gpt-6-luna', effort='ultra', serviceTier='priority'), turns=[dict(items=[question])])), host='remote-test')
             snapshot = expect(lambda v: any(t['hostId'] == 'remote-test' for t in v['tasks']))
             remote = next(t for t in snapshot['tasks'] if t['hostId'] == 'remote-test')
+            assert (remote['model'], remote['reasoningEffort'], remote['serviceTier']) == ('gpt-6-luna', 'ultra', 'priority')
+            local = next(t for t in snapshot['tasks'] if t['hostId'] == 'local')
+            assert local['serviceTier'] is None and local['model'] is None, 'Metadata leaked between hosts sharing a conversation ID'
             request = dict(request, hostId='remote-test', questionId=remote['pendingQuestionIds'][0])
             reply_mode[0] = 'error'
             assert http('POST', '/answer', request, auth)[0] == 409

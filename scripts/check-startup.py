@@ -8,7 +8,19 @@ import tempfile
 root = Path(__file__).resolve().parents[1]
 controller = (root / 'boringNotch/components/Settings/SettingsWindowController.swift').read_text()
 controller = controller.replace('import Defaults\n', '').replace('import Sparkle\n', '')
+view_model = (root / 'boringNotch/models/BoringViewModel.swift').read_text()
+camera_access = next(line for line in view_model.splitlines() if 'var webcamManager:' in line)
+assert 'WebcamManager.shared' not in (root / 'boringNotch/ContentView.swift').read_text()
 fixture = r'''
+final class WebcamManager {
+    static var creations = 0
+    static let shared = WebcamManager()
+    private init() { Self.creations += 1 }
+}
+final class StartupModel {
+CAMERA_ACCESS
+}
+
 final class SPUStandardUpdaterController {}
 enum Brand { static func localized(_ text: String) -> String { text } }
 @MainActor struct SettingsView: View {
@@ -24,6 +36,10 @@ enum Brand { static func localized(_ text: String) -> String { text } }
     static func main() {
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
+        let first = StartupModel(), second = StartupModel()
+        assert(WebcamManager.creations == 0, "Closed notch must not enumerate camera devices at startup")
+        assert(first.webcamManager === second.webcamManager && WebcamManager.creations == 1,
+               "First camera access must create one shared manager across displays")
         let controller = SettingsWindowController.shared
         let updater = SPUStandardUpdaterController()
         assert(controller.window == nil && SettingsView.creations == 0,
@@ -45,13 +61,13 @@ enum Brand { static func localized(_ text: String) -> String { text } }
         controller.setUpdaterController(replacement)
         assert(controller.window === window && SettingsView.updater === replacement)
         controller.close()
-        print("PASS: lazy settings, updater registration, first open, repeated open, close/reopen, updater replacement")
+        print("PASS: lazy shared camera access, lazy settings, updater registration, first open, repeated open, close/reopen, updater replacement")
     }
 }
 '''
 with tempfile.TemporaryDirectory(prefix='notch-startup-check-') as directory:
     folder = Path(directory)
-    (folder / 'Check.swift').write_text(controller + fixture)
+    (folder / 'Check.swift').write_text(controller + fixture.replace('CAMERA_ACCESS', camera_access))
     env = dict(os.environ, DEVELOPER_DIR='/Applications/Xcode.app/Contents/Developer')
     subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', '-parse-as-library',
                     str(folder / 'Check.swift'), '-o', str(folder / 'check')], env=env, check=True)

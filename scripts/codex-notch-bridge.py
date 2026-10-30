@@ -42,8 +42,30 @@ def question_reply_ids(text):
         return []
 
 
+REQUEST_TITLES = {
+    'item/commandExecution/requestApproval': '命令执行需要你确认',
+    'item/fileChange/requestApproval': '文件修改需要你确认',
+    'item/permissions/requestApproval': '权限申请需要你确认',
+    'item/tool/requestUserInput': 'Codex 正在等待你的回答',
+    'item/tool/requestOptionPicker': 'Codex 正在等待你的选择',
+    'item/plan/requestImplementation': '计划已准备好，等待你的决定',
+    'mcpServer/elicitation/request': '连接的工具需要你确认',
+    'execCommandApproval': '命令执行需要你确认',
+    'applyPatchApproval': '文件修改需要你确认',
+}
+
+
+def project_request(value):
+    if not isinstance(value, dict): return {}
+    return {k: v for k, v in value.items() if
+            (k == 'id' and (isinstance(v, str) or type(v) in (int, float))) or
+            (k == 'method' and isinstance(v, str)) or (k == 'completed' and isinstance(v, bool))}
+
+
 def project_questions(value, key=''):
     """Retain only question identity and reply acknowledgement, never prose."""
+    if key == 'requests':
+        return [project_request(v) for v in value] if isinstance(value, list) else []
     if key == 'text':
         return question_reply_ids(value)
     if key == 'questions':
@@ -53,7 +75,7 @@ def project_questions(value, key=''):
         return [project_questions(item) for item in value]
     if isinstance(value, dict):
         keys = {'turns', 'turnHistory', 'history', 'entitiesByKey', 'items',
-                'type', 'id', 'delivery', 'questions', 'content', 'input', 'text', 'status'}
+                'type', 'id', 'delivery', 'questions', 'content', 'input', 'text', 'status', 'requests'}
         result = {k: project_questions(v, k) for k, v in value.items()
                   if key == 'entitiesByKey' or k in keys}
         if value.get('type') == 'agentMessage' and value.get('delivery') == 'async':
@@ -71,7 +93,9 @@ def update_questions(previous, change):
         if not path:
             state = project_questions(patch.get('value', {}))
             continue
-        if path[0] not in ('turns', 'turnHistory'):
+        if path[0] not in ('turns', 'turnHistory', 'requests'):
+            continue
+        if path[0] == 'requests' and (len(path) > 3 or (len(path) == 3 and path[-1] not in ('id', 'method', 'completed'))):
             continue
         target = state
         for part in path[:-1]:
@@ -87,6 +111,10 @@ def update_questions(previous, change):
             continue  # A field discarded by the privacy projection.
         key = path[-1]
         value = project_questions(patch.get('value'), key)
+        if path[0] == 'requests':
+            raw = patch.get('value')
+            if len(path) == 2: value = project_request(raw)
+            elif len(path) == 3: value = project_request({key: raw}).get(key)
         if 'questions' in path:
             raw = patch.get('value')
             if isinstance(raw, str):
@@ -106,7 +134,7 @@ def update_questions(previous, change):
         elif isinstance(target, dict):
             if patch['op'] == 'remove':
                 target.pop(key, None)
-            elif ('questions' in path and key in ('title', 'options')) or key in project_questions({key: patch.get('value')}) or (len(path) > 1 and path[-2] == 'entitiesByKey'):
+            elif (path[0] == 'requests' and key in ('id', 'method', 'completed')) or ('questions' in path and key in ('title', 'options')) or key in project_questions({key: patch.get('value')}) or (len(path) > 1 and path[-2] == 'entitiesByKey'):
                 target[key] = value
     return state
 
@@ -115,7 +143,7 @@ def pending_questions(state):
     questions, answered = {}, set()
     def visit(value):
         if isinstance(value, dict):
-            if value.get('type') == 'agentMessage' and value.get('delivery') == 'async':
+            if value.get('type') == 'agentMessage' and (value.get('delivery') == 'async' or value.get('questions')):
                 count = len(value.get('questions') or [])
                 for i, question in enumerate(value.get('questions') or []):
                     identifier = json.dumps(['request_user_input_async', value.get('id'), i], separators=(',', ':'))
@@ -134,6 +162,11 @@ def pending_questions(state):
             for child in value:
                 visit(child)
     visit(state)
+    for request in state.get('requests', []):
+        method = request.get('method')
+        if method not in REQUEST_TITLES or request.get('completed') is True or request.get('id') is None: continue
+        identifier = 'request:' + json.dumps([method, request['id']], separators=(',', ':'), ensure_ascii=False)
+        questions[identifier] = dict(id=identifier, title=REQUEST_TITLES[method], options=[], replyable=False)
     return [questions[key] for key in sorted(questions.keys() - answered)]
 
 
@@ -202,7 +235,7 @@ def update_effort(previous, change):
 
 
 def update_model(previous, change):
-    fields = ('model', 'modelProvider')
+    fields = ('model', 'modelProvider', 'serviceTier')
     values = dict(previous or {})
     if change.get('type') == 'snapshot':
         values = change.get('conversationState', {}).get('latestThreadSettings') or {}
@@ -215,8 +248,11 @@ def update_model(previous, change):
                 values = value or {}
             elif len(path or []) == 2 and path[0] == 'latestThreadSettings' and path[1] in fields:
                 values[path[1]] = value
-    return {key: value for key in fields if isinstance(value := values.get(key), str)
+    result = {key: value for key in ('model', 'modelProvider') if isinstance(value := values.get(key), str)
             and 0 < len(value) <= 120 and all(c.isalnum() or c in '-_./: ' for c in value)}
+    if values.get('serviceTier') in ('default', 'priority'):
+        result['serviceTier'] = values['serviceTier']
+    return result
 
 
 def fuel_snapshot(result, now, weekly=False):
@@ -325,8 +361,9 @@ class Bridge:
                     idle_task_ids.append(f'{host}/{task_id}')
                 if state:
                     tasks.append(dict(id=task_id, hostId=host, title='Codex task', state=state,
-                                      isRunning=task_state(entry['runtime']) == 'running', reasoningEffort=entry.get('effort'),
+                                      isRunning=task_state(entry['runtime']) == 'running' and not any(q.get('replyable') is False for q in pending_questions(entry.get('questions', {}))), reasoningEffort=entry.get('effort'),
                                       model=entry.get('model', {}).get('model'), modelProvider=entry.get('model', {}).get('modelProvider'),
+                                      serviceTier=entry.get('model', {}).get('serviceTier'),
                                       pendingQuestionIds=pending_question_ids(entry.get('questions', {})),
                                       questions=pending_questions(entry.get('questions', {})),
                                       detail='Needs your attention in Codex' if state == 'waiting' else 'Codex is working'))
@@ -349,6 +386,8 @@ class Bridge:
             question = next((q for q in pending_questions(entry['questions']) if q['id'] == question_id), None)
             if not question:
                 raise ValueError('该问题已处理或不再有效。')
+            if question.get('replyable') is False:
+                raise ValueError('请在 Codex 中处理此请求。')
             if key in self.submissions:
                 raise ValueError('回答已发送或正在确认，请勿重复提交。')
             self.submissions.add(key)
@@ -493,7 +532,8 @@ class Bridge:
                         params = message.get('params', {})
                         if method in ('thread-stream-following-status-requested', 'thread-stream-following-changed'):
                             key = (params.get('hostId', 'local'), params['conversationId'])
-                            if key not in subscribed:
+                            # An owner reload loses its follower list even if our cache survives.
+                            if key not in subscribed or method == 'thread-stream-following-status-requested':
                                 follow(*key)
                                 subscribed.add(key)
                         elif method == 'thread-stream-state-changed':

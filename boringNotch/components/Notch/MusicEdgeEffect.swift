@@ -5,17 +5,15 @@ struct EdgeContour {
         let t = Double(i) / 20, u = 1 - t
         return (u*u, 2*u*t, t*t, u*u*u, 3*u*u*t, 3*u*t*t, t*t*t)
     }
-    private var points: [CGPoint] = []
-    private var distances: [Double] = []
+    private var vertices: [(point: CGPoint, distance: Double)] = []
     private(set) var length = 0.0
     init(path: Path) {
-        points.reserveCapacity(256)
-        distances.reserveCapacity(256)
+        vertices.reserveCapacity(256)
         var current = CGPoint.zero
         var first = CGPoint.zero
         func append(_ p: CGPoint) {
-            if let previous = points.last { length += hypot(p.x - previous.x, p.y - previous.y) }
-            points.append(p); distances.append(length)
+            if let previous = vertices.last?.point { length += hypot(p.x - previous.x, p.y - previous.y) }
+            vertices.append((p, length))
             current = p
         }
         path.forEach { element in
@@ -39,28 +37,28 @@ struct EdgeContour {
         }
     }
     func sample(_ fraction: Double) -> (point: CGPoint, normal: CGPoint) {
-        guard length > 0, points.count > 1 else { return (.zero, .zero) }
+        guard length > 0, vertices.count > 1 else { return (.zero, .zero) }
         let f = fraction - floor(fraction)
         let distance = f * length
-        var low = 1; var high = distances.count - 1
-        while low < high { let mid = (low + high) / 2; if distances[mid] < distance { low = mid + 1 } else { high = mid } }
+        var low = 1; var high = vertices.count - 1
+        while low < high { let mid = (low + high) / 2; if vertices[mid].distance < distance { low = mid + 1 } else { high = mid } }
         return interpolate(distance: distance, index: low)
     }
     // Reuse the previous segment for ordered perimeter samples. Also handles wrap/reversal.
     func sample(_ fraction: Double, cursor: inout Int) -> (point: CGPoint, normal: CGPoint) {
-        guard length > 0, points.count > 1 else { return (.zero, .zero) }
+        guard length > 0, vertices.count > 1 else { return (.zero, .zero) }
         let distance = (fraction - floor(fraction)) * length
-        cursor = min(max(1, cursor), distances.count - 1)
-        while cursor > 1 && distances[cursor - 1] >= distance { cursor -= 1 }
-        while cursor < distances.count - 1 && distances[cursor] < distance { cursor += 1 }
+        cursor = min(max(1, cursor), vertices.count - 1)
+        while cursor > 1 && vertices[cursor - 1].distance >= distance { cursor -= 1 }
+        while cursor < vertices.count - 1 && vertices[cursor].distance < distance { cursor += 1 }
         return interpolate(distance: distance, index: cursor)
     }
     private func interpolate(distance: Double, index: Int) -> (point: CGPoint, normal: CGPoint) {
-        let a = points[index - 1]; let b = points[index]
-        let segment = max(0.0001, distances[index] - distances[index - 1])
-        let t = (distance - distances[index - 1]) / segment
-        return (CGPoint(x: a.x + (b.x-a.x)*t, y: a.y + (b.y-a.y)*t),
-                CGPoint(x: -(b.y-a.y)/segment, y: (b.x-a.x)/segment))
+        let a = vertices[index - 1]; let b = vertices[index]
+        let segment = max(0.0001, b.distance - a.distance)
+        let t = (distance - a.distance) / segment
+        return (CGPoint(x: a.point.x + (b.point.x-a.point.x)*t, y: a.point.y + (b.point.y-a.point.y)*t),
+                CGPoint(x: -(b.point.y-a.point.y)/segment, y: (b.point.x-a.point.x)/segment))
     }
     func point(_ fraction: Double, outward: Double = 0) -> CGPoint {
         let sample = sample(fraction)
@@ -118,6 +116,10 @@ struct MusicEdgePlayback {
 
 struct MusicEdgeFrame: View {
     static let waterSampleCount = 120
+    // Keep 40 points for the strongest mist and preserve fractional alignment during spring overshoot.
+    static func drawingPadding(rocket: CGFloat) -> CGFloat {
+        24 + 48 * rocket - (rocket >= 1 ? 32 : 0)
+    }
     private static let waterHarmonics = (0..<waterSampleCount).map { i -> (Double, Double, Double, Double) in
         let f = Double(i) / Double(waterSampleCount)
         return (sin(f * .pi * 10), cos(f * .pi * 10), sin(f * .pi * 18), cos(f * .pi * 18))
@@ -141,7 +143,7 @@ struct MusicEdgeFrame: View {
     var sky = true
     var body: some View {
         Canvas { context, size in
-            let rect = CGRect(origin: .zero, size: size).insetBy(dx: 24 + 48 * shape.rocket, dy: 24 + 48 * shape.rocket)
+            let rect = CGRect(origin: .zero, size: size).insetBy(dx: Self.drawingPadding(rocket: shape.rocket), dy: Self.drawingPadding(rocket: shape.rocket))
             guard rect.width > 0, rect.height > 0 else { return }
             let outline = shape.path(in: rect)
             var mask = Path(CGRect(origin: .zero, size: size)); mask.addPath(outline)
@@ -360,7 +362,7 @@ struct MusicEdgeEffect: View, Animatable {
         }
         .onChange(of: paused) { _, value in phase.update(target: playback.speed, paused: value, at: .now) }
         .onChange(of: playback.speed) { _, value in phase.update(target: value, paused: paused, at: .now) }
-        .padding(-24 - 48 * shape.rocket)
+        .padding(-MusicEdgeFrame.drawingPadding(rocket: shape.rocket))
         .allowsHitTesting(false)
         .task(id: captureKey) { audio.setDemand(audioConsumer, bundleID: music.bundleIdentifier, active: onScreen && isVisible && style != "off" && reactive && musicPlaying && !reduced && !motion.suspended) }
     }

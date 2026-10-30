@@ -52,8 +52,9 @@ final class Bridge {
                 if text(object(entry.runtime)["type"]) == "idle", now - entry.receivedAt < 35 { idle.append(key.identity) }
                 if let state = entry.state {
                     tasks.append(["id": key.id, "hostId": key.host, "title": "Codex task", "state": state,
-                                  "isRunning": Projection.taskState(entry.runtime) == "running", "reasoningEffort": entry.effort,
+                                  "isRunning": Projection.taskState(entry.runtime) == "running" && !entry.pending.contains { $0["replyable"] as? Bool == false }, "reasoningEffort": entry.effort,
                                   "model": entry.model["model"] ?? null, "modelProvider": entry.model["modelProvider"] ?? null,
+                                  "serviceTier": entry.model["serviceTier"] ?? null,
                                   "pendingQuestionIds": entry.pending.compactMap { $0["id"] as? String }, "questions": entry.pending,
                                   "detail": state == "waiting" ? "Needs your attention in Codex" : "Codex is working"])
                 }
@@ -80,6 +81,7 @@ final class Bridge {
             defer { lock.unlock() }
             guard connected, let current = entries[key], Date().timeIntervalSince1970 - current.receivedAt <= 35, !current.owner.isEmpty else { throw BridgeError.invalid("Codex 连接已失效，请稍后重试。") }
             guard let pending = current.pending.first(where: { text($0["id"]) == questionID }) else { throw BridgeError.invalid("该问题已处理或不再有效。") }
+            guard pending["replyable"] as? Bool != false else { throw BridgeError.invalid("请在 Codex 中处理此请求。") }
             guard !submissions.contains(submission) else { throw BridgeError.invalid("回答已发送或正在确认，请勿重复提交。") }
             submissions.insert(submission)
             entry = current; question = pending
@@ -167,7 +169,9 @@ final class Bridge {
                         } else if kind == "broadcast" {
                             if ["thread-stream-following-status-requested", "thread-stream-following-changed"].contains(method) {
                                 let key = TaskKey(host: params["hostId"] as? String ?? "local", id: text(params["conversationId"]))
-                                if subscribed.insert(key).inserted { try follow(key) }
+                                let isNew = subscribed.insert(key).inserted
+                                // Owners can forget followers after a reload; answer every status query.
+                                if isNew || method == "thread-stream-following-status-requested" { try follow(key) }
                             } else if method == "thread-stream-state-changed" {
                                 guard number(message["version"]) == 11 else { throw BridgeError.invalid("Unsupported stream version") }
                                 let key = TaskKey(host: text(params["hostId"]), id: text(params["conversationId"]))
@@ -180,8 +184,9 @@ final class Bridge {
                                     try follow(key); continue
                                 }
                                 var entry = previous ?? Entry()
-                                entry.questions = try Projection.updateQuestions(entry.questions, change: change)
-                                entry.pending = Projection.pending(entry.questions)
+                                var refreshPending = false
+                                entry.questions = try Projection.updateQuestions(entry.questions, change: change, refreshPending: &refreshPending)
+                                if refreshPending { entry.pending = Projection.pending(entry.questions) }
                                 entry.runtime = try Projection.updateRuntime(entry.runtime, change: change)
                                 entry.effort = Projection.effort(entry.effort, change: change)
                                 entry.model = Projection.model(entry.model, change: change)

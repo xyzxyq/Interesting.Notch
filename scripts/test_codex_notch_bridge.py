@@ -146,7 +146,18 @@ assert bridge.update_model(model, {'type': 'patches', 'patches': [{'op': 'replac
 assert 'model' not in bridge.update_model(model, {'type': 'patches', 'patches': [{'op': 'remove', 'path': ['latestThreadSettings', 'model']}]})
 assert bridge.update_model(model, {'type': 'patches', 'patches': [{'op': 'replace', 'path': ['latestThreadSettings'], 'value': {}}]}) == {}
 assert bridge.update_model(None, {'type': 'snapshot', 'conversationState': {'latestThreadSettings': {'model': 'bad\nname'}}}) == {}
-print('PASS: Plus weekly allowance and model snapshot/patch/removal/privacy projection')
+for tier in ['priority', 'default', 'fast', 'flex', 'unknown', None, 1, {}, []]:
+    metadata = bridge.update_model(None, dict(type='snapshot', conversationState=dict(
+        latestThreadSettings=dict(model='gpt-6-astra', effort='ultra', serviceTier=tier, cwd='PRIVATE'))))
+    assert metadata.get('serviceTier') == (tier if tier in ('priority', 'default') else None)
+    assert set(metadata) <= {'model', 'modelProvider', 'serviceTier'}
+fast = dict(model='gpt-6-astra', modelProvider='openai', serviceTier='priority')
+assert bridge.update_model(fast, dict(type='patches', patches=[dict(op='replace', path=['latestThreadSettings', 'model'], value='gpt-6-luna')]))['serviceTier'] == 'priority'
+assert 'serviceTier' not in bridge.update_model(fast, dict(type='patches', patches=[dict(op='remove', path=['latestThreadSettings', 'serviceTier'])]))
+assert 'serviceTier' not in bridge.update_model(fast, dict(type='snapshot', conversationState=dict(latestThreadSettings=dict(model='gpt-6-astra'))))
+assert bridge.update_model(fast, dict(type='patches', patches=[dict(op='remove', path=['latestThreadSettings'])])) == {}
+assert bridge.update_model(fast, dict(type='patches', patches=[dict(op='replace', path=[], value={})])) == {}
+print('PASS: Plus weekly allowance and model/service-tier snapshot, patch, removal and privacy projection')
 
 # Async questions do not set waitingOnUserInput; acknowledgement is a separate message.
 question = dict(type='agentMessage', id='q1', delivery='async', text='private question',
@@ -253,3 +264,23 @@ completion.runtimes[('local', 'test')]['receivedAt'] = time.time()
 completion.connected = False
 assert completion.snapshot()['idleTaskIds'] == []
 print('PASS: completion requires fresh explicit idle, never disappearance or disconnect')
+
+# Current clients publish question-bearing agent messages without an async delivery tag.
+untagged = dict(turns=[dict(items=[dict(type='agentMessage', id='new-question',
+    questions=[dict(title='Choose a direction', options=['Visual', 'Logic'])])])])
+assert len(bridge.pending_questions(bridge.project_questions(untagged))) == 1
+# Native requests have stable per-request IDs; no approval payload crosses the bridge.
+native = dict(requests=[dict(id=17, method='item/commandExecution/requestApproval', params=dict(command='PRIVATE'))])
+projected = bridge.project_questions(native)
+assert 'PRIVATE' not in json.dumps(projected) and 'params' not in json.dumps(projected)
+request = bridge.pending_questions(projected)[0]
+assert request['replyable'] is False and request['id'].startswith('request:')
+projected = bridge.update_questions(projected, dict(type='patches', patches=[
+    dict(op='add', path=['requests', 1], value=dict(id='second', method='item/tool/requestUserInput', params=dict(secret='PRIVATE')))]))
+assert len(bridge.pending_questions(projected)) == 2
+projected = bridge.update_questions(projected, dict(type='patches', patches=[dict(op='remove', path=['requests', 0])]))
+assert len(bridge.pending_questions(projected)) == 1
+projected = bridge.update_questions(projected, dict(type='patches', patches=[dict(op='add', path=['requests', 0, 'completed'], value=True)]))
+assert not bridge.pending_questions(projected)
+assert not bridge.pending_questions(bridge.project_questions(dict(requests=[dict(id=1, method='currentTime/read')])) )
+print('PASS: untagged questions, native approval/input identities, completion/removal and request-payload exclusion')

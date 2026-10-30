@@ -37,7 +37,8 @@ class WebcamManager: NSObject, ObservableObject {
 
     private let sessionQueue = DispatchQueue(label: "BoringNotch.WebcamManager.SessionQueue", qos: .userInitiated)
     
-    private var isCleaningUp: Bool = false
+    // Accessed only on sessionQueue, including delayed setup/start callbacks.
+    private var wantsSession = false
     
     // MARK: - Constants
     
@@ -130,83 +131,79 @@ class WebcamManager: NSObject, ObservableObject {
     
     /// Sets up the capture session with a completion handler
     private func setupCaptureSession(completion: @escaping (Bool) -> Void) {
-        sessionQueue.async { [weak self] in
-            guard let self = self else { 
-                completion(false)
-                return 
-            }
-            
-            // Clean up any existing session before creating a new one
-            self.cleanupExistingSession()
-            
-            let session = AVCaptureSession()
-            
-            do {
-                // Get available devices and prefer external camera if available
-                let discoverySession = AVCaptureDevice.DiscoverySession(
-                    deviceTypes: [.external, .builtInWideAngleCamera],
-                    mediaType: .video,
-                    position: .unspecified
-                )
-                
-                guard let videoDevice = discoverySession.devices.first else {
-                    NSLog("No video devices available")
-                    DispatchQueue.main.async {
-                        self.isSessionRunning = false
-                        self.cameraAvailable = false
-                    }
-                    completion(false)
-                    return
-                }
-                
-                NSLog("Using camera: \(videoDevice.localizedName)")
-                
-                // Lock device for configuration
-                try videoDevice.lockForConfiguration()
-                defer { videoDevice.unlockForConfiguration() }
-                
-                let videoInput = try AVCaptureDeviceInput(device: videoDevice)
-                guard session.canAddInput(videoInput) else {
-                    throw NSError(domain: "BoringNotch.WebcamManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Cannot add video input"])
-                }
-                
-                session.beginConfiguration()
-                session.sessionPreset = .high
-                session.addInput(videoInput)
-                
-                let videoOutput = AVCaptureVideoDataOutput()
-                videoOutput.setSampleBufferDelegate(nil, queue: nil)
-                if session.canAddOutput(videoOutput) {
-                    session.addOutput(videoOutput)
-                }
-                session.commitConfiguration()
-                
-                self.captureSession = session
-                
-                // Create and set up preview layer on main thread
-                DispatchQueue.main.async {
-                    self.cameraAvailable = true
-                    let previewLayer = AVCaptureVideoPreviewLayer(session: session)
-                    previewLayer.videoGravity = .resizeAspectFill
-                    self.previewLayer = previewLayer
-                    
-                    // Setup is complete, let the caller know
-                    completion(true)
-                }
-                
-                NSLog("Capture session setup completed successfully")
-            } catch {
-                NSLog("Failed to setup capture session: \(error.localizedDescription)")
+        guard self.wantsSession else { completion(false); return }
+        // Clean up any existing session before creating a new one
+        self.cleanupExistingSession()
+
+        let session = AVCaptureSession()
+
+        do {
+            // Get available devices and prefer external camera if available
+            let discoverySession = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.external, .builtInWideAngleCamera],
+                mediaType: .video,
+                position: .unspecified
+            )
+
+            guard let videoDevice = discoverySession.devices.first else {
+                NSLog("No video devices available")
                 DispatchQueue.main.async {
                     self.isSessionRunning = false
                     self.cameraAvailable = false
-                    self.previewLayer = nil
                 }
+                self.wantsSession = false
                 completion(false)
+                return
             }
+
+            NSLog("Using camera: \(videoDevice.localizedName)")
+
+            // Lock device for configuration
+            try videoDevice.lockForConfiguration()
+            defer { videoDevice.unlockForConfiguration() }
+
+            let videoInput = try AVCaptureDeviceInput(device: videoDevice)
+            guard session.canAddInput(videoInput) else {
+                throw NSError(domain: "BoringNotch.WebcamManager", code: -1, userInfo: [NSLocalizedDescriptionKey: "Cannot add video input"])
+            }
+
+            session.beginConfiguration()
+            session.sessionPreset = .high
+            session.addInput(videoInput)
+
+            let videoOutput = AVCaptureVideoDataOutput()
+            videoOutput.setSampleBufferDelegate(nil, queue: nil)
+            if session.canAddOutput(videoOutput) {
+                session.addOutput(videoOutput)
+            }
+            session.commitConfiguration()
+
+            self.captureSession = session
+
+            // Create and set up preview layer on main thread
+            DispatchQueue.main.async {
+                self.cameraAvailable = true
+                let previewLayer = AVCaptureVideoPreviewLayer(session: session)
+                previewLayer.videoGravity = .resizeAspectFill
+                self.previewLayer = previewLayer
+
+                // Setup is complete, let the caller know
+                completion(true)
+            }
+
+            NSLog("Capture session setup completed successfully")
+        } catch {
+            NSLog("Failed to setup capture session: \(error.localizedDescription)")
+            DispatchQueue.main.async {
+                self.isSessionRunning = false
+                self.cameraAvailable = false
+                self.previewLayer = nil
+            }
+            self.wantsSession = false
+            completion(false)
         }
     }
-    
+
     /// Cleans up an existing capture session, removing all inputs and outputs
     private func cleanupExistingSession() {
         if let existingSession = self.captureSession {
@@ -266,6 +263,8 @@ class WebcamManager: NSObject, ObservableObject {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             
+            guard !self.wantsSession else { return }
+            self.wantsSession = true
             // If no session exists, create new session
             if self.captureSession == nil {
                 self.setupCaptureSession { success in
@@ -283,7 +282,7 @@ class WebcamManager: NSObject, ObservableObject {
     
     private func startRunningCaptureSession() {
         sessionQueue.async { [weak self] in
-            guard let self = self, let session = self.captureSession, !session.isRunning else {
+            guard let self = self, self.wantsSession, let session = self.captureSession, !session.isRunning else {
                 return
             }
             
@@ -300,6 +299,7 @@ class WebcamManager: NSObject, ObservableObject {
         sessionQueue.async { [weak self] in
             guard let self = self else { return }
             
+            self.wantsSession = false
             // Update state to indicate we're stopping
             DispatchQueue.main.async {
                 self.isSessionRunning = false

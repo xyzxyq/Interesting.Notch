@@ -207,18 +207,21 @@ class MusicManager: ObservableObject {
         if state.bundleIdentifier.isEmpty {
             // Source disappearance ends activity; video sources still use the
             // upstream app-artwork and visualizer presentation.
-            debounceIdleTask?.cancel()
-            lyricsTask?.cancel()
+            debounceIdleTask?.cancel(); debounceIdleTask = nil
+            lyricsTask?.cancel(); lyricsTask = nil
             lyricsGeneration &+= 1
             lyricsTrack = nil
-            isFetchingLyrics = false
-            elapsedTime = estimatedPlaybackPosition(at: Date())
-            timestampDate = Date()
-            playbackRate = 0
-            isPlaying = false
-            isMusicSource = false
-            isPlayerIdle = true
-            lyricsStatus = "Lyrics idle"
+            if isFetchingLyrics { isFetchingLyrics = false }
+            let now = Date()
+            let position = estimatedPlaybackPosition(at: now)
+            if elapsedTime != position { elapsedTime = position }
+            // Freeze the playback clock once; repeated empty-source events are UI no-ops.
+            if isPlaying || playbackRate != 0 { timestampDate = now }
+            if playbackRate != 0 { playbackRate = 0 }
+            if isPlaying { isPlaying = false }
+            if isMusicSource { isMusicSource = false }
+            if !isPlayerIdle { isPlayerIdle = true }
+            if lyricsStatus != "Lyrics idle" { lyricsStatus = "Lyrics idle" }
             return
         }
         if isMusicSource != state.isMusicSource { isMusicSource = state.isMusicSource }

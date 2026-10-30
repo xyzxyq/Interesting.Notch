@@ -6,6 +6,7 @@ enum CodexThrust {
     static func length(_ level: Int) -> Double { [0.55, 0.7, 0.85, 1.05, 1.4, 2.0][min(5, max(0, level))] }
     static func speed(_ level: Int) -> Double { [0.65, 0.8, 1, 1.3, 1.9, 3.0][min(5, max(0, level))] }
     @MainActor static func frameInterval(lowPower: Bool) -> Double { NotchMotionEnvironment.decorativeFrameInterval(lowPower: lowPower) }
+    static func fuelFrameInterval(lowPower: Bool) -> Double { lowPower ? 1.0 / 6 : 1.0 / 12 }
     static func wakePoint(_ progress: Double, lane: Int, side: Double, rect: CGRect) -> CGPoint {
         let p = min(1, max(0, progress))
         let x = p * (rect.width + 40)
@@ -68,40 +69,44 @@ struct CodexFlame: View {
     private var paused: Bool { !onScreen || motion.suspended || !active || reduced }
     var body: some View {
         TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: paused)) { timeline in
-            Canvas { context, size in
-                let h = size.height
-                let time = reduced ? 0 : phase.value(at: timeline.date)
-                let pulse = reduced ? 0.0 : sin(time * 7) * 0.09 + sin(time * 13) * 0.04
-                let bodyWidth = size.width - 80
-                let nozzle = NotchShape.rocketCoordinate(bodyWidth + h * 0.182, width: bodyWidth, height: h)
-                for layer in 0..<3 {
-                    let scale = [1.0, 0.75, 0.44][layer]
-                    let length = h * (reduced ? 0.45 : (effort < 0 ? 0.85 : CodexThrust.length(effort)) + pulse) * scale
-                    let radius = h * (effort == 5 ? 0.30 : 0.23) * scale
-                    let cy = h * 0.5
-                    var flame = Path()
-                    flame.move(to: CGPoint(x: nozzle, y: cy - radius))
-                    flame.addCurve(to: CGPoint(x: nozzle + length, y: cy + sin(time * 9) * radius * 0.2),
-                                   control1: CGPoint(x: nozzle + length * 0.35, y: cy - radius * 1.2),
-                                   control2: CGPoint(x: nozzle + length * 0.75, y: cy - radius * 0.25))
-                    flame.addCurve(to: CGPoint(x: nozzle, y: cy + radius),
-                                   control1: CGPoint(x: nozzle + length * 0.6, y: cy + radius * 0.45),
-                                   control2: CGPoint(x: nozzle + length * 0.3, y: cy + radius * 1.2))
-                    flame.closeSubpath()
-                    let boost = Double(max(0, min(5, effort) - 1)) / 4
-                    let colors: [Color] = [Color.orange.opacity(0.45 + boost * 0.4),
-                                           Color(red: 1, green: 0.5 + boost * 0.35, blue: boost * 0.3),
-                                           Color(red: 1, green: 0.94 + boost * 0.06, blue: 0.72 + boost * 0.28)]
-                    if layer == 0 && boost > 0 {
-                        var glow = context
-                        glow.addFilter(.blur(radius: 2 + boost * 3))
-                        glow.fill(flame, with: .color(.orange.opacity(0.25 + boost * 0.3)))
+            // Only the nozzle and its wake need a drawing surface, not the entire notch.
+            GeometryReader { geometry in
+                Canvas { context, size in
+                    let h = size.height
+                    let time = reduced ? 0 : phase.value(at: timeline.date)
+                    let pulse = reduced ? 0.0 : sin(time * 7) * 0.09 + sin(time * 13) * 0.04
+                    let bodyWidth = geometry.size.width
+                    let nozzle = NotchShape.rocketCoordinate(bodyWidth + h * 0.182, width: bodyWidth, height: h) - bodyWidth + 48
+                    for layer in 0..<3 {
+                        let scale = [1.0, 0.75, 0.44][layer]
+                        let length = h * (reduced ? 0.45 : (effort < 0 ? 0.85 : CodexThrust.length(effort)) + pulse) * scale
+                        let radius = h * (effort == 5 ? 0.30 : 0.23) * scale
+                        let cy = h * 0.5
+                        var flame = Path()
+                        flame.move(to: CGPoint(x: nozzle, y: cy - radius))
+                        flame.addCurve(to: CGPoint(x: nozzle + length, y: cy + sin(time * 9) * radius * 0.2),
+                                       control1: CGPoint(x: nozzle + length * 0.35, y: cy - radius * 1.2),
+                                       control2: CGPoint(x: nozzle + length * 0.75, y: cy - radius * 0.25))
+                        flame.addCurve(to: CGPoint(x: nozzle, y: cy + radius),
+                                       control1: CGPoint(x: nozzle + length * 0.6, y: cy + radius * 0.45),
+                                       control2: CGPoint(x: nozzle + length * 0.3, y: cy + radius * 1.2))
+                        flame.closeSubpath()
+                        let boost = Double(max(0, min(5, effort) - 1)) / 4
+                        let colors: [Color] = [Color.orange.opacity(0.45 + boost * 0.4),
+                                               Color(red: 1, green: 0.5 + boost * 0.35, blue: boost * 0.3),
+                                               Color(red: 1, green: 0.94 + boost * 0.06, blue: 0.72 + boost * 0.28)]
+                        if layer == 0 && boost > 0 {
+                            var glow = context
+                            glow.addFilter(.blur(radius: 2 + boost * 3))
+                            glow.fill(flame, with: .color(.orange.opacity(0.25 + boost * 0.3)))
+                        }
+                        context.fill(flame, with: .linearGradient(Gradient(colors: [colors[layer], colors[layer].opacity(0.2 + boost * 0.35)]),
+                                                                startPoint: CGPoint(x: nozzle, y: cy), endPoint: CGPoint(x: nozzle + length, y: cy)))
                     }
-                    context.fill(flame, with: .linearGradient(Gradient(colors: [colors[layer], colors[layer].opacity(0.2 + boost * 0.35)]),
-                                                            startPoint: CGPoint(x: nozzle, y: cy), endPoint: CGPoint(x: nozzle + length, y: cy)))
                 }
+                .frame(width: 128)
+                .offset(x: geometry.size.width - 48)
             }
-            .padding(.trailing, -80)
         }
         .opacity(active ? 1 : 0)
         .animation(.easeOut(duration: reduced ? 0.15 : CodexCompletionCue.flameOutDuration), value: active)
@@ -276,7 +281,7 @@ struct CodexSpeedLines: View {
         TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: paused)) { clock in
             Canvas { context, size in
                 guard active, effort >= 2, !reduced else { return }
-                let rect = CGRect(origin: .zero, size: size).insetBy(dx: 48, dy: 48)
+                let rect = CGRect(x: 0, y: 24, width: size.width - 48, height: size.height - 48)
                 let outline = shape.path(in: rect)
                 let time = phase.value(at: clock.date)
                 let boost = Double(effort - 2) / 3
@@ -304,7 +309,7 @@ struct CodexSpeedLines: View {
                 }
             }
         }
-        .padding(-48)
+        .padding(EdgeInsets(top: -24, leading: 0, bottom: -24, trailing: -48))
         .onAppear { onScreen = true }
         .onDisappear { onScreen = false; phase.update(target: speed, paused: true, at: .now) }
         .onChange(of: paused, initial: true) { _, value in phase.update(target: speed, paused: value, at: .now) }
@@ -321,9 +326,9 @@ struct CodexLiquidDrop: View, Animatable {
     var hoverOffset: CGFloat = 0
     var mergeElapsed: Double? = nil
     var volumeScale: CGFloat = 1
-    var animatableData: AnimatablePair<CGFloat, CGFloat> {
-        get { AnimatablePair(progress, volumeScale) }
-        set { progress = newValue.first; volumeScale = newValue.second }
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, Double> {
+        get { .init(.init(progress, volumeScale), symbolOpacity ?? max(0, (min(1, progress) - 0.72) / 0.28)) }
+        set { progress = newValue.first.first; volumeScale = newValue.first.second; symbolOpacity = newValue.second }
     }
     var body: some View {
         let t = min(1, max(0, progress))
@@ -387,19 +392,18 @@ struct CodexLiquidDrop: View, Animatable {
                 let alpha = (symbolOpacity ?? max(0, (t - 0.72) / 0.28)) * reminderBrightness
                 var light = context
                 light.opacity = alpha
-                // Scale the symbol and its ring with the same volume as the liquid surface.
+                // Keep the symbol seated in the lens as its volume changes.
                 light.translateBy(x: 32, y: cy)
                 light.scaleBy(x: volumeScale, y: volumeScale)
                 light.translateBy(x: -32, y: -cy)
-                let ring = Path(ellipseIn: CGRect(x: 20.5, y: cy - 11.5, width: 23, height: 23))
-                light.stroke(ring, with: .color(Color(red: 1, green: 0.9, blue: 0.65).opacity(0.24)), lineWidth: 0.6)
                 if let bulb = context.resolveSymbol(id: "bulb") {
                     light.draw(bulb, at: CGPoint(x: 32, y: cy))
                 }
         } symbols: {
-            Image(systemName: "lightbulb")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color(red: 1, green: 0.9, blue: 0.65))
+            Image(systemName: "lightbulb.fill")
+                .font(.system(size: 12, weight: .regular))
+                .foregroundStyle(LinearGradient(colors: [Color(red: 1, green: 0.95, blue: 0.79), Color(red: 0.95, green: 0.78, blue: 0.47)],
+                                                startPoint: .topLeading, endPoint: .bottomTrailing))
                 .tag("bulb")
         }
         .frame(width: 64, height: 82)
@@ -408,42 +412,73 @@ struct CodexLiquidDrop: View, Animatable {
     // Keep every reflection inside the silhouette, including during stretch and fusion.
     private static func drawLiquid(_ path: Path, center: CGPoint, in context: inout GraphicsContext, reflection: Double) {
         let bounds = path.boundingRect
+        guard !bounds.isEmpty else { return }
         let materialScale = min(bounds.width / 32, bounds.height / 35)
         func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
             CGPoint(x: bounds.minX + bounds.width * x, y: bounds.minY + bounds.height * y)
+        }
+        // Keep the gradient's transparent edge inside the 64×82 slot at maximum volume.
+        let shadowRadiusX = min(bounds.width * 0.65, center.x, 64 - center.x)
+        let shadowRadiusY = min(4 * materialScale, max(0, 81 - bounds.maxY))
+        if shadowRadiusX > 0 && shadowRadiusY > 0 {
+            var shadow = context
+            shadow.opacity *= reflection
+            shadow.translateBy(x: center.x, y: max(shadowRadiusY, min(bounds.maxY + 1.5 * materialScale, 81 - shadowRadiusY)))
+            shadow.scaleBy(x: shadowRadiusX, y: shadowRadiusY)
+            shadow.fill(Path(ellipseIn: CGRect(x: -1, y: -1, width: 2, height: 2)), with: .radialGradient(
+                Gradient(stops: [.init(color: .black.opacity(0.24), location: 0),
+                                 .init(color: .black.opacity(0.10), location: 0.45),
+                                 .init(color: .clear, location: 1)]), center: .zero, startRadius: 0, endRadius: 1))
         }
         context.fill(path, with: .color(.black))
         var surface = context
         surface.clip(to: path)
         surface.opacity *= reflection
         surface.fill(path, with: .radialGradient(
-            Gradient(stops: [.init(color: Color(white: 0.24), location: 0),
-                             .init(color: Color(white: 0.09), location: 0.38),
-                             .init(color: .black, location: 0.85)]),
-            center: point(0.28, 0.25), startRadius: 0, endRadius: max(1, bounds.height)))
+            Gradient(stops: [.init(color: Color(red: 0.37, green: 0.39, blue: 0.42), location: 0),
+                             .init(color: Color(red: 0.16, green: 0.18, blue: 0.20), location: 0.38),
+                             .init(color: Color(white: 0.035), location: 0.82)]),
+            center: point(0.22, 0.16), startRadius: 0, endRadius: max(1, bounds.height * 0.95)))
         surface.fill(path, with: .radialGradient(
-            Gradient(colors: [Color(red: 0.52, green: 0.61, blue: 0.69).opacity(0.3), .clear]),
-            center: point(0.68, 1.06), startRadius: 0, endRadius: max(1, bounds.height * 0.48)))
-        var rim = surface
-        rim.addFilter(.blur(radius: 0.6 * materialScale))
-        rim.stroke(path, with: .linearGradient(
-            Gradient(colors: [.white.opacity(0.24), .white.opacity(0.02), .white.opacity(0.12)]),
-            startPoint: point(0, 0), endPoint: point(1, 1)), lineWidth: 1.2 * materialScale)
-
-        // Share the bulb ring's center; a soft concentric arc replaces the detached streak.
-        let radius = min(bounds.width / 2, bounds.maxY - center.y) * 0.9
-        var highlight = Path()
-        highlight.addArc(center: center, radius: max(0, radius),
-                         startAngle: .degrees(195), endAngle: .degrees(285), clockwise: false)
-        var sheen = surface
-        sheen.addFilter(.blur(radius: 0.65 * materialScale))
-        sheen.stroke(highlight, with: .linearGradient(
-            Gradient(colors: [.white.opacity(0.02), .white.opacity(0.32), .white.opacity(0.02)]),
-            startPoint: CGPoint(x: center.x - radius, y: center.y),
-            endPoint: CGPoint(x: center.x + radius * 0.3, y: center.y - radius)),
-            style: StrokeStyle(lineWidth: max(0.8, bounds.width * 0.035), lineCap: .round))
+            Gradient(stops: [.init(color: Color(red: 0.55, green: 0.65, blue: 0.72).opacity(0.40), location: 0),
+                             .init(color: .clear, location: 1)]),
+            center: point(0.72, 1.08), startRadius: 0, endRadius: max(1, bounds.height * 0.43)))
+        var reflectionFace = Path()
+        reflectionFace.move(to: point(0.10, 0.43))
+        reflectionFace.addCurve(to: point(0.46, 0.07), control1: point(0.14, 0.20), control2: point(0.31, 0.07))
+        reflectionFace.addCurve(to: point(0.77, 0.23), control1: point(0.59, 0.06), control2: point(0.71, 0.15))
+        reflectionFace.addCurve(to: point(0.10, 0.43), control1: point(0.47, 0.18), control2: point(0.31, 0.33))
+        reflectionFace.closeSubpath()
+        surface.fill(reflectionFace, with: .linearGradient(
+            Gradient(colors: [.white.opacity(0.30), .white.opacity(0.08), .clear]),
+            startPoint: point(0.20, 0.10), endPoint: point(0.58, 0.39)))
+        surface.stroke(path, with: .linearGradient(
+            Gradient(stops: [.init(color: .white.opacity(0.65), location: 0),
+                             .init(color: .white.opacity(0.14), location: 0.32),
+                             .init(color: .white.opacity(0.025), location: 0.55),
+                             .init(color: Color(red: 0.65, green: 0.75, blue: 0.81).opacity(0.38), location: 0.88),
+                             .init(color: .white.opacity(0.12), location: 1)]),
+            startPoint: point(0.05, 0), endPoint: point(0.85, 1)), lineWidth: 1 * materialScale)
+        var lower = Path()
+        lower.move(to: point(0.35, 0.91))
+        lower.addQuadCurve(to: point(0.82, 0.74), control: point(0.68, 0.96))
+        surface.stroke(lower, with: .linearGradient(Gradient(colors: [.clear, .white.opacity(0.28), .clear]),
+                                                  startPoint: point(0.35, 0.91), endPoint: point(0.82, 0.74)),
+                       style: StrokeStyle(lineWidth: 0.7 * materialScale, lineCap: .round))
     }
 
+}
+
+private struct CodexDropPressStyle: ButtonStyle {
+    @State private var hovered = false
+    @Environment(\.accessibilityReduceMotion) private var reduced
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(reduced ? 1 : configuration.isPressed ? 0.96 : hovered ? 1.045 : 1, anchor: .bottom)
+            .onHover { hovered = $0 }
+            .animation(.easeOut(duration: 0.16), value: hovered)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
 }
 
 struct CodexDropButton: View {
@@ -467,9 +502,7 @@ struct CodexDropButton: View {
 
     var body: some View {
         Button {
-            let local = NSPoint(x: anchorView.bounds.midX, y: anchorView.bounds.maxY - 51)
-            let anchor = anchorView.window?.convertPoint(toScreen: anchorView.convert(local, to: nil)) ?? NSEvent.mouseLocation
-            action(anchor)
+            action(Self.bottomAnchor(view: anchorView, count: mergedCount))
         } label: {
             TimelineView(.animation(minimumInterval: CodexThrust.frameInterval(lowPower: motion.lowPower), paused: !onScreen || expanded || motion.suspended || idleSince == nil || reduced)) { clock in
                 let reminder = idleSince.map { CodexDropMotion.reminder(at: clock.date.timeIntervalSince($0)) }
@@ -482,13 +515,16 @@ struct CodexDropButton: View {
                 .overlay(alignment: .bottomTrailing) {
                     if count > 1 {
                         Text("\(count)").font(.system(size: 9, weight: .bold)).padding(3)
-                            .background(.orange, in: Circle()).padding(.trailing, 8).padding(.bottom, 8)
+                            .foregroundStyle(Color(red: 0.98, green: 0.86, blue: 0.65))
+                            .background(Color(white: 0.12), in: Circle())
+                            .overlay { Circle().strokeBorder(.white.opacity(0.2), lineWidth: 0.6) }
+                            .padding(.trailing, 8).padding(.bottom, 8)
                     }
                 }
                 .contentShape(Rectangle())
             }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(CodexDropPressStyle())
         .background(CodexDropAnchor(view: anchorView))
         .onAppear { onScreen = true }
         .onDisappear { onScreen = false; idleSince = nil; surface = 0; cancelMerging() }
@@ -523,18 +559,25 @@ struct CodexDropButton: View {
                     progress = waiting ? 1 : 0
                     withAnimation(.easeInOut(duration: 0.15)) { visible = waiting }
                 } else if waiting {
-                    if !visible { try await Task.sleep(for: .milliseconds(550)) }
+                    if !visible { try await Task.sleep(for: .milliseconds(120)) }
                     try Task.checkCancellation()
-                    let alreadySettled = visible && progress == 1
-                    visible = true
-                    if !alreadySettled { try await move(CodexDropMotion.fall, reveal: true) }
+                    if visible {
+                        // Retarget an interrupted retraction from its presentation value.
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.86)) {
+                            progress = 1; surface = 0; symbolVisible = true
+                        }
+                        try await Task.sleep(for: .seconds(0.4))
+                    } else {
+                        visible = true
+                        try await move(reveal: true)
+                    }
                     if mergedCount == 0 { mergedCount = 1 }
                     idleSince = .now
                     startMerging()
                 } else if visible {
                     idleSince = nil
                     surface = 0
-                    try await move(CodexDropMotion.returning, reveal: false)
+                    try await move(reveal: false)
                     try Task.checkCancellation()
                     visible = false
                     symbolVisible = false
@@ -549,6 +592,14 @@ struct CodexDropButton: View {
         .opacity(expanded ? 0 : 1)
         .offset(y: expanded && !reduced ? -16 : 0)
         .animation(.easeInOut(duration: reduced ? 0.15 : 0.24), value: expanded)
+    }
+
+    static func bottomAnchor(view: NSView, count: Int) -> CGPoint {
+        guard let window = view.window else { return NSEvent.mouseLocation }
+        // Convert the full bounds first; SwiftUI hosting can flip the local coordinate system.
+        let bounds = window.convertToScreen(view.convert(view.bounds, to: nil))
+        let bottom = 51 + 16 * CodexMergeMotion.scale(for: Double(max(1, count)))
+        return CGPoint(x: bounds.midX, y: bounds.maxY - bottom)
     }
 
     private func cancelMerging() {
@@ -572,37 +623,40 @@ struct CodexDropButton: View {
         }
     }
 
-    private func move(_ frames: [CodexDropMotion.Frame], reveal: Bool) async throws {
-        let initial = CodexDropMotion.Frame(progress: progress, surface: surface, duration: 0)
-        let started = ProcessInfo.processInfo.systemUptime
-        let duration = frames.reduce(0) { $0 + $1.duration }
-        while true {
+    private func move(reveal: Bool) async throws {
+        try Task.checkCancellation()
+        if reveal {
+            withAnimation(.easeIn(duration: 0.18)) { progress = 0.38; surface = 8 }
+            try await Task.sleep(for: .seconds(0.16))
             try Task.checkCancellation()
-            let elapsed = min(duration, ProcessInfo.processInfo.systemUptime - started)
-            let sample = CodexDropMotion.sample(frames, initial: initial, time: elapsed)
-            var transaction = Transaction()
-            transaction.disablesAnimations = true
-            withTransaction(transaction) {
-                progress = sample.progress
-                surface = sample.surface
+            // One spring carries the descent and settling; no timer gap between rebounds.
+            withAnimation(.interpolatingSpring(stiffness: 160, damping: 16)) {
+                progress = 1; surface = 0; symbolVisible = true
             }
-            if reveal && progress > 0.86 { symbolVisible = true }
-            if !reveal { symbolVisible = progress > 0.86 }
-            if elapsed >= duration { return }
-            try await Task.sleep(for: .seconds(motion.lowPower ? 1.0 / 30 : 1.0 / 60))
+            try await Task.sleep(for: .seconds(0.72))
+        } else {
+            withAnimation(.easeInOut(duration: 0.42)) { progress = 0; symbolVisible = false; surface = 4 }
+            try await Task.sleep(for: .seconds(0.14))
+            try Task.checkCancellation()
+            withAnimation(.easeOut(duration: 0.28)) { surface = 0 }
+            try await Task.sleep(for: .seconds(0.28))
         }
     }
 
 }
 
 // Read the actual drop position; click location varies across its hit area.
-private struct CodexDropAnchor: NSViewRepresentable {
+struct CodexDropAnchor: NSViewRepresentable {
     let view: NSView
-    func makeNSView(context: Context) -> NSView { view }
+    var identifier = "codex-drop-anchor"
+    func makeNSView(context: Context) -> NSView {
+        view.identifier = NSUserInterfaceItemIdentifier(identifier)
+        return view
+    }
     func updateNSView(_ nsView: NSView, context: Context) {}
 }
 
-// Shared keyframes make the two landing rebounds and the return sequence testable.
+// The settled reminder shares a deterministic, decaying idle phase.
 enum CodexDropMotion {
     static func reminder(at elapsed: Double) -> (offset: CGFloat, brightness: Double) {
         let t = max(0, elapsed)
@@ -611,48 +665,6 @@ enum CodexDropMotion {
                 0.86 + 0.14 * settling + (0.08 + 0.20 * settling) * (cos(t * 2 * .pi / 2.8) - 1))
     }
 
-    struct Frame {
-        let progress: CGFloat
-        let surface: CGFloat
-        let duration: Double
-    }
-    // Continuous monotone Hermite interpolation preserves velocity across descent
-    // nodes; only actual bounce extrema settle to zero velocity.
-    static func sample(_ frames: [Frame], initial: Frame, time: Double) -> Frame {
-        let nodes = [initial] + frames
-        let times = frames.reduce(into: [0.0]) { $0.append($0.last! + $1.duration) }
-        guard let segment = (1..<times.count).first(where: { time < times[$0] }) else { return nodes.last! }
-        let i = segment - 1
-        let h = times[i + 1] - times[i]
-        let u = min(1, max(0, (time - times[i]) / h))
-        func interpolate(_ value: (Frame) -> CGFloat) -> CGFloat {
-            func slope(_ j: Int) -> Double {
-                guard j > 0, j < nodes.count - 1 else { return 0 }
-                let a = Double(value(nodes[j]) - value(nodes[j - 1])) / (times[j] - times[j - 1])
-                let b = Double(value(nodes[j + 1]) - value(nodes[j])) / (times[j + 1] - times[j])
-                return a * b > 0 ? 2 * a * b / (a + b) : 0
-            }
-            return CGFloat((2*u*u*u - 3*u*u + 1) * Double(value(nodes[i]))
-                + (u*u*u - 2*u*u + u) * h * slope(i)
-                + (-2*u*u*u + 3*u*u) * Double(value(nodes[i + 1]))
-                + (u*u*u - u*u) * h * slope(i + 1))
-        }
-        return Frame(progress: interpolate { $0.progress }, surface: interpolate { $0.surface }, duration: 0)
-    }
-    static let fall: [Frame] = [
-        .init(progress: 0.38, surface: 8, duration: 0.24),
-        .init(progress: 0.76, surface: 4, duration: 0.18),
-        .init(progress: 1.06, surface: 0, duration: 0.18),
-        .init(progress: 0.79, surface: 3.5, duration: 0.17),
-        .init(progress: 1.025, surface: 0, duration: 0.17),
-        .init(progress: 0.93, surface: 1.2, duration: 0.13),
-        .init(progress: 1, surface: 0, duration: 0.17)
-    ]
-    // Reverse both the destinations and segment durations of the birth animation.
-    static let returning: [Frame] = fall.indices.reversed().map { index in
-        let destination = index == 0 ? Frame(progress: 0, surface: 0, duration: 0) : fall[index - 1]
-        return Frame(progress: destination.progress, surface: destination.surface, duration: fall[index].duration)
-    }
 
 }
 
@@ -669,7 +681,7 @@ struct CodexFuelGauge: View {
             : Color(white: 0.85)
     }
     var body: some View {
-        TimelineView(.animation(minimumInterval: motion.lowPower ? 1.0 / 6 : 1.0 / 12, paused: !onScreen || motion.suspended || reduced || fuel == nil)) { tick in
+        TimelineView(.animation(minimumInterval: CodexThrust.fuelFrameInterval(lowPower: motion.lowPower), paused: !onScreen || motion.suspended || reduced || fuel == nil)) { tick in
             CodexFuelFrame(level: (fuel?.remainingPercent ?? 0) / 100,
                            phase: reduced ? 0 : tick.date.timeIntervalSinceReferenceDate,
                            tint: tint, available: fuel != nil)
@@ -748,7 +760,9 @@ enum CodexMergeMotion {
 
 // Keep native controls live: never render the card through a Canvas symbol.
 struct CodexCardReveal: AnimatableModifier {
-    static let duration = 0.65
+    static let duration = 0.5
+    static let panelInset: CGFloat = 48
+    static let dropGap: CGFloat = 6
     var progress: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduced
     var animatableData: CGFloat {
@@ -761,11 +775,11 @@ struct CodexCardReveal: AnimatableModifier {
         if t == 1 { return Path(CGRect(origin: .zero, size: size)) }
         func smooth(_ value: CGFloat) -> CGFloat {
             let u = min(1, max(0, value))
-            return u * u * (3 - 2 * u)
+            return u * u * u * (10 - 15 * u + 6 * u * u)
         }
         let seed = min(32, size.width, size.height)
-        let width = seed + (size.width - seed) * smooth(t / 0.72)
-        let height = seed + (size.height - seed) * smooth((t - 0.08) / 0.82)
+        let width = seed + (size.width - seed) * smooth(t)
+        let height = seed + (size.height - seed) * smooth(t)
         let radius = 16 + 4 * t + 28 * sin(.pi * t)
         return Path(roundedRect: CGRect(x: (size.width - width) / 2, y: 0, width: width, height: height),
                     cornerRadius: min(radius, width / 2, height / 2))
@@ -799,10 +813,9 @@ struct CodexCardReveal: AnimatableModifier {
     }
 }
 
-// The dissolving boundary converges on the top-center droplet attachment point.
-// The mask retains hit testing so native fields and buttons don't become click-through.
+// Contract toward the droplet with one vector mask, avoiding thousands of per-frame tiles.
 struct CodexDissolve: AnimatableModifier {
-    static let duration = 0.8
+    static let duration = 0.36
     var progress: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduced
     var animatableData: CGFloat {
@@ -814,37 +827,9 @@ struct CodexDissolve: AnimatableModifier {
             if reduced {
                 Color.white.opacity(1 - Double(min(1, max(0, progress))))
             } else {
-                Canvas { context, size in
-                    let p = min(1, max(0, progress))
-                    guard p < 1, size.width > 0, size.height > 0 else { return }
-                    if p == 0 {
-                        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(.white))
-                        return
-                    }
-                    let columns = max(1, Int(ceil(size.width / 5)))
-                    let rows = max(1, Int(ceil(size.height / 5)))
-                    let w = size.width / CGFloat(columns), h = size.height / CGFloat(rows)
-                    for row in 0..<rows {
-                        for column in 0..<columns {
-                            let x = (CGFloat(column) + 0.5) / CGFloat(columns)
-                            let y = (CGFloat(row) + 0.5) / CGFloat(rows)
-                            // Bottom and side edges dissolve first; the final remnant stays by the droplet.
-                            let depth = 1 - min(1, hypot((x - 0.5) * 2, y))
-                            let seed = CGFloat((row * 73 + column * 137 + row * column * 19) % 101) / 100
-                            let local = min(1, max(0, (p - depth * 0.62 - seed * 0.12) / 0.26))
-                            let fade = local * local * (3 - 2 * local)
-                            guard fade < 1 else { continue }
-                            let inset = fade * min(w, h) * 0.32
-                            let rect = CGRect(x: CGFloat(column) * w + inset,
-                                              y: CGFloat(row) * h + inset,
-                                              width: w - inset * 2, height: h - inset * 2)
-                                // Overlap intact cells to avoid antialiasing seams in the solid center.
-                                .insetBy(dx: -0.35 * (1 - fade), dy: -0.35 * (1 - fade))
-                                .offsetBy(dx: (0.5 - x) * fade * 5, dy: -fade * (2 + y * 4))
-                            context.fill(Path(roundedRect: rect, cornerRadius: inset),
-                                         with: .color(.white.opacity(Double(1 - fade))))
-                        }
-                    }
+                GeometryReader { geometry in
+                    CodexCardReveal.outline(size: geometry.size, progress: progress)
+                        .fill(.white.opacity(Double(min(1, max(0, (1 - progress) * 5)))))
                 }
             }
         }

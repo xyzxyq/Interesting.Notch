@@ -37,7 +37,7 @@ class BoringViewModel: NSObject, ObservableObject {
     @Published var notchSize: CGSize = getClosedNotchSize()
     @Published var closedNotchSize: CGSize = getClosedNotchSize()
     
-    let webcamManager = WebcamManager.shared
+    var webcamManager: WebcamManager { .shared }
     @Published var isCameraExpanded: Bool = false
     @Published var isRequestingAuthorization: Bool = false
     
@@ -63,7 +63,7 @@ class BoringViewModel: NSObject, ObservableObject {
             .map { shelf, drag, general in
                 shelf || drag || general
             }
-            .assign(to: \.anyDropZoneTargeting, on: self)
+            .sink { [weak self] in self?.anyDropZoneTargeting = $0 }
             .store(in: &cancellables)
         
         setupDetectorObserver()

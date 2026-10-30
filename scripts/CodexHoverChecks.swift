@@ -3,12 +3,13 @@ import SwiftUI
 
 @MainActor private final class HoverState: ObservableObject {
     @Published var expanded = false
+    @Published var waiting = true
 }
 
 private struct HoverFixture: View {
     @ObservedObject var state: HoverState
     var body: some View {
-        CodexDropButton(waiting: true, expanded: state.expanded, count: 4,
+        CodexDropButton(waiting: state.waiting, expanded: state.expanded, count: 4,
                         action: { _ in }, surface: .constant(0))
             .padding(20)
     }
@@ -64,6 +65,14 @@ private struct HoverFixture: View {
         }
         advance(0.35)
         assert(coverage() > settled * 0.9, "Rapid hover reversals must preserve the four-request droplet")
+        for _ in 0..<3 {
+            state.waiting = false
+            advance(0.1)
+            state.waiting = true
+            advance(0.1)
+        }
+        advance(0.7)
+        assert(coverage() > settled * 0.9, "Interrupted retraction must restore the existing drop without replaying birth")
         print("PASS: expanded hiding, immediate size restoration and five rapid hover reversals")
     }
 }

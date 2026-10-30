@@ -1,0 +1,3698 @@
+{
+  "full_app": {
+    "常驻水波开启，Codex 启用，无任务": {
+      "runs": [
+        {
+          "label": "final-active-1",
+          "pid": 2854,
+          "arguments": [
+            "-hideNotchOption",
+            "never"
+          ],
+          "context_before": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "context_after": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "rows": [
+            {
+              "time": 10.184454375,
+              "epoch": 1793255502.807711,
+              "cpu_ns": 660933750.0,
+              "wakeups": 457,
+              "interrupts": 893,
+              "energy_nj": 879849314,
+              "resident": 109445120,
+              "footprint": 78890016
+            },
+            {
+              "time": 11.18957575,
+              "epoch": 1793255503.812834,
+              "cpu_ns": 708211750.0,
+              "wakeups": 490,
+              "interrupts": 977,
+              "energy_nj": 884603852,
+              "resident": 103792640,
+              "footprint": 77874208
+            },
+            {
+              "time": 12.19469225,
+              "epoch": 1793255504.817951,
+              "cpu_ns": 759532083.3333334,
+              "wakeups": 533,
+              "interrupts": 1063,
+              "energy_nj": 889840636,
+              "resident": 103825408,
+              "footprint": 78496800
+            },
+            {
+              "time": 13.196764375,
+              "epoch": 1793255505.820024,
+              "cpu_ns": 808069125.0,
+              "wakeups": 581,
+              "interrupts": 1149,
+              "energy_nj": 893800260,
+              "resident": 103825408,
+              "footprint": 77874208
+            },
+            {
+              "time": 14.20183825,
+              "epoch": 1793255506.825098,
+              "cpu_ns": 854710375.0,
+              "wakeups": 636,
+              "interrupts": 1235,
+              "energy_nj": 898026488,
+              "resident": 103841792,
+              "footprint": 78513184
+            },
+            {
+              "time": 15.206942541,
+              "epoch": 1793255507.8302028,
+              "cpu_ns": 903369458.3333334,
+              "wakeups": 683,
+              "interrupts": 1321,
+              "energy_nj": 901853828,
+              "resident": 103841792,
+              "footprint": 77923360
+            },
+            {
+              "time": 16.207933041,
+              "epoch": 1793255508.8311942,
+              "cpu_ns": 943016833.3333334,
+              "wakeups": 745,
+              "interrupts": 1406,
+              "energy_nj": 905282180,
+              "resident": 103841792,
+              "footprint": 78218272
+            },
+            {
+              "time": 17.212919625,
+              "epoch": 1793255509.836181,
+              "cpu_ns": 981081125.0,
+              "wakeups": 807,
+              "interrupts": 1490,
+              "energy_nj": 908537880,
+              "resident": 103841792,
+              "footprint": 78201888
+            },
+            {
+              "time": 18.213332833,
+              "epoch": 1793255510.836596,
+              "cpu_ns": 1022686333.3333334,
+              "wakeups": 870,
+              "interrupts": 1572,
+              "energy_nj": 912208320,
+              "resident": 103858176,
+              "footprint": 78529568
+            },
+            {
+              "time": 19.218476333,
+              "epoch": 1793255511.841739,
+              "cpu_ns": 1068502625.0,
+              "wakeups": 926,
+              "interrupts": 1658,
+              "energy_nj": 916097803,
+              "resident": 103874560,
+              "footprint": 77956128
+            },
+            {
+              "time": 20.223601958,
+              "epoch": 1793255512.846864,
+              "cpu_ns": 1106390416.6666667,
+              "wakeups": 980,
+              "interrupts": 1742,
+              "energy_nj": 919322670,
+              "resident": 103874560,
+              "footprint": 77956128
+            },
+            {
+              "time": 21.228707125,
+              "epoch": 1793255513.85197,
+              "cpu_ns": 1145448250.0,
+              "wakeups": 1029,
+              "interrupts": 1827,
+              "energy_nj": 922625094,
+              "resident": 103874560,
+              "footprint": 78545952
+            },
+            {
+              "time": 22.233848458,
+              "epoch": 1793255514.8571122,
+              "cpu_ns": 1191721041.6666667,
+              "wakeups": 1077,
+              "interrupts": 1912,
+              "energy_nj": 926422937,
+              "resident": 103874560,
+              "footprint": 78545952
+            },
+            {
+              "time": 23.234237833,
+              "epoch": 1793255515.857502,
+              "cpu_ns": 1237354500.0,
+              "wakeups": 1128,
+              "interrupts": 1999,
+              "energy_nj": 930227056,
+              "resident": 103874560,
+              "footprint": 78251040
+            },
+            {
+              "time": 24.239360291,
+              "epoch": 1793255516.8626251,
+              "cpu_ns": 1275291125.0,
+              "wakeups": 1190,
+              "interrupts": 2079,
+              "energy_nj": 933364084,
+              "resident": 103890944,
+              "footprint": 77972512
+            },
+            {
+              "time": 25.244484083,
+              "epoch": 1793255517.8677492,
+              "cpu_ns": 1313985541.6666667,
+              "wakeups": 1250,
+              "interrupts": 2163,
+              "energy_nj": 936699630,
+              "resident": 103907328,
+              "footprint": 78578720
+            },
+            {
+              "time": 26.249608583,
+              "epoch": 1793255518.872874,
+              "cpu_ns": 1356992958.3333333,
+              "wakeups": 1307,
+              "interrupts": 2246,
+              "energy_nj": 940287043,
+              "resident": 103923712,
+              "footprint": 77972512
+            },
+            {
+              "time": 27.254735458,
+              "epoch": 1793255519.878001,
+              "cpu_ns": 1403224375.0,
+              "wakeups": 1363,
+              "interrupts": 2332,
+              "energy_nj": 944056022,
+              "resident": 103923712,
+              "footprint": 78595104
+            },
+            {
+              "time": 28.259857833,
+              "epoch": 1793255520.883125,
+              "cpu_ns": 1441851875.0,
+              "wakeups": 1421,
+              "interrupts": 2414,
+              "energy_nj": 947227535,
+              "resident": 103923712,
+              "footprint": 78005280
+            },
+            {
+              "time": 29.260224958,
+              "epoch": 1793255521.883492,
+              "cpu_ns": 1479093666.6666667,
+              "wakeups": 1481,
+              "interrupts": 2499,
+              "energy_nj": 950517445,
+              "resident": 103923712,
+              "footprint": 78595104
+            },
+            {
+              "time": 30.265391041,
+              "epoch": 1793255522.888659,
+              "cpu_ns": 1522734041.6666667,
+              "wakeups": 1536,
+              "interrupts": 2581,
+              "energy_nj": 954261197,
+              "resident": 103940096,
+              "footprint": 77988896
+            },
+            {
+              "time": 31.266667541,
+              "epoch": 1793255523.889936,
+              "cpu_ns": 1565342625.0,
+              "wakeups": 1592,
+              "interrupts": 2669,
+              "energy_nj": 957965268,
+              "resident": 103940096,
+              "footprint": 78611488
+            },
+            {
+              "time": 32.268969708,
+              "epoch": 1793255524.8922381,
+              "cpu_ns": 1604359041.6666667,
+              "wakeups": 1650,
+              "interrupts": 2752,
+              "energy_nj": 961187301,
+              "resident": 103940096,
+              "footprint": 78021664
+            },
+            {
+              "time": 33.274111291,
+              "epoch": 1793255525.89738,
+              "cpu_ns": 1642156291.6666667,
+              "wakeups": 1700,
+              "interrupts": 2834,
+              "energy_nj": 964736561,
+              "resident": 103956480,
+              "footprint": 78332960
+            },
+            {
+              "time": 34.279231125,
+              "epoch": 1793255526.9025002,
+              "cpu_ns": 1683486208.3333333,
+              "wakeups": 1751,
+              "interrupts": 2918,
+              "energy_nj": 968619980,
+              "resident": 103989248,
+              "footprint": 78349344
+            },
+            {
+              "time": 35.28435325,
+              "epoch": 1793255527.9076228,
+              "cpu_ns": 1728654250.0,
+              "wakeups": 1808,
+              "interrupts": 3002,
+              "energy_nj": 972390037,
+              "resident": 103989248,
+              "footprint": 78660640
+            },
+            {
+              "time": 36.289474916,
+              "epoch": 1793255528.912744,
+              "cpu_ns": 1765983458.3333333,
+              "wakeups": 1867,
+              "interrupts": 3084,
+              "energy_nj": 975593549,
+              "resident": 103989248,
+              "footprint": 78070816
+            },
+            {
+              "time": 37.294601208,
+              "epoch": 1793255529.9178722,
+              "cpu_ns": 1804035708.3333333,
+              "wakeups": 1923,
+              "interrupts": 3167,
+              "energy_nj": 978866047,
+              "resident": 103989248,
+              "footprint": 78070816
+            },
+            {
+              "time": 38.298040833,
+              "epoch": 1793255530.921313,
+              "cpu_ns": 1847006708.3333333,
+              "wakeups": 1981,
+              "interrupts": 3252,
+              "energy_nj": 982662162,
+              "resident": 103989248,
+              "footprint": 78660640
+            },
+            {
+              "time": 39.30317225,
+              "epoch": 1793255531.926443,
+              "cpu_ns": 1895326208.3333333,
+              "wakeups": 2035,
+              "interrupts": 3339,
+              "energy_nj": 986570795,
+              "resident": 103989248,
+              "footprint": 78660640
+            },
+            {
+              "time": 40.308282,
+              "epoch": 1793255532.931554,
+              "cpu_ns": 1948486791.6666667,
+              "wakeups": 2042,
+              "interrupts": 3429,
+              "energy_nj": 990521338,
+              "resident": 103989248,
+              "footprint": 78365728
+            }
+          ],
+          "summary": {
+            "seconds": 30.123827624999997,
+            "cpu_percent": 4.274201332230824,
+            "idle_wakeups_s": 52.616155547397845,
+            "interrupt_wakeups_s": 84.18584887583656,
+            "process_energy_mw": 3.673903110113153,
+            "footprint_mib": 74.73538208007812
+          }
+        },
+        {
+          "label": "final-active-2",
+          "pid": 3122,
+          "arguments": [
+            "-hideNotchOption",
+            "never"
+          ],
+          "context_before": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "context_after": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "rows": [
+            {
+              "time": 104.29681625,
+              "epoch": 1793255596.920115,
+              "cpu_ns": 647748916.6666666,
+              "wakeups": 475,
+              "interrupts": 889,
+              "energy_nj": 869792270,
+              "resident": 109395968,
+              "footprint": 77825080
+            },
+            {
+              "time": 105.301924,
+              "epoch": 1793255597.9252229,
+              "cpu_ns": 685907125.0,
+              "wakeups": 522,
+              "interrupts": 972,
+              "energy_nj": 875216687,
+              "resident": 109395968,
+              "footprint": 77825080
+            },
+            {
+              "time": 106.307032833,
+              "epoch": 1793255598.930332,
+              "cpu_ns": 723541125.0,
+              "wakeups": 561,
+              "interrupts": 1054,
+              "energy_nj": 880365237,
+              "resident": 109412352,
+              "footprint": 78431288
+            },
+            {
+              "time": 107.310003458,
+              "epoch": 1793255599.933303,
+              "cpu_ns": 761116583.3333334,
+              "wakeups": 601,
+              "interrupts": 1136,
+              "energy_nj": 885725802,
+              "resident": 109428736,
+              "footprint": 77825080
+            },
+            {
+              "time": 108.315751291,
+              "epoch": 1793255600.939052,
+              "cpu_ns": 802629833.3333334,
+              "wakeups": 648,
+              "interrupts": 1216,
+              "energy_nj": 891560558,
+              "resident": 109428736,
+              "footprint": 78447672
+            },
+            {
+              "time": 109.317711791,
+              "epoch": 1793255601.941014,
+              "cpu_ns": 841528458.3333334,
+              "wakeups": 685,
+              "interrupts": 1298,
+              "energy_nj": 898012915,
+              "resident": 109445120,
+              "footprint": 77874232
+            },
+            {
+              "time": 110.318030708,
+              "epoch": 1793255602.941333,
+              "cpu_ns": 883172500.0,
+              "wakeups": 699,
+              "interrupts": 1385,
+              "energy_nj": 904831560,
+              "resident": 97468416,
+              "footprint": 78496824
+            },
+            {
+              "time": 111.323161,
+              "epoch": 1793255603.946464,
+              "cpu_ns": 925898625.0,
+              "wakeups": 742,
+              "interrupts": 1467,
+              "energy_nj": 910145668,
+              "resident": 97468416,
+              "footprint": 77874232
+            },
+            {
+              "time": 112.328276583,
+              "epoch": 1793255604.9515781,
+              "cpu_ns": 970907708.3333334,
+              "wakeups": 780,
+              "interrupts": 1550,
+              "energy_nj": 916088380,
+              "resident": 97484800,
+              "footprint": 78496824
+            },
+            {
+              "time": 113.330900166,
+              "epoch": 1793255605.9542022,
+              "cpu_ns": 1013766916.6666666,
+              "wakeups": 809,
+              "interrupts": 1638,
+              "energy_nj": 921075084,
+              "resident": 97484800,
+              "footprint": 77907000
+            },
+            {
+              "time": 114.335975375,
+              "epoch": 1793255606.959278,
+              "cpu_ns": 1048628500.0,
+              "wakeups": 813,
+              "interrupts": 1717,
+              "energy_nj": 928955946,
+              "resident": 97468416,
+              "footprint": 77907000
+            },
+            {
+              "time": 115.343271083,
+              "epoch": 1793255607.9665742,
+              "cpu_ns": 1088123833.3333333,
+              "wakeups": 829,
+              "interrupts": 1802,
+              "energy_nj": 935166702,
+              "resident": 97484800,
+              "footprint": 78513208
+            },
+            {
+              "time": 116.348331041,
+              "epoch": 1793255608.971634,
+              "cpu_ns": 1124748083.3333333,
+              "wakeups": 860,
+              "interrupts": 1886,
+              "energy_nj": 940949736,
+              "resident": 97517568,
+              "footprint": 78545976
+            },
+            {
+              "time": 117.353436458,
+              "epoch": 1793255609.9767418,
+              "cpu_ns": 1161253041.6666667,
+              "wakeups": 891,
+              "interrupts": 1965,
+              "energy_nj": 947618047,
+              "resident": 97599488,
+              "footprint": 77956152
+            },
+            {
+              "time": 118.354672083,
+              "epoch": 1793255610.9779782,
+              "cpu_ns": 1194730583.3333333,
+              "wakeups": 927,
+              "interrupts": 2048,
+              "energy_nj": 953204243,
+              "resident": 97599488,
+              "footprint": 77956152
+            },
+            {
+              "time": 119.359807541,
+              "epoch": 1793255611.983114,
+              "cpu_ns": 1248702625.0,
+              "wakeups": 970,
+              "interrupts": 2129,
+              "energy_nj": 960564652,
+              "resident": 97599488,
+              "footprint": 78545976
+            },
+            {
+              "time": 120.36236625,
+              "epoch": 1793255612.985673,
+              "cpu_ns": 1290464625.0,
+              "wakeups": 995,
+              "interrupts": 2208,
+              "energy_nj": 965550765,
+              "resident": 97583104,
+              "footprint": 78545976
+            },
+            {
+              "time": 121.367494958,
+              "epoch": 1793255613.9908018,
+              "cpu_ns": 1335246791.6666667,
+              "wakeups": 1038,
+              "interrupts": 2289,
+              "energy_nj": 970709218,
+              "resident": 97583104,
+              "footprint": 77956152
+            },
+            {
+              "time": 122.372594625,
+              "epoch": 1793255614.995902,
+              "cpu_ns": 1383599875.0,
+              "wakeups": 1094,
+              "interrupts": 2370,
+              "energy_nj": 978948904,
+              "resident": 97599488,
+              "footprint": 77972536
+            },
+            {
+              "time": 123.372816541,
+              "epoch": 1793255615.996125,
+              "cpu_ns": 1439693208.3333333,
+              "wakeups": 1142,
+              "interrupts": 2450,
+              "energy_nj": 988435013,
+              "resident": 97599488,
+              "footprint": 78562360
+            },
+            {
+              "time": 124.377938958,
+              "epoch": 1793255617.001247,
+              "cpu_ns": 1480751833.3333333,
+              "wakeups": 1182,
+              "interrupts": 2530,
+              "energy_nj": 994643976,
+              "resident": 97599488,
+              "footprint": 77939768
+            },
+            {
+              "time": 125.379715416,
+              "epoch": 1793255618.0030239,
+              "cpu_ns": 1520534208.3333333,
+              "wakeups": 1234,
+              "interrupts": 2613,
+              "energy_nj": 1001577480,
+              "resident": 97615872,
+              "footprint": 78578744
+            },
+            {
+              "time": 126.384108875,
+              "epoch": 1793255619.0074182,
+              "cpu_ns": 1558688541.6666667,
+              "wakeups": 1271,
+              "interrupts": 2694,
+              "energy_nj": 1007008174,
+              "resident": 97632256,
+              "footprint": 78005304
+            },
+            {
+              "time": 127.38524525,
+              "epoch": 1793255620.008554,
+              "cpu_ns": 1606393875.0,
+              "wakeups": 1307,
+              "interrupts": 2774,
+              "energy_nj": 1013351918,
+              "resident": 97648640,
+              "footprint": 78611512
+            },
+            {
+              "time": 128.385758375,
+              "epoch": 1793255621.009068,
+              "cpu_ns": 1649547625.0,
+              "wakeups": 1365,
+              "interrupts": 2857,
+              "energy_nj": 1018305524,
+              "resident": 97648640,
+              "footprint": 77988920
+            },
+            {
+              "time": 129.386836583,
+              "epoch": 1793255622.010147,
+              "cpu_ns": 1698410000.0,
+              "wakeups": 1424,
+              "interrupts": 2938,
+              "energy_nj": 1026330143,
+              "resident": 97665024,
+              "footprint": 78611512
+            },
+            {
+              "time": 130.3918015,
+              "epoch": 1793255623.015112,
+              "cpu_ns": 1731643791.6666667,
+              "wakeups": 1471,
+              "interrupts": 3019,
+              "energy_nj": 1030950817,
+              "resident": 97665024,
+              "footprint": 78021688
+            },
+            {
+              "time": 131.396912958,
+              "epoch": 1793255624.020224,
+              "cpu_ns": 1770961958.3333333,
+              "wakeups": 1521,
+              "interrupts": 3103,
+              "energy_nj": 1036751655,
+              "resident": 97681408,
+              "footprint": 78021688
+            },
+            {
+              "time": 132.400800125,
+              "epoch": 1793255625.0241122,
+              "cpu_ns": 1816147708.3333333,
+              "wakeups": 1566,
+              "interrupts": 3186,
+              "energy_nj": 1043673843,
+              "resident": 97681408,
+              "footprint": 78611512
+            },
+            {
+              "time": 133.405907041,
+              "epoch": 1793255626.0292192,
+              "cpu_ns": 1857305416.6666667,
+              "wakeups": 1609,
+              "interrupts": 3266,
+              "energy_nj": 1047788603,
+              "resident": 97697792,
+              "footprint": 78627896
+            },
+            {
+              "time": 134.411015666,
+              "epoch": 1793255627.034328,
+              "cpu_ns": 1898909500.0,
+              "wakeups": 1649,
+              "interrupts": 3350,
+              "energy_nj": 1052353257,
+              "resident": 97714176,
+              "footprint": 78038072
+            }
+          ],
+          "summary": {
+            "seconds": 30.11419941599999,
+            "cpu_percent": 4.154719725567663,
+            "idle_wakeups_s": 38.98493145317492,
+            "interrupt_wakeups_s": 81.72224557603364,
+            "process_energy_mw": 6.062289236983781,
+            "footprint_mib": 74.42290496826172
+          }
+        }
+      ],
+      "means": {
+        "seconds": 30.119013520499994,
+        "cpu_percent": 4.214460528899243,
+        "idle_wakeups_s": 45.80054350028638,
+        "interrupt_wakeups_s": 82.9540472259351,
+        "process_energy_mw": 4.868096173548467,
+        "footprint_mib": 74.57914352416992
+      }
+    },
+    "常驻水波开启，Codex 暂时关闭": {
+      "runs": [
+        {
+          "label": "final-idle-control-1",
+          "pid": 2986,
+          "arguments": [
+            "-hideNotchOption",
+            "never",
+            "-codexRocketEnabled",
+            "NO"
+          ],
+          "context_before": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "context_after": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "rows": [
+            {
+              "time": 57.295281458,
+              "epoch": 1793255549.918559,
+              "cpu_ns": 591314041.6666666,
+              "wakeups": 383,
+              "interrupts": 875,
+              "energy_nj": 821629035,
+              "resident": 108625920,
+              "footprint": 77644832
+            },
+            {
+              "time": 58.300359041,
+              "epoch": 1793255550.923639,
+              "cpu_ns": 634510500.0,
+              "wakeups": 398,
+              "interrupts": 957,
+              "energy_nj": 827728525,
+              "resident": 87588864,
+              "footprint": 77677600
+            },
+            {
+              "time": 59.300903333,
+              "epoch": 1793255551.9241831,
+              "cpu_ns": 673618875.0,
+              "wakeups": 425,
+              "interrupts": 1038,
+              "energy_nj": 834958315,
+              "resident": 88522752,
+              "footprint": 78267424
+            },
+            {
+              "time": 60.304045333,
+              "epoch": 1793255552.927325,
+              "cpu_ns": 706781125.0,
+              "wakeups": 456,
+              "interrupts": 1119,
+              "energy_nj": 840781324,
+              "resident": 88621056,
+              "footprint": 77661216
+            },
+            {
+              "time": 61.309022541,
+              "epoch": 1793255553.9323032,
+              "cpu_ns": 743206166.6666666,
+              "wakeups": 489,
+              "interrupts": 1202,
+              "energy_nj": 845833619,
+              "resident": 88637440,
+              "footprint": 78300192
+            },
+            {
+              "time": 62.310721,
+              "epoch": 1793255554.934002,
+              "cpu_ns": 780287375.0,
+              "wakeups": 510,
+              "interrupts": 1282,
+              "energy_nj": 854167911,
+              "resident": 89849856,
+              "footprint": 77743136
+            },
+            {
+              "time": 63.314318666,
+              "epoch": 1793255555.937599,
+              "cpu_ns": 863149041.6666666,
+              "wakeups": 528,
+              "interrupts": 1364,
+              "energy_nj": 868261781,
+              "resident": 90685440,
+              "footprint": 78300192
+            },
+            {
+              "time": 64.317162,
+              "epoch": 1793255556.940445,
+              "cpu_ns": 913922166.6666666,
+              "wakeups": 543,
+              "interrupts": 1445,
+              "energy_nj": 877088002,
+              "resident": 90603520,
+              "footprint": 77677600
+            },
+            {
+              "time": 65.322293333,
+              "epoch": 1793255557.945576,
+              "cpu_ns": 954366666.6666666,
+              "wakeups": 592,
+              "interrupts": 1533,
+              "energy_nj": 881456964,
+              "resident": 90603520,
+              "footprint": 78300192
+            },
+            {
+              "time": 66.325699416,
+              "epoch": 1793255558.948982,
+              "cpu_ns": 992327000.0,
+              "wakeups": 620,
+              "interrupts": 1615,
+              "energy_nj": 887796242,
+              "resident": 89358336,
+              "footprint": 77710368
+            },
+            {
+              "time": 67.32857425,
+              "epoch": 1793255559.9518578,
+              "cpu_ns": 1040982666.6666666,
+              "wakeups": 627,
+              "interrupts": 1696,
+              "energy_nj": 896349121,
+              "resident": 89374720,
+              "footprint": 77726752
+            },
+            {
+              "time": 68.333694375,
+              "epoch": 1793255560.9569778,
+              "cpu_ns": 1077136208.3333333,
+              "wakeups": 674,
+              "interrupts": 1782,
+              "energy_nj": 900889757,
+              "resident": 89374720,
+              "footprint": 78005280
+            },
+            {
+              "time": 69.336584916,
+              "epoch": 1793255561.9598699,
+              "cpu_ns": 1108607041.6666667,
+              "wakeups": 730,
+              "interrupts": 1864,
+              "energy_nj": 905387996,
+              "resident": 89374720,
+              "footprint": 78316576
+            },
+            {
+              "time": 70.341688208,
+              "epoch": 1793255562.964972,
+              "cpu_ns": 1145230125.0,
+              "wakeups": 756,
+              "interrupts": 1944,
+              "energy_nj": 910547395,
+              "resident": 89374720,
+              "footprint": 77726752
+            },
+            {
+              "time": 71.3421845,
+              "epoch": 1793255563.965469,
+              "cpu_ns": 1179322750.0,
+              "wakeups": 789,
+              "interrupts": 2026,
+              "energy_nj": 916254063,
+              "resident": 89358336,
+              "footprint": 77726752
+            },
+            {
+              "time": 72.346640833,
+              "epoch": 1793255564.9699259,
+              "cpu_ns": 1216959791.6666667,
+              "wakeups": 822,
+              "interrupts": 2112,
+              "energy_nj": 921269045,
+              "resident": 89358336,
+              "footprint": 78316576
+            },
+            {
+              "time": 73.347432875,
+              "epoch": 1793255565.97072,
+              "cpu_ns": 1250808166.6666667,
+              "wakeups": 873,
+              "interrupts": 2192,
+              "energy_nj": 925075966,
+              "resident": 89374720,
+              "footprint": 78332960
+            },
+            {
+              "time": 74.352538208,
+              "epoch": 1793255566.9758239,
+              "cpu_ns": 1290025083.3333333,
+              "wakeups": 905,
+              "interrupts": 2275,
+              "energy_nj": 931695489,
+              "resident": 89374720,
+              "footprint": 77743136
+            },
+            {
+              "time": 75.355914375,
+              "epoch": 1793255567.979202,
+              "cpu_ns": 1331030583.3333333,
+              "wakeups": 918,
+              "interrupts": 2355,
+              "energy_nj": 936381907,
+              "resident": 89407488,
+              "footprint": 77775904
+            },
+            {
+              "time": 76.359501916,
+              "epoch": 1793255568.98279,
+              "cpu_ns": 1366625708.3333333,
+              "wakeups": 946,
+              "interrupts": 2436,
+              "energy_nj": 940779086,
+              "resident": 89423872,
+              "footprint": 78382112
+            },
+            {
+              "time": 77.361097208,
+              "epoch": 1793255569.984385,
+              "cpu_ns": 1399900875.0,
+              "wakeups": 989,
+              "interrupts": 2518,
+              "energy_nj": 944987260,
+              "resident": 89440256,
+              "footprint": 77759520
+            },
+            {
+              "time": 78.366249166,
+              "epoch": 1793255570.989538,
+              "cpu_ns": 1434615750.0,
+              "wakeups": 1023,
+              "interrupts": 2597,
+              "energy_nj": 951374265,
+              "resident": 89489408,
+              "footprint": 78382112
+            },
+            {
+              "time": 79.370900916,
+              "epoch": 1793255571.994189,
+              "cpu_ns": 1473452041.6666667,
+              "wakeups": 1052,
+              "interrupts": 2678,
+              "energy_nj": 956653712,
+              "resident": 89505792,
+              "footprint": 77808672
+            },
+            {
+              "time": 80.375994166,
+              "epoch": 1793255572.9992828,
+              "cpu_ns": 1510399625.0,
+              "wakeups": 1087,
+              "interrupts": 2762,
+              "energy_nj": 961339357,
+              "resident": 89505792,
+              "footprint": 78398496
+            },
+            {
+              "time": 81.3785985,
+              "epoch": 1793255574.001887,
+              "cpu_ns": 1550014416.6666667,
+              "wakeups": 1118,
+              "interrupts": 2843,
+              "energy_nj": 967157616,
+              "resident": 89505792,
+              "footprint": 77775904
+            },
+            {
+              "time": 82.379771333,
+              "epoch": 1793255575.003061,
+              "cpu_ns": 1590212666.6666667,
+              "wakeups": 1127,
+              "interrupts": 2926,
+              "energy_nj": 972724046,
+              "resident": 89505792,
+              "footprint": 78398496
+            },
+            {
+              "time": 83.384312791,
+              "epoch": 1793255576.007603,
+              "cpu_ns": 1626394875.0,
+              "wakeups": 1166,
+              "interrupts": 3009,
+              "energy_nj": 978475282,
+              "resident": 89505792,
+              "footprint": 77808672
+            },
+            {
+              "time": 84.388711416,
+              "epoch": 1793255577.012002,
+              "cpu_ns": 1668268708.3333333,
+              "wakeups": 1212,
+              "interrupts": 3091,
+              "energy_nj": 982476855,
+              "resident": 89505792,
+              "footprint": 77808672
+            },
+            {
+              "time": 85.393791625,
+              "epoch": 1793255578.0170822,
+              "cpu_ns": 1702222000.0,
+              "wakeups": 1265,
+              "interrupts": 3174,
+              "energy_nj": 986695125,
+              "resident": 89505792,
+              "footprint": 78087200
+            },
+            {
+              "time": 86.398866541,
+              "epoch": 1793255579.022157,
+              "cpu_ns": 1738734375.0,
+              "wakeups": 1315,
+              "interrupts": 3253,
+              "energy_nj": 990663428,
+              "resident": 89505792,
+              "footprint": 78398496
+            },
+            {
+              "time": 87.403997416,
+              "epoch": 1793255580.02729,
+              "cpu_ns": 1775312291.6666667,
+              "wakeups": 1358,
+              "interrupts": 3335,
+              "energy_nj": 995323419,
+              "resident": 89505792,
+              "footprint": 77808672
+            }
+          ],
+          "summary": {
+            "seconds": 30.108715957999998,
+            "cpu_percent": 3.932410308203154,
+            "idle_wakeups_s": 32.382649640724345,
+            "interrupt_wakeups_s": 81.7039160165968,
+            "process_energy_mw": 5.768907058085576,
+            "footprint_mib": 74.20413208007812
+          }
+        },
+        {
+          "label": "final-idle-control-2",
+          "pid": 3217,
+          "arguments": [
+            "-hideNotchOption",
+            "never",
+            "-codexRocketEnabled",
+            "NO"
+          ],
+          "context_before": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "context_after": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "rows": [
+            {
+              "time": 151.382234208,
+              "epoch": 1793255644.005553,
+              "cpu_ns": 604660666.6666666,
+              "wakeups": 269,
+              "interrupts": 878,
+              "energy_nj": 878792338,
+              "resident": 95338496,
+              "footprint": 78873632
+            },
+            {
+              "time": 152.3873635,
+              "epoch": 1793255645.010685,
+              "cpu_ns": 641372875.0,
+              "wakeups": 302,
+              "interrupts": 959,
+              "energy_nj": 883747629,
+              "resident": 95404032,
+              "footprint": 78873632
+            },
+            {
+              "time": 153.388103375,
+              "epoch": 1793255646.0114229,
+              "cpu_ns": 673747375.0,
+              "wakeups": 320,
+              "interrupts": 1041,
+              "energy_nj": 889997241,
+              "resident": 95322112,
+              "footprint": 79463456
+            },
+            {
+              "time": 154.392178791,
+              "epoch": 1793255647.0155,
+              "cpu_ns": 711250791.6666666,
+              "wakeups": 355,
+              "interrupts": 1124,
+              "energy_nj": 894860332,
+              "resident": 95338496,
+              "footprint": 78857248
+            },
+            {
+              "time": 155.392345708,
+              "epoch": 1793255648.015667,
+              "cpu_ns": 752522875.0,
+              "wakeups": 389,
+              "interrupts": 1207,
+              "energy_nj": 899500564,
+              "resident": 95354880,
+              "footprint": 79496224
+            },
+            {
+              "time": 156.397404791,
+              "epoch": 1793255649.020726,
+              "cpu_ns": 789152833.3333334,
+              "wakeups": 428,
+              "interrupts": 1285,
+              "energy_nj": 904942202,
+              "resident": 95289344,
+              "footprint": 78906400
+            },
+            {
+              "time": 157.402469916,
+              "epoch": 1793255650.025792,
+              "cpu_ns": 829749583.3333334,
+              "wakeups": 468,
+              "interrupts": 1366,
+              "energy_nj": 909519776,
+              "resident": 95305728,
+              "footprint": 79512608
+            },
+            {
+              "time": 158.407583083,
+              "epoch": 1793255651.0309062,
+              "cpu_ns": 867444833.3333334,
+              "wakeups": 506,
+              "interrupts": 1447,
+              "energy_nj": 914392174,
+              "resident": 95305728,
+              "footprint": 78890016
+            },
+            {
+              "time": 159.411539958,
+              "epoch": 1793255652.034867,
+              "cpu_ns": 909704083.3333334,
+              "wakeups": 541,
+              "interrupts": 1533,
+              "energy_nj": 919258671,
+              "resident": 95272960,
+              "footprint": 79463456
+            },
+            {
+              "time": 160.416672791,
+              "epoch": 1793255653.039996,
+              "cpu_ns": 954937250.0,
+              "wakeups": 575,
+              "interrupts": 1618,
+              "energy_nj": 923982328,
+              "resident": 95272960,
+              "footprint": 78873632
+            },
+            {
+              "time": 161.419419416,
+              "epoch": 1793255654.0427442,
+              "cpu_ns": 996684000.0,
+              "wakeups": 614,
+              "interrupts": 1700,
+              "energy_nj": 928500635,
+              "resident": 95272960,
+              "footprint": 78873632
+            },
+            {
+              "time": 162.424518,
+              "epoch": 1793255655.047843,
+              "cpu_ns": 1047094125.0,
+              "wakeups": 661,
+              "interrupts": 1784,
+              "energy_nj": 932182814,
+              "resident": 95272960,
+              "footprint": 79152160
+            },
+            {
+              "time": 163.429649916,
+              "epoch": 1793255656.0529761,
+              "cpu_ns": 1091660250.0,
+              "wakeups": 695,
+              "interrupts": 1870,
+              "energy_nj": 936362163,
+              "resident": 95272960,
+              "footprint": 79463456
+            },
+            {
+              "time": 164.434748375,
+              "epoch": 1793255657.058073,
+              "cpu_ns": 1133951666.6666667,
+              "wakeups": 753,
+              "interrupts": 1952,
+              "energy_nj": 940650874,
+              "resident": 95289344,
+              "footprint": 78873632
+            },
+            {
+              "time": 165.43987125,
+              "epoch": 1793255658.063197,
+              "cpu_ns": 1175985000.0,
+              "wakeups": 806,
+              "interrupts": 2036,
+              "energy_nj": 944568047,
+              "resident": 95305728,
+              "footprint": 78890016
+            },
+            {
+              "time": 166.442132666,
+              "epoch": 1793255659.065459,
+              "cpu_ns": 1223312291.6666667,
+              "wakeups": 828,
+              "interrupts": 2120,
+              "energy_nj": 949198768,
+              "resident": 95322112,
+              "footprint": 79496224
+            },
+            {
+              "time": 167.45334925,
+              "epoch": 1793255660.0766761,
+              "cpu_ns": 1286882125.0,
+              "wakeups": 872,
+              "interrupts": 2203,
+              "energy_nj": 959217920,
+              "resident": 95338496,
+              "footprint": 79201312
+            },
+            {
+              "time": 168.458438041,
+              "epoch": 1793255661.0817652,
+              "cpu_ns": 1325180250.0,
+              "wakeups": 914,
+              "interrupts": 2283,
+              "energy_nj": 964785877,
+              "resident": 95338496,
+              "footprint": 78922784
+            },
+            {
+              "time": 169.463552958,
+              "epoch": 1793255662.08688,
+              "cpu_ns": 1359684500.0,
+              "wakeups": 932,
+              "interrupts": 2367,
+              "energy_nj": 971628569,
+              "resident": 95354880,
+              "footprint": 78922784
+            },
+            {
+              "time": 170.468668583,
+              "epoch": 1793255663.091997,
+              "cpu_ns": 1397736625.0,
+              "wakeups": 982,
+              "interrupts": 2452,
+              "energy_nj": 976069784,
+              "resident": 95354880,
+              "footprint": 79512608
+            },
+            {
+              "time": 171.473795541,
+              "epoch": 1793255664.097125,
+              "cpu_ns": 1434320666.6666667,
+              "wakeups": 1032,
+              "interrupts": 2536,
+              "energy_nj": 979715187,
+              "resident": 95371264,
+              "footprint": 78906400
+            },
+            {
+              "time": 172.474288833,
+              "epoch": 1793255665.0976179,
+              "cpu_ns": 1468683250.0,
+              "wakeups": 1089,
+              "interrupts": 2616,
+              "energy_nj": 983787787,
+              "resident": 95371264,
+              "footprint": 79528992
+            },
+            {
+              "time": 173.476143375,
+              "epoch": 1793255666.0994718,
+              "cpu_ns": 1511719875.0,
+              "wakeups": 1127,
+              "interrupts": 2700,
+              "energy_nj": 988129781,
+              "resident": 95387648,
+              "footprint": 78955552
+            },
+            {
+              "time": 174.48042175,
+              "epoch": 1793255667.103751,
+              "cpu_ns": 1552782250.0,
+              "wakeups": 1161,
+              "interrupts": 2780,
+              "energy_nj": 993710096,
+              "resident": 95387648,
+              "footprint": 79545376
+            },
+            {
+              "time": 175.484305375,
+              "epoch": 1793255668.107635,
+              "cpu_ns": 1587747125.0,
+              "wakeups": 1201,
+              "interrupts": 2863,
+              "energy_nj": 998913147,
+              "resident": 95387648,
+              "footprint": 78922784
+            },
+            {
+              "time": 176.489413541,
+              "epoch": 1793255669.1127439,
+              "cpu_ns": 1624541208.3333333,
+              "wakeups": 1253,
+              "interrupts": 2948,
+              "energy_nj": 1002640321,
+              "resident": 95387648,
+              "footprint": 79545376
+            },
+            {
+              "time": 177.494502833,
+              "epoch": 1793255670.117834,
+              "cpu_ns": 1660179916.6666667,
+              "wakeups": 1295,
+              "interrupts": 3030,
+              "energy_nj": 1007095932,
+              "resident": 95387648,
+              "footprint": 78955552
+            },
+            {
+              "time": 178.494755625,
+              "epoch": 1793255671.1180868,
+              "cpu_ns": 1695217166.6666667,
+              "wakeups": 1322,
+              "interrupts": 3110,
+              "energy_nj": 1013220247,
+              "resident": 95338496,
+              "footprint": 78955552
+            },
+            {
+              "time": 179.4998735,
+              "epoch": 1793255672.123206,
+              "cpu_ns": 1738685833.3333333,
+              "wakeups": 1350,
+              "interrupts": 3194,
+              "energy_nj": 1020557046,
+              "resident": 91160576,
+              "footprint": 79234080
+            },
+            {
+              "time": 180.500784958,
+              "epoch": 1793255673.124119,
+              "cpu_ns": 1780075833.3333333,
+              "wakeups": 1387,
+              "interrupts": 3279,
+              "energy_nj": 1024461487,
+              "resident": 91160576,
+              "footprint": 79545376
+            },
+            {
+              "time": 181.505930041,
+              "epoch": 1793255674.129264,
+              "cpu_ns": 1819789166.6666667,
+              "wakeups": 1435,
+              "interrupts": 3360,
+              "energy_nj": 1028566385,
+              "resident": 91160576,
+              "footprint": 78955552
+            }
+          ],
+          "summary": {
+            "seconds": 30.123695833,
+            "cpu_percent": 4.033796207266332,
+            "idle_wakeups_s": 38.707069891559144,
+            "interrupt_wakeups_s": 82.39360846556586,
+            "process_energy_mw": 4.971967843199541,
+            "footprint_mib": 75.29788208007812
+          }
+        }
+      ],
+      "means": {
+        "seconds": 30.1162058955,
+        "cpu_percent": 3.9831032577347427,
+        "idle_wakeups_s": 35.54485976614174,
+        "interrupt_wakeups_s": 82.04876224108133,
+        "process_energy_mw": 5.370437450642559,
+        "footprint_mib": 74.75100708007812
+      }
+    },
+    "常驻边缘装饰暂时关闭，Codex 启用，无任务": {
+      "runs": [
+        {
+          "label": "final-no-decor-1",
+          "pid": 3496,
+          "arguments": [
+            "-hideNotchOption",
+            "never",
+            "-musicEdgeStyle",
+            "off"
+          ],
+          "context_before": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "context_after": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "rows": [
+            {
+              "time": 16.912272833,
+              "epoch": 1793255787.845547,
+              "cpu_ns": 272811375.0,
+              "wakeups": 21,
+              "interrupts": 77,
+              "energy_nj": 751529389,
+              "resident": 86589440,
+              "footprint": 32916488
+            },
+            {
+              "time": 17.917347583,
+              "epoch": 1793255788.850624,
+              "cpu_ns": 275648791.6666667,
+              "wakeups": 23,
+              "interrupts": 79,
+              "energy_nj": 751960220,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 18.920170791,
+              "epoch": 1793255789.853447,
+              "cpu_ns": 278237833.3333333,
+              "wakeups": 23,
+              "interrupts": 80,
+              "energy_nj": 752383671,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 19.925283166,
+              "epoch": 1793255790.85856,
+              "cpu_ns": 282440166.6666667,
+              "wakeups": 23,
+              "interrupts": 82,
+              "energy_nj": 752709539,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 20.926149166,
+              "epoch": 1793255791.859426,
+              "cpu_ns": 285819916.6666667,
+              "wakeups": 23,
+              "interrupts": 83,
+              "energy_nj": 753009764,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 21.931336375,
+              "epoch": 1793255792.864615,
+              "cpu_ns": 288889083.3333333,
+              "wakeups": 23,
+              "interrupts": 84,
+              "energy_nj": 753356351,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 22.936474,
+              "epoch": 1793255793.8697531,
+              "cpu_ns": 289187583.3333333,
+              "wakeups": 23,
+              "interrupts": 85,
+              "energy_nj": 753373820,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 23.940147791,
+              "epoch": 1793255794.873427,
+              "cpu_ns": 293346875.0,
+              "wakeups": 23,
+              "interrupts": 86,
+              "energy_nj": 753657594,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 24.945291291,
+              "epoch": 1793255795.878571,
+              "cpu_ns": 297453583.3333333,
+              "wakeups": 24,
+              "interrupts": 87,
+              "energy_nj": 753939699,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 25.948144583,
+              "epoch": 1793255796.881424,
+              "cpu_ns": 301940166.6666667,
+              "wakeups": 26,
+              "interrupts": 89,
+              "energy_nj": 754242717,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 26.950818125,
+              "epoch": 1793255797.884099,
+              "cpu_ns": 306254708.3333333,
+              "wakeups": 26,
+              "interrupts": 90,
+              "energy_nj": 754537876,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 27.955946041,
+              "epoch": 1793255798.889228,
+              "cpu_ns": 309880750.0,
+              "wakeups": 27,
+              "interrupts": 91,
+              "energy_nj": 754832943,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 28.96108125,
+              "epoch": 1793255799.894363,
+              "cpu_ns": 314284416.6666667,
+              "wakeups": 29,
+              "interrupts": 93,
+              "energy_nj": 755131294,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 29.966205833,
+              "epoch": 1793255800.899488,
+              "cpu_ns": 318539750.0,
+              "wakeups": 30,
+              "interrupts": 94,
+              "energy_nj": 755418016,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 30.971351166,
+              "epoch": 1793255801.904634,
+              "cpu_ns": 321798458.3333333,
+              "wakeups": 30,
+              "interrupts": 95,
+              "energy_nj": 755721951,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 31.973124541,
+              "epoch": 1793255802.9064069,
+              "cpu_ns": 326191125.0,
+              "wakeups": 31,
+              "interrupts": 97,
+              "energy_nj": 756016593,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 32.97407325,
+              "epoch": 1793255803.9073558,
+              "cpu_ns": 330219166.6666667,
+              "wakeups": 31,
+              "interrupts": 98,
+              "energy_nj": 756294049,
+              "resident": 86671360,
+              "footprint": 32916488
+            },
+            {
+              "time": 33.979206875,
+              "epoch": 1793255804.912491,
+              "cpu_ns": 334453125.0,
+              "wakeups": 31,
+              "interrupts": 99,
+              "energy_nj": 756623769,
+              "resident": 86687744,
+              "footprint": 32916488
+            },
+            {
+              "time": 34.984341833,
+              "epoch": 1793255805.9176269,
+              "cpu_ns": 338770125.0,
+              "wakeups": 32,
+              "interrupts": 101,
+              "energy_nj": 756922533,
+              "resident": 86687744,
+              "footprint": 32916488
+            },
+            {
+              "time": 35.988937375,
+              "epoch": 1793255806.9222221,
+              "cpu_ns": 342864125.0,
+              "wakeups": 32,
+              "interrupts": 102,
+              "energy_nj": 757198157,
+              "resident": 86687744,
+              "footprint": 32916488
+            },
+            {
+              "time": 36.994067041,
+              "epoch": 1793255807.927352,
+              "cpu_ns": 346881666.6666667,
+              "wakeups": 32,
+              "interrupts": 103,
+              "energy_nj": 757474117,
+              "resident": 86687744,
+              "footprint": 32916488
+            },
+            {
+              "time": 37.994262291,
+              "epoch": 1793255808.927548,
+              "cpu_ns": 351168833.3333333,
+              "wakeups": 33,
+              "interrupts": 104,
+              "energy_nj": 757770491,
+              "resident": 86704128,
+              "footprint": 32916488
+            },
+            {
+              "time": 38.997814458,
+              "epoch": 1793255809.9311,
+              "cpu_ns": 355160166.6666667,
+              "wakeups": 35,
+              "interrupts": 106,
+              "energy_nj": 758068210,
+              "resident": 86704128,
+              "footprint": 32916488
+            },
+            {
+              "time": 40.00199025,
+              "epoch": 1793255810.935277,
+              "cpu_ns": 359361250.0,
+              "wakeups": 36,
+              "interrupts": 107,
+              "energy_nj": 758348434,
+              "resident": 86704128,
+              "footprint": 32916488
+            },
+            {
+              "time": 41.00711875,
+              "epoch": 1793255811.940405,
+              "cpu_ns": 363730708.3333333,
+              "wakeups": 36,
+              "interrupts": 108,
+              "energy_nj": 758640968,
+              "resident": 86704128,
+              "footprint": 32916488
+            },
+            {
+              "time": 42.007380541,
+              "epoch": 1793255812.9406679,
+              "cpu_ns": 368230333.3333333,
+              "wakeups": 38,
+              "interrupts": 110,
+              "energy_nj": 758940521,
+              "resident": 86704128,
+              "footprint": 32916488
+            },
+            {
+              "time": 43.012132916,
+              "epoch": 1793255813.945421,
+              "cpu_ns": 376296500.0,
+              "wakeups": 38,
+              "interrupts": 111,
+              "energy_nj": 759555410,
+              "resident": 86917120,
+              "footprint": 32916488
+            },
+            {
+              "time": 44.0125745,
+              "epoch": 1793255814.945863,
+              "cpu_ns": 379661333.3333333,
+              "wakeups": 38,
+              "interrupts": 112,
+              "energy_nj": 759972959,
+              "resident": 86917120,
+              "footprint": 32916488
+            },
+            {
+              "time": 45.016053916,
+              "epoch": 1793255815.949356,
+              "cpu_ns": 381941000.0,
+              "wakeups": 39,
+              "interrupts": 114,
+              "energy_nj": 760445931,
+              "resident": 86917120,
+              "footprint": 32916488
+            },
+            {
+              "time": 46.019483708,
+              "epoch": 1793255816.952773,
+              "cpu_ns": 385916833.3333333,
+              "wakeups": 39,
+              "interrupts": 115,
+              "energy_nj": 760724401,
+              "resident": 86917120,
+              "footprint": 32916488
+            },
+            {
+              "time": 47.02427325,
+              "epoch": 1793255817.9575622,
+              "cpu_ns": 389910916.6666667,
+              "wakeups": 40,
+              "interrupts": 116,
+              "energy_nj": 760995398,
+              "resident": 86917120,
+              "footprint": 32916488
+            }
+          ],
+          "summary": {
+            "seconds": 30.112000417,
+            "cpu_percent": 0.3888799815523285,
+            "idle_wakeups_s": 0.6309776745776537,
+            "interrupt_wakeups_s": 1.2951647004488682,
+            "process_energy_mw": 0.31436001822900744,
+            "footprint_mib": 31.39160919189453
+          }
+        },
+        {
+          "label": "final-no-decor-2",
+          "pid": 3599,
+          "arguments": [
+            "-hideNotchOption",
+            "never",
+            "-musicEdgeStyle",
+            "off"
+          ],
+          "context_before": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "context_after": {
+            "connected": true,
+            "running": 0,
+            "waiting": 0
+          },
+          "rows": [
+            {
+              "time": 65.911996291,
+              "epoch": 1793255836.845292,
+              "cpu_ns": 269067375.0,
+              "wakeups": 24,
+              "interrupts": 74,
+              "energy_nj": 752842618,
+              "resident": 106037248,
+              "footprint": 32801824
+            },
+            {
+              "time": 66.917095875,
+              "epoch": 1793255837.850394,
+              "cpu_ns": 271792125.0,
+              "wakeups": 24,
+              "interrupts": 76,
+              "energy_nj": 753361070,
+              "resident": 106037248,
+              "footprint": 32801824
+            },
+            {
+              "time": 67.922228375,
+              "epoch": 1793255838.855527,
+              "cpu_ns": 275938708.3333333,
+              "wakeups": 25,
+              "interrupts": 77,
+              "energy_nj": 753641660,
+              "resident": 106037248,
+              "footprint": 32801824
+            },
+            {
+              "time": 68.925421166,
+              "epoch": 1793255839.85872,
+              "cpu_ns": 279760166.6666667,
+              "wakeups": 27,
+              "interrupts": 79,
+              "energy_nj": 753944312,
+              "resident": 106037248,
+              "footprint": 32801824
+            },
+            {
+              "time": 69.930554666,
+              "epoch": 1793255840.8638542,
+              "cpu_ns": 283750125.0,
+              "wakeups": 28,
+              "interrupts": 80,
+              "energy_nj": 754222425,
+              "resident": 106037248,
+              "footprint": 32801824
+            },
+            {
+              "time": 70.935273833,
+              "epoch": 1793255841.8685749,
+              "cpu_ns": 287737500.0,
+              "wakeups": 28,
+              "interrupts": 81,
+              "energy_nj": 754497388,
+              "resident": 106037248,
+              "footprint": 32801824
+            },
+            {
+              "time": 71.9404035,
+              "epoch": 1793255842.873703,
+              "cpu_ns": 292055750.0,
+              "wakeups": 30,
+              "interrupts": 83,
+              "energy_nj": 754792264,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 72.945522875,
+              "epoch": 1793255843.8788228,
+              "cpu_ns": 296363375.0,
+              "wakeups": 30,
+              "interrupts": 84,
+              "energy_nj": 755083693,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 73.950637791,
+              "epoch": 1793255844.883939,
+              "cpu_ns": 300445166.6666667,
+              "wakeups": 30,
+              "interrupts": 85,
+              "energy_nj": 755361776,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 74.955750083,
+              "epoch": 1793255845.889051,
+              "cpu_ns": 304705875.0,
+              "wakeups": 31,
+              "interrupts": 87,
+              "energy_nj": 755651558,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 75.960861916,
+              "epoch": 1793255846.894163,
+              "cpu_ns": 308744083.3333333,
+              "wakeups": 31,
+              "interrupts": 88,
+              "energy_nj": 755927670,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 76.965971583,
+              "epoch": 1793255847.899273,
+              "cpu_ns": 308744083.3333333,
+              "wakeups": 31,
+              "interrupts": 88,
+              "energy_nj": 755927670,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 77.971125416,
+              "epoch": 1793255848.904428,
+              "cpu_ns": 313002375.0,
+              "wakeups": 33,
+              "interrupts": 90,
+              "energy_nj": 756218531,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 78.975251125,
+              "epoch": 1793255849.908554,
+              "cpu_ns": 316536083.3333333,
+              "wakeups": 34,
+              "interrupts": 91,
+              "energy_nj": 756508196,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 79.97940025,
+              "epoch": 1793255850.912704,
+              "cpu_ns": 318760791.6666667,
+              "wakeups": 34,
+              "interrupts": 92,
+              "energy_nj": 756990376,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 80.981452375,
+              "epoch": 1793255851.914756,
+              "cpu_ns": 322590458.3333333,
+              "wakeups": 35,
+              "interrupts": 94,
+              "energy_nj": 757274096,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 81.982136958,
+              "epoch": 1793255852.915442,
+              "cpu_ns": 326654583.3333333,
+              "wakeups": 35,
+              "interrupts": 95,
+              "energy_nj": 757550692,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 82.987282541,
+              "epoch": 1793255853.920588,
+              "cpu_ns": 330737000.0,
+              "wakeups": 36,
+              "interrupts": 96,
+              "energy_nj": 757830274,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 83.990665958,
+              "epoch": 1793255854.9239721,
+              "cpu_ns": 335023375.0,
+              "wakeups": 38,
+              "interrupts": 98,
+              "energy_nj": 758120963,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 84.995780791,
+              "epoch": 1793255855.929087,
+              "cpu_ns": 339138750.0,
+              "wakeups": 39,
+              "interrupts": 99,
+              "energy_nj": 758397780,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 86.000903916,
+              "epoch": 1793255856.93421,
+              "cpu_ns": 343189250.0,
+              "wakeups": 40,
+              "interrupts": 100,
+              "energy_nj": 758676103,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 87.006026583,
+              "epoch": 1793255857.9393332,
+              "cpu_ns": 347357291.6666667,
+              "wakeups": 40,
+              "interrupts": 101,
+              "energy_nj": 758964407,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 88.011139708,
+              "epoch": 1793255858.944447,
+              "cpu_ns": 351674750.0,
+              "wakeups": 41,
+              "interrupts": 103,
+              "energy_nj": 759259760,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 89.012885583,
+              "epoch": 1793255859.946193,
+              "cpu_ns": 355750458.3333333,
+              "wakeups": 42,
+              "interrupts": 104,
+              "energy_nj": 759537495,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 90.015189583,
+              "epoch": 1793255860.9484968,
+              "cpu_ns": 359916625.0,
+              "wakeups": 43,
+              "interrupts": 105,
+              "energy_nj": 759818673,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 91.020308625,
+              "epoch": 1793255861.9536169,
+              "cpu_ns": 364237875.0,
+              "wakeups": 45,
+              "interrupts": 107,
+              "energy_nj": 760113098,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 92.02543,
+              "epoch": 1793255862.958739,
+              "cpu_ns": 368249416.6666667,
+              "wakeups": 45,
+              "interrupts": 108,
+              "energy_nj": 760390693,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 93.030549375,
+              "epoch": 1793255863.963858,
+              "cpu_ns": 372552416.6666667,
+              "wakeups": 45,
+              "interrupts": 109,
+              "energy_nj": 760679447,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 94.03568,
+              "epoch": 1793255864.9689898,
+              "cpu_ns": 377406625.0,
+              "wakeups": 45,
+              "interrupts": 111,
+              "energy_nj": 761036810,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 95.040807,
+              "epoch": 1793255865.974117,
+              "cpu_ns": 381693666.6666667,
+              "wakeups": 45,
+              "interrupts": 112,
+              "energy_nj": 761324915,
+              "resident": 106070016,
+              "footprint": 32834592
+            },
+            {
+              "time": 96.043861333,
+              "epoch": 1793255866.977172,
+              "cpu_ns": 385823000.0,
+              "wakeups": 45,
+              "interrupts": 113,
+              "energy_nj": 761603747,
+              "resident": 106070016,
+              "footprint": 32834592
+            }
+          ],
+          "summary": {
+            "seconds": 30.131865042,
+            "cpu_percent": 0.3874822379472942,
+            "idle_wakeups_s": 0.6969366141368502,
+            "interrupt_wakeups_s": 1.2943108548255788,
+            "process_energy_mw": 0.29075959910838894,
+            "footprint_mib": 31.313507080078125
+          }
+        }
+      ],
+      "means": {
+        "seconds": 30.121932729500003,
+        "cpu_percent": 0.38818110974981135,
+        "idle_wakeups_s": 0.663957144357252,
+        "interrupt_wakeups_s": 1.2947377776372235,
+        "process_energy_mw": 0.3025598086686982,
+        "footprint_mib": 31.352558135986328
+      }
+    }
+  },
+  "animation": {
+    "controlled-before": {
+      "summary": {
+        "drop": {
+          "phases": 14,
+          "median_phase_p95_ms": 16.772312461398542,
+          "max_gap_ms": 50.46875006519258,
+          "median_first_update_ms": 104.51054165605456,
+          "gaps_over25": 12
+        },
+        "reveal": {
+          "phases": 7,
+          "median_phase_p95_ms": 16.822041478008032,
+          "max_gap_ms": 22.91191671974957,
+          "median_first_update_ms": 107.28254169225693,
+          "gaps_over25": 0
+        },
+        "collapse": {
+          "phases": 7,
+          "median_phase_p95_ms": 16.771916765719652,
+          "max_gap_ms": 23.742000106722116,
+          "median_first_update_ms": 32.16412500478327,
+          "gaps_over25": 0
+        }
+      },
+      "phases": [
+        {
+          "phase": "drop-appear",
+          "kind": "drop",
+          "samples": 40,
+          "first_update_ms": 164.99579162336886,
+          "median_ms": 16.667208168655634,
+          "p95_ms": 16.786874970421195,
+          "max_ms": 16.90016663633287,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "card-open",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 147.03541668131948,
+          "median_ms": 16.671375138685107,
+          "p95_ms": 16.767250141128898,
+          "max_ms": 19.680875120684505,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "card-close",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 30.41795827448368,
+          "median_ms": 16.669312492012978,
+          "p95_ms": 16.747291665524244,
+          "max_ms": 16.75187493674457,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "drop-retract",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 47.099916730076075,
+          "median_ms": 16.66637510061264,
+          "p95_ms": 16.73358352854848,
+          "max_ms": 16.84045814909041,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-0",
+          "kind": "drop",
+          "samples": 39,
+          "first_update_ms": 165.05845845676959,
+          "median_ms": 16.66833320632577,
+          "p95_ms": 16.815250040963292,
+          "max_ms": 17.066000029444695,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-0",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 100.82283336669207,
+          "median_ms": 16.667208401486278,
+          "p95_ms": 16.900124959647655,
+          "max_ms": 22.91191671974957,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-0",
+          "kind": "collapse",
+          "samples": 22,
+          "first_update_ms": 33.198999939486384,
+          "median_ms": 16.63762517273426,
+          "p95_ms": 16.771916765719652,
+          "max_ms": 16.82529179379344,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-0",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 42.54033323377371,
+          "median_ms": 16.667291754856706,
+          "p95_ms": 16.758541576564312,
+          "max_ms": 16.80383342318237,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-1",
+          "kind": "drop",
+          "samples": 27,
+          "first_update_ms": 164.73158332519233,
+          "median_ms": 17.372770933434367,
+          "p95_ms": 49.55233330838382,
+          "max_ms": 50.46875006519258,
+          "gaps_over25": 7
+        },
+        {
+          "phase": "open-1",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 107.28254169225693,
+          "median_ms": 16.63312502205372,
+          "p95_ms": 17.272875178605318,
+          "max_ms": 22.24879153072834,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-1",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 33.24066661298275,
+          "median_ms": 16.679083346389234,
+          "p95_ms": 16.96525001898408,
+          "max_ms": 23.742000106722116,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-1",
+          "kind": "drop",
+          "samples": 19,
+          "first_update_ms": 49.92879158817232,
+          "median_ms": 16.681187436915934,
+          "p95_ms": 34.91804166696966,
+          "max_ms": 34.99420825392008,
+          "gaps_over25": 5
+        },
+        {
+          "phase": "appear-2",
+          "kind": "drop",
+          "samples": 39,
+          "first_update_ms": 179.38529164530337,
+          "median_ms": 16.658583423122764,
+          "p95_ms": 16.80283318273723,
+          "max_ms": 16.871083294972777,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-2",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 110.3992082644254,
+          "median_ms": 16.672666650265455,
+          "p95_ms": 18.837166717275977,
+          "max_ms": 20.287458319216967,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-2",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 30.436333268880844,
+          "median_ms": 16.68339583557099,
+          "p95_ms": 16.81562513113022,
+          "max_ms": 17.1125833876431,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-2",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 47.268500085920095,
+          "median_ms": 16.65350003167987,
+          "p95_ms": 16.75933343358338,
+          "max_ms": 16.818375093862414,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-3",
+          "kind": "drop",
+          "samples": 27,
+          "first_update_ms": 159.0922917239368,
+          "median_ms": 16.6690832702443,
+          "p95_ms": 16.77179173566401,
+          "max_ms": 16.810375032946467,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-3",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 113.77808335237205,
+          "median_ms": 16.673291567713022,
+          "p95_ms": 16.773833194747567,
+          "max_ms": 16.958416672423482,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-3",
+          "kind": "collapse",
+          "samples": 22,
+          "first_update_ms": 32.16412500478327,
+          "median_ms": 16.64141658693552,
+          "p95_ms": 16.777124954387546,
+          "max_ms": 16.78125001490116,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-3",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 48.74104168266058,
+          "median_ms": 16.653249971568584,
+          "p95_ms": 16.749541740864515,
+          "max_ms": 16.87075011432171,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-4",
+          "kind": "drop",
+          "samples": 39,
+          "first_update_ms": 183.36316663771868,
+          "median_ms": 16.66147925425321,
+          "p95_ms": 16.796166775748134,
+          "max_ms": 19.44029168225825,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-4",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 99.81449996121228,
+          "median_ms": 16.66683331131935,
+          "p95_ms": 16.742000123485923,
+          "max_ms": 16.976791666820645,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-4",
+          "kind": "collapse",
+          "samples": 22,
+          "first_update_ms": 32.53591665998101,
+          "median_ms": 16.638875007629395,
+          "p95_ms": 16.758041689172387,
+          "max_ms": 16.790249850600958,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-4",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 48.76083321869373,
+          "median_ms": 16.67541661299765,
+          "p95_ms": 16.745458357036114,
+          "max_ms": 16.805541701614857,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-5",
+          "kind": "drop",
+          "samples": 39,
+          "first_update_ms": 166.75354167819023,
+          "median_ms": 16.67160412762314,
+          "p95_ms": 16.772833187133074,
+          "max_ms": 16.797958174720407,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-5",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 92.17312489636242,
+          "median_ms": 16.686833230778575,
+          "p95_ms": 16.822041478008032,
+          "max_ms": 16.889958176761866,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-5",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 30.498041538521647,
+          "median_ms": 16.665520728565753,
+          "p95_ms": 16.75795833580196,
+          "max_ms": 18.702125176787376,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-5",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 47.229791758581996,
+          "median_ms": 16.667666845023632,
+          "p95_ms": 16.71258336864412,
+          "max_ms": 16.73375000245869,
+          "gaps_over25": 0
+        }
+      ],
+      "screenHz": 60
+    },
+    "controlled-after": {
+      "summary": {
+        "drop": {
+          "phases": 14,
+          "median_phase_p95_ms": 16.72879175748676,
+          "max_gap_ms": 30.37366666831076,
+          "median_first_update_ms": 103.89881231822073,
+          "gaps_over25": 1
+        },
+        "reveal": {
+          "phases": 7,
+          "median_phase_p95_ms": 16.785375075414777,
+          "max_gap_ms": 23.767000064253807,
+          "median_first_update_ms": 49.156333319842815,
+          "gaps_over25": 0
+        },
+        "collapse": {
+          "phases": 7,
+          "median_phase_p95_ms": 16.746249981224537,
+          "max_gap_ms": 23.641958367079496,
+          "median_first_update_ms": 32.054875046014786,
+          "gaps_over25": 0
+        }
+      },
+      "phases": [
+        {
+          "phase": "drop-appear",
+          "kind": "drop",
+          "samples": 39,
+          "first_update_ms": 157.86358318291605,
+          "median_ms": 16.665666596964,
+          "p95_ms": 16.7713335249573,
+          "max_ms": 30.37366666831076,
+          "gaps_over25": 1
+        },
+        {
+          "phase": "card-open",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 215.14729177579284,
+          "median_ms": 16.659124987199903,
+          "p95_ms": 16.80933334864676,
+          "max_ms": 21.99975005351007,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "card-close",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 32.054875046014786,
+          "median_ms": 16.651125042699277,
+          "p95_ms": 16.741833416745067,
+          "max_ms": 23.206666577607393,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "drop-retract",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 48.543458338826895,
+          "median_ms": 16.66758325882256,
+          "p95_ms": 16.72020833939314,
+          "max_ms": 16.93533337675035,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-0",
+          "kind": "drop",
+          "samples": 26,
+          "first_update_ms": 163.89691666699946,
+          "median_ms": 16.66245819069445,
+          "p95_ms": 16.771958442404866,
+          "max_ms": 16.849416540935636,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-0",
+          "kind": "reveal",
+          "samples": 32,
+          "first_update_ms": 49.156333319842815,
+          "median_ms": 16.652624821290374,
+          "p95_ms": 17.130000051110983,
+          "max_ms": 23.767000064253807,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-0",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 31.991166761144996,
+          "median_ms": 16.655145795084536,
+          "p95_ms": 16.74595824442804,
+          "max_ms": 23.641958367079496,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-0",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 48.73420833609998,
+          "median_ms": 16.679499996826053,
+          "p95_ms": 16.7215415276587,
+          "max_ms": 16.73179166391492,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-1",
+          "kind": "drop",
+          "samples": 40,
+          "first_update_ms": 168.7658333685249,
+          "median_ms": 16.67066663503647,
+          "p95_ms": 16.782791819423437,
+          "max_ms": 16.973208403214812,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-1",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 49.04279159381986,
+          "median_ms": 16.678041545674205,
+          "p95_ms": 16.767583321779966,
+          "max_ms": 16.784833278506994,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-1",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 33.10875012539327,
+          "median_ms": 16.676625004038215,
+          "p95_ms": 16.76508318632841,
+          "max_ms": 16.835083486512303,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-1",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 49.88112486898899,
+          "median_ms": 16.666250070557,
+          "p95_ms": 16.727041685953736,
+          "max_ms": 16.766374930739403,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-2",
+          "kind": "drop",
+          "samples": 40,
+          "first_update_ms": 166.3262916263193,
+          "median_ms": 16.663249814882874,
+          "p95_ms": 16.763208201155066,
+          "max_ms": 16.84450008906424,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-2",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 48.83179161697626,
+          "median_ms": 16.67204173281789,
+          "p95_ms": 16.773958457633853,
+          "max_ms": 16.863708151504397,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-2",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 33.232458401471376,
+          "median_ms": 16.644729068502784,
+          "p95_ms": 16.7885001283139,
+          "max_ms": 16.80658315308392,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-2",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 49.89200015552342,
+          "median_ms": 16.665250062942505,
+          "p95_ms": 16.722749918699265,
+          "max_ms": 16.748666763305664,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-3",
+          "kind": "drop",
+          "samples": 40,
+          "first_update_ms": 169.1789166070521,
+          "median_ms": 16.655833460390568,
+          "p95_ms": 16.787000000476837,
+          "max_ms": 16.968958312645555,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-3",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 49.003958236426115,
+          "median_ms": 16.67112484574318,
+          "p95_ms": 16.796999843791127,
+          "max_ms": 16.815708251670003,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-3",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 31.90208342857659,
+          "median_ms": 16.66337507776916,
+          "p95_ms": 16.74887491390109,
+          "max_ms": 23.336125072091818,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-3",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 42.398083256557584,
+          "median_ms": 16.67429180815816,
+          "p95_ms": 16.713833436369896,
+          "max_ms": 16.725666588172317,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-4",
+          "kind": "drop",
+          "samples": 40,
+          "first_update_ms": 163.80179161205888,
+          "median_ms": 16.671250108629465,
+          "p95_ms": 16.730541829019785,
+          "max_ms": 16.819375101476908,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-4",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 60.128083219751716,
+          "median_ms": 16.66199997998774,
+          "p95_ms": 16.77204156294465,
+          "max_ms": 16.83220826089382,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-4",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 31.93587507121265,
+          "median_ms": 16.658854205161333,
+          "p95_ms": 16.746249981224537,
+          "max_ms": 23.305749986320734,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-4",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 48.71287499554455,
+          "median_ms": 16.66137482970953,
+          "p95_ms": 16.714583383873105,
+          "max_ms": 16.741833416745067,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "appear-5",
+          "kind": "drop",
+          "samples": 40,
+          "first_update_ms": 165.61266663484275,
+          "median_ms": 16.655416693538427,
+          "p95_ms": 16.789416782557964,
+          "max_ms": 16.877291724085808,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "open-5",
+          "kind": "reveal",
+          "samples": 30,
+          "first_update_ms": 60.10599993169308,
+          "median_ms": 16.66804146952927,
+          "p95_ms": 16.785375075414777,
+          "max_ms": 16.843999968841672,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "close-5",
+          "kind": "collapse",
+          "samples": 21,
+          "first_update_ms": 33.13033329322934,
+          "median_ms": 16.67100004851818,
+          "p95_ms": 16.739875078201294,
+          "max_ms": 22.937958361580968,
+          "gaps_over25": 0
+        },
+        {
+          "phase": "retract-5",
+          "kind": "drop",
+          "samples": 24,
+          "first_update_ms": 49.934041453525424,
+          "median_ms": 16.659041633829474,
+          "p95_ms": 16.71670819632709,
+          "max_ms": 16.75145816989243,
+          "gaps_over25": 0
+        }
+      ],
+      "screenHz": 60
+    }
+  },
+  "component_phases": {
+    "controlled-before": [
+      {
+        "phase": "hidden-idle",
+        "seconds": 10.082092667,
+        "cpu_percent": 0.01266188851359948,
+        "idle_wakeups_s": 0.09918575766250692,
+        "interrupt_wakeups_s": 0.3967430306500277,
+        "process_energy_mw": 0.011589459039833284,
+        "footprint_mib": 14.672744750976562
+      },
+      {
+        "phase": "drop-appear",
+        "seconds": 1.0100537079999992,
+        "cpu_percent": 7.28033480638108,
+        "idle_wakeups_s": 77.22361631090618,
+        "interrupt_wakeups_s": 107.91505356267658,
+        "process_energy_mw": 6.619234152645678,
+        "footprint_mib": 58.344642639160156
+      },
+      {
+        "phase": "drop-idle",
+        "seconds": 7.053463499999998,
+        "cpu_percent": 3.3796635274760187,
+        "idle_wakeups_s": 1.2759688910277913,
+        "interrupt_wakeups_s": 82.6544292743558,
+        "process_energy_mw": 8.608627803915057,
+        "footprint_mib": 57.704017639160156
+      },
+      {
+        "phase": "card-idle",
+        "seconds": 7.062624791000001,
+        "cpu_percent": 10.48163308363788,
+        "idle_wakeups_s": 56.63616740757989,
+        "interrupt_wakeups_s": 86.22856487804039,
+        "process_energy_mw": 19.157650307633336,
+        "footprint_mib": 73.61038208007812
+      },
+      {
+        "phase": "drop-retract",
+        "seconds": 2.008448958999999,
+        "cpu_percent": 0.02437826452128427,
+        "idle_wakeups_s": 1.9915865833063484,
+        "interrupt_wakeups_s": 2.489483229132935,
+        "process_energy_mw": 0.014631688730905914,
+        "footprint_mib": 30.626007080078125
+      },
+      {
+        "phase": "hidden-again",
+        "seconds": 6.5582125829999995,
+        "cpu_percent": 0.2549843643375344,
+        "idle_wakeups_s": 4.421936561674277,
+        "interrupt_wakeups_s": 5.794261701504226,
+        "process_energy_mw": 0.47397518160017843,
+        "footprint_mib": 30.329132080078125
+      },
+      {
+        "phase": "appear-0",
+        "seconds": 0.5040448750000053,
+        "cpu_percent": 11.01772767090751,
+        "idle_wakeups_s": 67.45431148367423,
+        "interrupt_wakeups_s": 115.06911958979722,
+        "process_energy_mw": 12.348523531758824,
+        "footprint_mib": 65.64163208007812
+      },
+      {
+        "phase": "retract-0",
+        "seconds": 0.5027455419999995,
+        "cpu_percent": 2.9268285386407293,
+        "idle_wakeups_s": 51.7160229737055,
+        "interrupt_wakeups_s": 67.62864542715334,
+        "process_energy_mw": 4.7339435184887275,
+        "footprint_mib": 65.25100708007812
+      },
+      {
+        "phase": "appear-1",
+        "seconds": 0.5009745420000016,
+        "cpu_percent": 10.294842819910466,
+        "idle_wakeups_s": 31.93775064122909,
+        "interrupt_wakeups_s": 81.84048601814955,
+        "process_energy_mw": 14.35845416671887,
+        "footprint_mib": 70.54788208007812
+      },
+      {
+        "phase": "retract-1",
+        "seconds": 1.0106545829999973,
+        "cpu_percent": 2.0586492836725276,
+        "idle_wakeups_s": 22.757528028742993,
+        "interrupt_wakeups_s": 56.39909120166742,
+        "process_energy_mw": 13.435418221420202,
+        "footprint_mib": 68.53225708007812
+      },
+      {
+        "phase": "appear-2",
+        "seconds": 0.5050882090000002,
+        "cpu_percent": 7.45493546059001,
+        "idle_wakeups_s": 57.41571369764443,
+        "interrupt_wakeups_s": 112.85157519881835,
+        "process_energy_mw": 11.309907652189912,
+        "footprint_mib": 69.36038208007812
+      },
+      {
+        "phase": "retract-2",
+        "seconds": 1.0080077499999973,
+        "cpu_percent": 0.728755971039608,
+        "idle_wakeups_s": 1.9841117292997057,
+        "interrupt_wakeups_s": 9.920558646498527,
+        "process_energy_mw": 1.8695669750555044,
+        "footprint_mib": 68.71975708007812
+      },
+      {
+        "phase": "retract-3",
+        "seconds": 0.500956084000002,
+        "cpu_percent": 2.561302359589658,
+        "idle_wakeups_s": 27.94656147942889,
+        "interrupt_wakeups_s": 65.87403777293953,
+        "process_energy_mw": 6.798076934823665,
+        "footprint_mib": 68.90725708007812
+      },
+      {
+        "phase": "appear-4",
+        "seconds": 1.011258583,
+        "cpu_percent": 8.826599991389145,
+        "idle_wakeups_s": 44.49900426704215,
+        "interrupt_wakeups_s": 109.76421052537064,
+        "process_energy_mw": 13.113307736444694,
+        "footprint_mib": 70.07913208007812
+      },
+      {
+        "phase": "retract-4",
+        "seconds": 0.5014979589999982,
+        "cpu_percent": 0.6349643654947565,
+        "idle_wakeups_s": 15.952208491440798,
+        "interrupt_wakeups_s": 17.946234552870898,
+        "process_energy_mw": 1.2878716421655514,
+        "footprint_mib": 69.45413208007812
+      },
+      {
+        "phase": "appear-5",
+        "seconds": 0.5027437080000041,
+        "cpu_percent": 8.369282598096014,
+        "idle_wakeups_s": 51.716211632826216,
+        "interrupt_wakeups_s": 99.45425314005041,
+        "process_energy_mw": 11.837136706641688,
+        "footprint_mib": 70.25100708007812
+      },
+      {
+        "phase": "retract-5",
+        "seconds": 1.5146720409999972,
+        "cpu_percent": 0.048269525033109224,
+        "idle_wakeups_s": 1.3204178501106985,
+        "interrupt_wakeups_s": 3.301044625276746,
+        "process_energy_mw": 0.07347069001585949,
+        "footprint_mib": 35.407257080078125
+      }
+    ],
+    "controlled-after": [
+      {
+        "phase": "hidden-idle",
+        "seconds": 10.077299541,
+        "cpu_percent": 0.018980365975541,
+        "idle_wakeups_s": 0.297698801925491,
+        "interrupt_wakeups_s": 0.595397603850982,
+        "process_energy_mw": 0.019540155494917423,
+        "footprint_mib": 14.828994750976562
+      },
+      {
+        "phase": "drop-appear",
+        "seconds": 1.0055052500000006,
+        "cpu_percent": 7.986121902396822,
+        "idle_wakeups_s": 71.60579221242251,
+        "interrupt_wakeups_s": 110.39226299415138,
+        "process_energy_mw": 7.290153880350197,
+        "footprint_mib": 58.48524475097656
+      },
+      {
+        "phase": "drop-idle",
+        "seconds": 7.556602374999999,
+        "cpu_percent": 3.607944238299294,
+        "idle_wakeups_s": 1.3233460626542497,
+        "interrupt_wakeups_s": 81.78278667203263,
+        "process_energy_mw": 8.361830868466201,
+        "footprint_mib": 57.82899475097656
+      },
+      {
+        "phase": "card-open",
+        "seconds": 0.5004520409999991,
+        "cpu_percent": 15.189708924243057,
+        "idle_wakeups_s": 63.94219101606193,
+        "interrupt_wakeups_s": 89.91870611633709,
+        "process_energy_mw": 22.712771791852923,
+        "footprint_mib": 73.56350708007812
+      },
+      {
+        "phase": "card-idle",
+        "seconds": 7.069644666999999,
+        "cpu_percent": 4.839029745444112,
+        "idle_wakeups_s": 60.11617556732856,
+        "interrupt_wakeups_s": 82.32379807102406,
+        "process_energy_mw": 4.33338059308717,
+        "footprint_mib": 73.36038208007812
+      },
+      {
+        "phase": "drop-retract",
+        "seconds": 1.0102355830000036,
+        "cpu_percent": 0.0580186453400739,
+        "idle_wakeups_s": 0.0,
+        "interrupt_wakeups_s": 2.969604368014019,
+        "process_energy_mw": 0.033412998480771075,
+        "footprint_mib": 32.53223419189453
+      },
+      {
+        "phase": "hidden-again",
+        "seconds": 8.061257500000004,
+        "cpu_percent": 0.005295906583637944,
+        "idle_wakeups_s": 0.37215037480194607,
+        "interrupt_wakeups_s": 0.6202506246699101,
+        "process_energy_mw": 0.00299345356478192,
+        "footprint_mib": 30.25098419189453
+      },
+      {
+        "phase": "open-0",
+        "seconds": 0.5050830830000024,
+        "cpu_percent": 16.029277042063665,
+        "idle_wakeups_s": 35.63770121360393,
+        "interrupt_wakeups_s": 53.4565518204059,
+        "process_energy_mw": 31.720686238069717,
+        "footprint_mib": 76.29788208007812
+      },
+      {
+        "phase": "retract-0",
+        "seconds": 0.5029579999999996,
+        "cpu_percent": 1.3673275568403842,
+        "idle_wakeups_s": 9.941187932193154,
+        "interrupt_wakeups_s": 17.894138277947675,
+        "process_energy_mw": 1.2762099419832282,
+        "footprint_mib": 68.62600708007812
+      },
+      {
+        "phase": "appear-1",
+        "seconds": 0.5051104580000043,
+        "cpu_percent": 8.21316229145792,
+        "idle_wakeups_s": 75.23106955746238,
+        "interrupt_wakeups_s": 110.86683934783929,
+        "process_energy_mw": 7.736771112349383,
+        "footprint_mib": 67.46975708007812
+      },
+      {
+        "phase": "open-1",
+        "seconds": 0.5041406669999944,
+        "cpu_percent": 10.111918161656122,
+        "idle_wakeups_s": 61.49077435961012,
+        "interrupt_wakeups_s": 83.31008139043952,
+        "process_energy_mw": 15.303895331260959,
+        "footprint_mib": 73.62600708007812
+      },
+      {
+        "phase": "retract-1",
+        "seconds": 0.5037521670000018,
+        "cpu_percent": 1.4533684378175062,
+        "idle_wakeups_s": 5.955309369418533,
+        "interrupt_wakeups_s": 17.8659281082556,
+        "process_energy_mw": 1.1860494884977792,
+        "footprint_mib": 67.46975708007812
+      },
+      {
+        "phase": "appear-2",
+        "seconds": 0.5046288750000016,
+        "cpu_percent": 8.739591050948057,
+        "idle_wakeups_s": 71.33955622337284,
+        "interrupt_wakeups_s": 118.89926037228805,
+        "process_energy_mw": 7.28289676249697,
+        "footprint_mib": 67.81350708007812
+      },
+      {
+        "phase": "retract-2",
+        "seconds": 0.5051189579999971,
+        "cpu_percent": 0.8494038744829737,
+        "idle_wakeups_s": 9.898658367124737,
+        "interrupt_wakeups_s": 15.83785338739958,
+        "process_energy_mw": 0.6129625409941588,
+        "footprint_mib": 67.40725708007812
+      },
+      {
+        "phase": "appear-3",
+        "seconds": 0.5051511659999974,
+        "cpu_percent": 8.312264293575879,
+        "idle_wakeups_s": 75.22500700315159,
+        "interrupt_wakeups_s": 114.81711595217875,
+        "process_energy_mw": 6.875908111830465,
+        "footprint_mib": 66.46975708007812
+      },
+      {
+        "phase": "retract-3",
+        "seconds": 0.5051322079999991,
+        "cpu_percent": 0.4152460748783834,
+        "idle_wakeups_s": 3.959359487130552,
+        "interrupt_wakeups_s": 3.959359487130552,
+        "process_energy_mw": 0.28169654943087735,
+        "footprint_mib": 66.59475708007812
+      },
+      {
+        "phase": "appear-4",
+        "seconds": 1.0079761659999988,
+        "cpu_percent": 9.106969631793218,
+        "idle_wakeups_s": 65.47773868692852,
+        "interrupt_wakeups_s": 110.12165142801614,
+        "process_energy_mw": 7.248409482729781,
+        "footprint_mib": 66.95413208007812
+      },
+      {
+        "phase": "retract-4",
+        "seconds": 0.5051312909999979,
+        "cpu_percent": 0.1067296779284264,
+        "idle_wakeups_s": 1.9796833374157456,
+        "interrupt_wakeups_s": 1.9796833374157456,
+        "process_energy_mw": 0.05768005371894516,
+        "footprint_mib": 66.78225708007812
+      },
+      {
+        "phase": "appear-5",
+        "seconds": 0.5051353750000018,
+        "cpu_percent": 9.702926995890321,
+        "idle_wakeups_s": 67.30868927958149,
+        "interrupt_wakeups_s": 110.86137057813423,
+        "process_energy_mw": 7.599449949431845,
+        "footprint_mib": 66.84475708007812
+      },
+      {
+        "phase": "retract-5",
+        "seconds": 1.5125505419999996,
+        "cpu_percent": 0.05929829395853061,
+        "idle_wakeups_s": 2.644539728709443,
+        "interrupt_wakeups_s": 3.3056746608868037,
+        "process_energy_mw": 0.034110595690758756,
+        "footprint_mib": 34.360382080078125
+      }
+    ]
+  },
+  "bridge_idle": {
+    "pid": 89458,
+    "rows": [
+      {
+        "time": 0.05115525,
+        "epoch": 1793256026.523082,
+        "cpu_ns": 28467067166.666668,
+        "wakeups": 440,
+        "interrupts": 1418,
+        "energy_nj": 10198870741,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 1.056258583,
+        "epoch": 1793256027.5281868,
+        "cpu_ns": 28467463833.333332,
+        "wakeups": 440,
+        "interrupts": 1418,
+        "energy_nj": 10198903966,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 2.061364291,
+        "epoch": 1793256028.533293,
+        "cpu_ns": 28467463833.333332,
+        "wakeups": 440,
+        "interrupts": 1418,
+        "energy_nj": 10198903966,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 3.066437875,
+        "epoch": 1793256029.538368,
+        "cpu_ns": 28467818208.333332,
+        "wakeups": 440,
+        "interrupts": 1419,
+        "energy_nj": 10198995832,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 4.070867416,
+        "epoch": 1793256030.542797,
+        "cpu_ns": 28468216625.0,
+        "wakeups": 440,
+        "interrupts": 1419,
+        "energy_nj": 10199026944,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 5.075961875,
+        "epoch": 1793256031.5478919,
+        "cpu_ns": 28468510000.0,
+        "wakeups": 440,
+        "interrupts": 1419,
+        "energy_nj": 10199075452,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 6.081092541,
+        "epoch": 1793256032.553025,
+        "cpu_ns": 28468734166.666668,
+        "wakeups": 440,
+        "interrupts": 1419,
+        "energy_nj": 10199145585,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 7.08531375,
+        "epoch": 1793256033.557245,
+        "cpu_ns": 28469007083.333332,
+        "wakeups": 440,
+        "interrupts": 1419,
+        "energy_nj": 10199191053,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 8.090434583,
+        "epoch": 1793256034.562367,
+        "cpu_ns": 28469456166.666668,
+        "wakeups": 440,
+        "interrupts": 1419,
+        "energy_nj": 10199224683,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 9.095537541,
+        "epoch": 1793256035.56747,
+        "cpu_ns": 28493188375.0,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206613062,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 10.097334333,
+        "epoch": 1793256036.569267,
+        "cpu_ns": 28493663458.333332,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206646031,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 11.099631416,
+        "epoch": 1793256037.571563,
+        "cpu_ns": 28494141541.666668,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206678839,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 12.104741708,
+        "epoch": 1793256038.5766761,
+        "cpu_ns": 28494564083.333332,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206713014,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 13.107479541,
+        "epoch": 1793256039.5794141,
+        "cpu_ns": 28495046125.0,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206745974,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 14.111406208,
+        "epoch": 1793256040.5833411,
+        "cpu_ns": 28495472250.0,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206777978,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 15.116522583,
+        "epoch": 1793256041.588458,
+        "cpu_ns": 28495736000.0,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206822017,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 16.120957458,
+        "epoch": 1793256042.5928938,
+        "cpu_ns": 28496003000.0,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206861319,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 17.126052791,
+        "epoch": 1793256043.5979881,
+        "cpu_ns": 28496470791.666668,
+        "wakeups": 440,
+        "interrupts": 1420,
+        "energy_nj": 10206894960,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 18.128514,
+        "epoch": 1793256044.600451,
+        "cpu_ns": 28497271708.333332,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10206947674,
+        "resident": 11583488,
+        "footprint": 14631464
+      },
+      {
+        "time": 19.133634833,
+        "epoch": 1793256045.605572,
+        "cpu_ns": 28524582125.0,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10213226549,
+        "resident": 11599872,
+        "footprint": 14647848
+      },
+      {
+        "time": 20.135942583,
+        "epoch": 1793256046.607881,
+        "cpu_ns": 28524833041.666668,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10213281371,
+        "resident": 11599872,
+        "footprint": 14647848
+      },
+      {
+        "time": 21.139673375,
+        "epoch": 1793256047.611611,
+        "cpu_ns": 28525047125.0,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10213349232,
+        "resident": 11599872,
+        "footprint": 14647848
+      },
+      {
+        "time": 22.144787625,
+        "epoch": 1793256048.616726,
+        "cpu_ns": 28525299208.333332,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10213422719,
+        "resident": 11599872,
+        "footprint": 14647848
+      },
+      {
+        "time": 23.14989675,
+        "epoch": 1793256049.621836,
+        "cpu_ns": 28525744666.666668,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10213455719,
+        "resident": 11599872,
+        "footprint": 14647848
+      },
+      {
+        "time": 24.154878291,
+        "epoch": 1793256050.626818,
+        "cpu_ns": 28525969083.333332,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10213527294,
+        "resident": 11599872,
+        "footprint": 14647848
+      },
+      {
+        "time": 25.158820208,
+        "epoch": 1793256051.63076,
+        "cpu_ns": 28526431000.0,
+        "wakeups": 441,
+        "interrupts": 1422,
+        "energy_nj": 10213559369,
+        "resident": 11599872,
+        "footprint": 14647848
+      }
+    ],
+    "summary": {
+      "seconds": 25.107664958,
+      "cpu_percent": 0.23643709374263053,
+      "idle_wakeups_s": 0.0398284747575211,
+      "interrupt_wakeups_s": 0.1593138990300844,
+      "process_energy_mw": 0.5850256495206175,
+      "footprint_mib": 13.969276428222656
+    }
+  },
+  "attachment_geometry": {
+    "dropBottom": 824,
+    "cardTop": 818
+  },
+  "trace": {
+    "trace-before": {
+      "hitches": 40,
+      "hitch_duration_ms": {
+        "16.666": 27,
+        "16.667": 13
+      },
+      "frame_lifetime_rows": 1075
+    },
+    "final-trace": {
+      "hitches": 2,
+      "hitch_duration_ms": {
+        "49.998": 1,
+        "33.332": 1
+      },
+      "frame_lifetime_rows": 94,
+      "excluded": "Fixture did not execute droplet movement; not a valid improvement comparison."
+    },
+    "verified-trace": {
+      "excluded": "xctrace hung while stopping/saving after target exit; terminated; no valid exported presentation statistics",
+      "progress_rows": 2221,
+      "drop_intermediate_rows": 303
+    }
+  },
+  "checks": {
+    "interaction": "passed with assertions enabled under -O",
+    "energy": "passed",
+    "motion": "passed",
+    "media_stream": "passed",
+    "debug_stop": "passed",
+    "release": "build and development signature passed"
+  },
+  "source_sha256": {
+    "boringNotch/managers/CodexActivity.swift": "0a2710a4e00a7e4c47d4c9d5c2118d81ffc3bb48446226a402c20637266356c8",
+    "boringNotch/components/Notch/CodexNotchEffect.swift": "44936cf662b34830edfaf1bac3b76c993b0465a9b465b58dd73cccca2a08f80a",
+    "script/build_and_run.sh": "faa75902f86da3096cf0e7fee0781ad17789e0cc1b7eee3eaca887b8fb2a58ee",
+    "scripts/check-codex-interaction.py": "bb609bb7d6dd0145823fda253dcbc4d1bfb12fc3b8f2bf4fc9cefb9fc833b391"
+  },
+  "final_build_recheck": {
+    "label": "verified-idle",
+    "pid": 5541,
+    "arguments": [
+      "-hideNotchOption",
+      "never"
+    ],
+    "context_before": {
+      "connected": true,
+      "running": 0,
+      "waiting": 0
+    },
+    "context_after": {
+      "connected": true,
+      "running": 0,
+      "waiting": 0
+    },
+    "rows": [
+      {
+        "time": 16.668634625,
+        "epoch": 1793256874.671652,
+        "cpu_ns": 634618833.3333334,
+        "wakeups": 497,
+        "interrupts": 878,
+        "energy_nj": 865446956,
+        "resident": 105824256,
+        "footprint": 78152736
+      },
+      {
+        "time": 17.6737455,
+        "epoch": 1793256875.676764,
+        "cpu_ns": 673044000.0,
+        "wakeups": 556,
+        "interrupts": 958,
+        "energy_nj": 869561372,
+        "resident": 105840640,
+        "footprint": 77874208
+      },
+      {
+        "time": 18.678873625,
+        "epoch": 1793256876.681893,
+        "cpu_ns": 711404291.6666666,
+        "wakeups": 608,
+        "interrupts": 1041,
+        "energy_nj": 873501554,
+        "resident": 105840640,
+        "footprint": 78464032
+      },
+      {
+        "time": 19.681255791,
+        "epoch": 1793256877.684275,
+        "cpu_ns": 753990708.3333334,
+        "wakeups": 662,
+        "interrupts": 1121,
+        "energy_nj": 878643515,
+        "resident": 105857024,
+        "footprint": 77857824
+      },
+      {
+        "time": 20.683918541,
+        "epoch": 1793256878.686938,
+        "cpu_ns": 796526208.3333334,
+        "wakeups": 714,
+        "interrupts": 1201,
+        "energy_nj": 882429706,
+        "resident": 105857024,
+        "footprint": 78480416
+      },
+      {
+        "time": 21.689271166,
+        "epoch": 1793256879.692291,
+        "cpu_ns": 834991291.6666666,
+        "wakeups": 769,
+        "interrupts": 1282,
+        "energy_nj": 886787437,
+        "resident": 105873408,
+        "footprint": 77906976
+      },
+      {
+        "time": 22.691741708,
+        "epoch": 1793256880.694761,
+        "cpu_ns": 879674583.3333334,
+        "wakeups": 831,
+        "interrupts": 1362,
+        "energy_nj": 893054775,
+        "resident": 105873408,
+        "footprint": 78496800
+      },
+      {
+        "time": 23.69603825,
+        "epoch": 1793256881.6990578,
+        "cpu_ns": 924626916.6666666,
+        "wakeups": 877,
+        "interrupts": 1443,
+        "energy_nj": 897304539,
+        "resident": 105873408,
+        "footprint": 77874208
+      },
+      {
+        "time": 24.700573166,
+        "epoch": 1793256882.703596,
+        "cpu_ns": 966318833.3333334,
+        "wakeups": 919,
+        "interrupts": 1524,
+        "energy_nj": 901636569,
+        "resident": 105873408,
+        "footprint": 78496800
+      },
+      {
+        "time": 25.701600916,
+        "epoch": 1793256883.7046201,
+        "cpu_ns": 1008919916.6666666,
+        "wakeups": 971,
+        "interrupts": 1607,
+        "energy_nj": 905714535,
+        "resident": 105889792,
+        "footprint": 77923360
+      },
+      {
+        "time": 26.703626625,
+        "epoch": 1793256884.706645,
+        "cpu_ns": 1047333666.6666666,
+        "wakeups": 1035,
+        "interrupts": 1689,
+        "energy_nj": 909078655,
+        "resident": 105889792,
+        "footprint": 77923360
+      },
+      {
+        "time": 27.708752375,
+        "epoch": 1793256885.711772,
+        "cpu_ns": 1087161291.6666667,
+        "wakeups": 1087,
+        "interrupts": 1771,
+        "energy_nj": 913184482,
+        "resident": 105889792,
+        "footprint": 78513184
+      },
+      {
+        "time": 28.713882125,
+        "epoch": 1793256886.716901,
+        "cpu_ns": 1127508000.0,
+        "wakeups": 1146,
+        "interrupts": 1851,
+        "energy_nj": 917025291,
+        "resident": 105922560,
+        "footprint": 78545952
+      },
+      {
+        "time": 29.718926541,
+        "epoch": 1793256887.721945,
+        "cpu_ns": 1169886000.0,
+        "wakeups": 1179,
+        "interrupts": 1933,
+        "energy_nj": 921319665,
+        "resident": 105922560,
+        "footprint": 77956128
+      },
+      {
+        "time": 30.7240525,
+        "epoch": 1793256888.727071,
+        "cpu_ns": 1210861250.0,
+        "wakeups": 1227,
+        "interrupts": 2015,
+        "energy_nj": 925469229,
+        "resident": 105922560,
+        "footprint": 77956128
+      },
+      {
+        "time": 31.729181666,
+        "epoch": 1793256889.7322,
+        "cpu_ns": 1252564000.0,
+        "wakeups": 1281,
+        "interrupts": 2097,
+        "energy_nj": 929684964,
+        "resident": 105938944,
+        "footprint": 78562336
+      },
+      {
+        "time": 32.731501083,
+        "epoch": 1793256890.734518,
+        "cpu_ns": 1297127791.6666667,
+        "wakeups": 1338,
+        "interrupts": 2177,
+        "energy_nj": 935077028,
+        "resident": 105938944,
+        "footprint": 78562336
+      },
+      {
+        "time": 33.733801041,
+        "epoch": 1793256891.73682,
+        "cpu_ns": 1338396375.0,
+        "wakeups": 1397,
+        "interrupts": 2261,
+        "energy_nj": 939638536,
+        "resident": 105938944,
+        "footprint": 78267424
+      },
+      {
+        "time": 34.738937,
+        "epoch": 1793256892.741956,
+        "cpu_ns": 1377845958.3333333,
+        "wakeups": 1445,
+        "interrupts": 2342,
+        "energy_nj": 944545952,
+        "resident": 105938944,
+        "footprint": 77972512
+      },
+      {
+        "time": 35.74405875,
+        "epoch": 1793256893.7470772,
+        "cpu_ns": 1418792041.6666667,
+        "wakeups": 1490,
+        "interrupts": 2423,
+        "energy_nj": 949339273,
+        "resident": 105971712,
+        "footprint": 78595104
+      },
+      {
+        "time": 36.744368625,
+        "epoch": 1793256894.747387,
+        "cpu_ns": 1459523958.3333333,
+        "wakeups": 1550,
+        "interrupts": 2505,
+        "energy_nj": 953238564,
+        "resident": 105971712,
+        "footprint": 77972512
+      },
+      {
+        "time": 37.749449958,
+        "epoch": 1793256895.7524679,
+        "cpu_ns": 1497904000.0,
+        "wakeups": 1574,
+        "interrupts": 2586,
+        "energy_nj": 958120924,
+        "resident": 105971712,
+        "footprint": 78595104
+      },
+      {
+        "time": 38.750571041,
+        "epoch": 1793256896.75359,
+        "cpu_ns": 1539336250.0,
+        "wakeups": 1629,
+        "interrupts": 2663,
+        "energy_nj": 963015362,
+        "resident": 105971712,
+        "footprint": 78005280
+      },
+      {
+        "time": 39.751386625,
+        "epoch": 1793256897.754404,
+        "cpu_ns": 1575278958.3333333,
+        "wakeups": 1641,
+        "interrupts": 2746,
+        "energy_nj": 967286701,
+        "resident": 105988096,
+        "footprint": 78611488
+      },
+      {
+        "time": 40.755184458,
+        "epoch": 1793256898.7582028,
+        "cpu_ns": 1617703541.6666667,
+        "wakeups": 1690,
+        "interrupts": 2828,
+        "energy_nj": 971627836,
+        "resident": 105988096,
+        "footprint": 77988896
+      },
+      {
+        "time": 41.757653958,
+        "epoch": 1793256899.760671,
+        "cpu_ns": 1659484208.3333333,
+        "wakeups": 1725,
+        "interrupts": 2910,
+        "energy_nj": 976813302,
+        "resident": 105988096,
+        "footprint": 78611488
+      },
+      {
+        "time": 42.76274325,
+        "epoch": 1793256900.765768,
+        "cpu_ns": 1701744833.3333333,
+        "wakeups": 1765,
+        "interrupts": 2994,
+        "energy_nj": 980994806,
+        "resident": 106004480,
+        "footprint": 78038048
+      },
+      {
+        "time": 43.767243125,
+        "epoch": 1793256901.770261,
+        "cpu_ns": 1744129375.0,
+        "wakeups": 1797,
+        "interrupts": 3075,
+        "energy_nj": 986046716,
+        "resident": 106004480,
+        "footprint": 78038048
+      },
+      {
+        "time": 44.77098375,
+        "epoch": 1793256902.774001,
+        "cpu_ns": 1783491833.3333333,
+        "wakeups": 1850,
+        "interrupts": 3156,
+        "energy_nj": 990192011,
+        "resident": 106004480,
+        "footprint": 78627872
+      },
+      {
+        "time": 45.774055166,
+        "epoch": 1793256903.777073,
+        "cpu_ns": 1822907625.0,
+        "wakeups": 1903,
+        "interrupts": 3238,
+        "energy_nj": 994453860,
+        "resident": 106020864,
+        "footprint": 78644256
+      },
+      {
+        "time": 46.776099208,
+        "epoch": 1793256904.779116,
+        "cpu_ns": 1860409833.3333333,
+        "wakeups": 1956,
+        "interrupts": 3321,
+        "energy_nj": 998132694,
+        "resident": 106020864,
+        "footprint": 78054432
+      }
+    ],
+    "summary": {
+      "seconds": 30.107464583,
+      "cpu_percent": 4.071385674541774,
+      "idle_wakeups_s": 48.45974313040679,
+      "interrupt_wakeups_s": 81.14266790101699,
+      "process_energy_mw": 4.407071131287496,
+      "footprint_mib": 74.43850708007812
+    }
+  },
+  "binary_sha256": "bda124a2aa2c892d45ae5a005cd5cb1fa0e286b406500359248804f45397dab9",
+  "interpretation_correction_2026_10_29": {
+    "reason": "A later real-question check revealed missed subscription reaffirmations despite connected=true.",
+    "affected": [
+      "full_app",
+      "bridge_idle",
+      "final_build_recheck"
+    ],
+    "limitation": "Recorded CPU, wakeup and process energy counters remain valid for the observed processes; an empty bridge task list did not establish that Codex was truly idle. These samples are not a baseline for a correctly subscribed active workload.",
+    "unaffected": "Isolated component and animation fixtures do not depend on the live bridge.",
+    "fix_record": "request-reliability-2026-10-29.md"
+  }
+}
