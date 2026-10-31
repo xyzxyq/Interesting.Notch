@@ -3,14 +3,14 @@
     <channel>
         <title>Interesting Notch</title>
         <item>
-            <title>3.0.14</title>
-            <pubDate>Sat, 31 Oct 2026 00:21:28 +0800</pubDate>
+            <title>3.0.15</title>
+            <pubDate>Sat, 31 Oct 2026 11:17:29 +0800</pubDate>
             <link>https://github.com/xyzxyq/Interesting.Notch/releases</link>
-            <sparkle:version>314</sparkle:version>
-            <sparkle:shortVersionString>3.0.14</sparkle:shortVersionString>
+            <sparkle:version>315</sparkle:version>
+            <sparkle:shortVersionString>3.0.15</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.14/interesting-notch-3.0.14-arm64.dmg" length="9752370" type="application/octet-stream" sparkle:edSignature="8/3/grEQ5oV0wyW0bWkxb+02lAH+Lq7y2faganJk7heYoysRlFFVtWPVcsItxbH0VpwZDGCTy83FFUJLhqkaAA=="/>
+            <enclosure url="https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.15/interesting-notch-3.0.15-arm64.dmg" length="9770369" type="application/octet-stream" sparkle:edSignature="nmuKlS+A/boz7f+7Zw2TmDoYMnUM7VXGdh0NYD9N7bhJxY/6HCv9DXbF3uWqcIKnf5krL+ayHdI3tZAIyeFHCA=="/>
         </item>
     </channel>
 </rss>

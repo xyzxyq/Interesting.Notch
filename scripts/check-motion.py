@@ -24,6 +24,7 @@ marquee = marquee.replace('.onDisappear { reset() }', '''.onDisappear { reset() 
         }''')
 check = r'''
 import AppKit
+import Combine
 import SwiftUI
 private struct MotionCheckReducedKey: EnvironmentKey { static let defaultValue = false }
 extension EnvironmentValues {
@@ -33,10 +34,11 @@ extension EnvironmentValues {
     }
 }
 @MainActor var observation: (String, CGFloat, Bool, Bool) = ("", 0, false, false)
-enum Key { case gestureSensitivity, enableHaptics }
+enum Key { case gestureSensitivity, enableHaptics, smartEnergySaving }
 enum Defaults {
     static subscript(_ key: Key) -> CGFloat { 100 }
     static subscript(_ key: Key) -> Bool { false }
+    static func publisher(_ key: Key) -> AnyPublisher<Bool, Never> { Just(false).eraseToAnyPublisher() }
 }
 enum NotchState { case open, closed }
 @MainActor final class VM {
@@ -171,10 +173,11 @@ LOTTIE_COORDINATOR
 '''.replace('GESTURES', gestures).replace('LOTTIE_COORDINATOR', lottie_coordinator)
 with tempfile.TemporaryDirectory(prefix='notch-motion-check-') as temp:
     folder = Path(temp)
-    (folder / 'Motion.swift').write_text('import SwiftUI\n// One shared observer set' + motion.replace('private(set)', ''))
+    (folder / 'Motion.swift').write_text('import SwiftUI\nimport Combine\n// One shared observer set' + motion.replace('private(set)', ''))
     (folder / 'Marquee.swift').write_text(marquee)
     (folder / 'Check.swift').write_text(check)
     subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', '-target', f'{platform.machine()}-apple-macos14.0',
                     '-external-plugin-path', env['DEVELOPER_DIR'] + '/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins#' + env['DEVELOPER_DIR'] + '/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift-plugin-server', str(folder / 'Motion.swift'),
-                    str(folder / 'Marquee.swift'), str(folder / 'Check.swift'), '-o', str(folder / 'check')], env=env, check=True)
+                    str(folder / 'Marquee.swift'), str(folder / 'Check.swift'),
+                    str(root / 'boringNotch/managers/BatteryActivityManager.swift'), '-o', str(folder / 'check')], env=env, check=True)
     subprocess.run([str(folder / 'check')], check=True)

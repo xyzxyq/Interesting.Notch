@@ -1,4 +1,10 @@
 import AppKit
+import Combine
+
+@MainActor final class NotchMotionEnvironment {
+    static let shared = NotchMotionEnvironment()
+    @Published var energySavingActive = false
+}
 
 @main @MainActor struct PaperPlanePointerChecks {
     static func check(_ condition: Bool) { assert(condition) }

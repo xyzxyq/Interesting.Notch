@@ -134,6 +134,7 @@ struct GeneralSettings: View {
     }
     @EnvironmentObject var vm: BoringViewModel
     @ObservedObject var coordinator = BoringViewCoordinator.shared
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
 
     @Default(.mirrorShape) var mirrorShape
     @Default(.showEmojis) var showEmojis
@@ -147,6 +148,7 @@ struct GeneralSettings: View {
     @Default(.automaticallySwitchDisplay) var automaticallySwitchDisplay
     @Default(.enableGestures) var enableGestures
     @Default(.openNotchOnHover) var openNotchOnHover
+    @Default(.smartEnergySaving) private var smartEnergySaving
     
 
     var body: some View {
@@ -190,6 +192,19 @@ struct GeneralSettings: View {
                     .disabled(showOnAllDisplays)
             } header: {
                 Text("System features")
+            }
+
+            Section {
+                Defaults.Toggle(key: .smartEnergySaving) {
+                    Text("智能节能")
+                }
+                if smartEnergySaving {
+                    LabeledContent("当前状态", value: motion.energySavingActive
+                                   ? "节能中 · 仅保留基础功能"
+                                   : "正常运行 · 符合条件时自动节能")
+                }
+            } footer: {
+                Text("电池供电、系统低电量模式或设备过热时，暂停新增动效并隐藏 Codex 提醒，保留原有基础功能；条件解除后自动恢复，不改变原有设置或处理待办事项。")
             }
 
             Section {

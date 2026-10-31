@@ -4,11 +4,20 @@ import SwiftUI
 import CoreLocation
 import MapKit
 
+@MainActor final class NotchMotionEnvironment: ObservableObject {
+    static let shared = NotchMotionEnvironment()
+    @Published var energySavingActive = false
+}
+
 private final class WeatherStub: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var fail = false
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var count = 0
+    static var requestCount: Int { lock.lock(); defer { lock.unlock() }; return count }
     override class func canInit(with request: URLRequest) -> Bool { request.url?.host == "api.open-meteo.com" }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
+        Self.lock.lock(); Self.count += 1; Self.lock.unlock()
         let response = HTTPURLResponse(url: request.url!, statusCode: Self.fail ? 503 : 200, httpVersion: nil, headerFields: nil)!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: Data("{\"current\":{\"time\":\(Date.now.timeIntervalSince1970),\"weather_code\":61,\"wind_speed_10m\":2}}".utf8))
@@ -18,8 +27,9 @@ private final class WeatherStub: URLProtocol, @unchecked Sendable {
 }
 
 private final class LocationStub: CLLocationManager {
+    var requests = 0
     override var authorizationStatus: CLAuthorizationStatus { .authorizedAlways }
-    override func requestLocation() {}
+    override func requestLocation() { requests += 1 }
     override func stopUpdatingLocation() {}
 }
 
@@ -60,6 +70,7 @@ private final class GeocoderStub: CLGeocoder {
         manager.enabled = true
         try await Task.sleep(for: .milliseconds(200))
         assert(manager.snapshot?.kind == .rain, "Enabled did not load weather")
+        if !CommandLine.arguments.contains("--headless") {
         let host = NSHostingView(rootView: Form { Section { NotchWeatherSettings() } }.formStyle(.grouped))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 620), styleMask: [.titled], backing: .buffered, defer: false)
         window.contentView = host
@@ -75,6 +86,7 @@ private final class GeocoderStub: CLGeocoder {
         host.cacheDisplay(in: host.bounds, to: bitmap)
         try bitmap.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: "/tmp/weather-settings-preview.png"))
         window.orderOut(nil)
+        }
         let manual = manager.selected
         let weatherBeforeSwitch = manager.snapshot
         manager.select(nil)
@@ -127,8 +139,44 @@ private final class GeocoderStub: CLGeocoder {
         assert(manager.snapshot == nil && manager.status == "天气动效未开启", "Late request repopulated disabled effects")
         manager.select(nil)
         assert(manager.cityName == "尚未获取城市")
+        func hasTask(_ name: String) -> Bool {
+            let value = Mirror(reflecting: manager).children.first { $0.label == name }!.value
+            return !Mirror(reflecting: value).children.isEmpty
+        }
+        manager.enabled = true
+        manager.locationManager(location, didUpdateLocations: [CLLocation(latitude: 24.48123, longitude: 118.08123)])
+        let lateCity = geocoder.replies.last!
+        let cityBeforeSaving = manager.cityName
+        let cityPreference = UserDefaults.standard.data(forKey: "weatherSelectedCity")
+        assert(hasTask("loop") && hasTask("cityRequest"))
+        NotchMotionEnvironment.shared.energySavingActive = true
+        try await Task.sleep(for: .milliseconds(60))
+        assert(manager.enabled && UserDefaults.standard.bool(forKey: "weatherEffectsEnabled"))
+        assert(manager.snapshot == nil && manager.status == "智能节能已暂停天气动效")
+        assert(!hasTask("loop") && !hasTask("request") && !hasTask("cityRequest"), "Saving retained weather work")
+        let requests = WeatherStub.requestCount, locations = location.requests, cityRequests = geocoder.replies.count
+        manager.start()
+        manager.locationManager(location, didUpdateLocations: [CLLocation(latitude: 31.2, longitude: 121.5)])
+        manager.locationManager(location, didFailWithError: NSError(domain: kCLErrorDomain, code: CLError.denied.rawValue))
+        lateCity([DistrictMark(placemark: MKPlacemark(coordinate: CLLocationCoordinate2D(latitude: 24.48, longitude: 118.08)))], nil)
+        try await Task.sleep(for: .milliseconds(160))
+        assert(manager.cityName == cityBeforeSaving && manager.snapshot == nil, "Late location changed suspended weather")
+        assert(UserDefaults.standard.data(forKey: "weatherSelectedCity") == cityPreference)
+        assert(WeatherStub.requestCount == requests && location.requests == locations && geocoder.replies.count == cityRequests,
+               "Saving restarted a forecast, location request or geocoder")
+        NotchMotionEnvironment.shared.energySavingActive = false
+        try await Task.sleep(for: .milliseconds(220))
+        assert(manager.enabled && hasTask("loop") && manager.snapshot != nil, "Leaving saving did not restore weather")
+        NotchMotionEnvironment.shared.energySavingActive = true
+        try await Task.sleep(for: .milliseconds(40))
+        manager.enabled = false
+        let disabledLocationRequests = location.requests
+        NotchMotionEnvironment.shared.energySavingActive = false
+        try await Task.sleep(for: .milliseconds(100))
+        assert(!manager.enabled && !hasTask("loop") && !hasTask("request") && manager.snapshot == nil)
+        assert(location.requests == disabledLocationRequests, "Disabled weather located after leaving saving")
         for key in ["weatherEffectsEnabled", "weatherSelectedCity", "weatherSnapshot"] { UserDefaults.standard.removeObject(forKey: key) }
         URLProtocol.unregisterClass(WeatherStub.self)
-        print("Weather manager checks passed: city/district, timeout, late callback, raw fix, duplicate fix, enable/disable, 503 cache and toggle reload")
+        print("Weather manager checks passed: city/district, timeout, late callback, raw fix, duplicate fix, enable/disable, 503 cache, saving cancellation, late location rejection and preference-preserving resume")
     }
 }

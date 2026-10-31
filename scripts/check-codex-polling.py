@@ -7,7 +7,7 @@ import tempfile
 
 root = Path(__file__).resolve().parents[1]
 activity = (root / 'boringNotch/managers/CodexActivity.swift').read_text()
-activity = activity.split('    func open(_ task:', 1)[0] + '    func dismissResolvedRequests() {}\n    func closeRequests() {}\n}\n'
+activity = activity.split('    func open(_ task:', 1)[0] + '    func dismissResolvedRequests() {}\n    func closeRequests() {}\n    func hideRequestsImmediately() {}\n}\n'
 activity += '\nenum CodexReminderStyle: String { case droplet, pullCord }\nenum CodexPullCordStyle: String { case classic, donut, orbit, crystal, jellyfish, ufo, moon, capsule, fish }\n@MainActor final class CodexGenieTransition {}\n'
 activity = activity.replace('private(set) ', '').replace('private ', '').replace('UserDefaults.standard', 'testDefaults')
 activity = activity.replace('URLSession(configuration:', 'ControlledSession(configuration:')
@@ -19,6 +19,7 @@ let testDefaults = UserDefaults(suiteName: suite)!
 @MainActor final class NotchMotionEnvironment: ObservableObject {
     static let shared = NotchMotionEnvironment()
     @Published var suspended = false
+    @Published var energySavingActive = false
     static func decorativeFrameInterval(lowPower: Bool) -> Double { lowPower ? 1.0 / 10 : 1.0 / 20 }
 }
 @MainActor final class ControlledSession {
@@ -194,6 +195,47 @@ let testDefaults = UserDefaults(suiteName: suite)!
         try? await Task.sleep(for: .milliseconds(1150))
         assert(ControlledSession.requests.count == 6 && activity.pollTask == nil, "Disabled feature kept polling")
         print("PASS: disabled startup, enable/disable, late response rejection, single loop, sleep/wake, no false completion, session cleanup")
+
+        activity.enabled = true
+        await settle { ControlledSession.requests.count == 7 }
+        var runningTask = reminder
+        runningTask.isRunning = true
+        activity.tasks = [runningTask]
+        activity.connected = true
+        activity.removeRequest(activity.pending[0])
+        let draftID = activity.pending[0].identity
+        activity.answerDrafts[draftID] = CodexAnswerDraft(text: "Unsent custom answer", selection: nil)
+        let savedTasks = activity.tasks, savedDrafts = activity.answerDrafts
+        let savedRead = activity.readReminders, savedAge = activity.fishWaitingSince
+        NotchMotionEnvironment.shared.energySavingActive = true
+        assert(activity.pollTask == nil && !activity.connected && !activity.waiting && !activity.running)
+        assert(!activity.presentationEnabled && activity.enabled && testDefaults.bool(forKey: "codexRocketEnabled"))
+        assert(activity.tasks == savedTasks && activity.answerDrafts == savedDrafts && activity.readReminders == savedRead,
+               "Temporary saving must preserve pending, ignored and unsent user data")
+        assert(activity.fishWaitingSince == savedAge, "Saving is not resolving the queue")
+        activity.demonstrate("waiting")
+        assert(activity.preview == nil && activity.previewTask == nil, "Preview must not bypass saving")
+        ControlledSession.reply(6, running: false)
+        await settle { ControlledSession.invalidations == 4 }
+        assert(activity.tasks == savedTasks && activity.answerDrafts == savedDrafts && activity.completionSequence == 0,
+               "An in-flight pre-saving response must not mutate the suspended state")
+        NotchMotionEnvironment.shared.suspended = true
+        NotchMotionEnvironment.shared.suspended = false
+        assert(activity.tasks == savedTasks && activity.answerDrafts == savedDrafts,
+               "Sleep/wake while saving must not clear the retained queue")
+        try? await Task.sleep(for: .milliseconds(1150))
+        assert(ControlledSession.requests.count == 7 && activity.pollTask == nil, "Saving kept polling")
+        NotchMotionEnvironment.shared.energySavingActive = false
+        await settle { ControlledSession.requests.count == 8 }
+        assert(!activity.connected && activity.preview == nil, "Restoration must fetch fresh state without replaying preview")
+        ControlledSession.reply(7, running: false)
+        await settle { activity.connected }
+        assert(activity.tasks.isEmpty && activity.answerDrafts.isEmpty && activity.readReminders.isEmpty,
+               "Restored polling must reconcile the actual current queue")
+        assert(activity.completionSequence == 0, "Cross-saving reconciliation is not a new completion")
+        activity.enabled = false
+        await settle { ControlledSession.invalidations == 5 }
+        print("PASS: smart-saving queue/draft/ignore/age preservation, preview suppression, late-response rejection, no polling and fresh resume without false completion")
     }
 }
 '''

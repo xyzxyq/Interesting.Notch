@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import Combine
 
 @MainActor final class NotchWeatherManager: NSObject, ObservableObject, @preconcurrency CLLocationManagerDelegate {
     static let shared = NotchWeatherManager()
@@ -42,6 +43,8 @@ import CoreLocation
     private var locationRetryInterval: TimeInterval = 900
     private var lastAuthorization: CLAuthorizationStatus?
     private var cached: NotchWeatherSnapshot?
+    private var energyObservation: AnyCancellable?
+    private var active: Bool { enabled && !NotchMotionEnvironment.shared.energySavingActive }
 
     init(location: CLLocationManager = CLLocationManager(), geocoder: CLGeocoder = CLGeocoder(), cityTimeout: TimeInterval = 10) {
         self.location = location
@@ -53,6 +56,9 @@ import CoreLocation
         // Created on the main actor; Core Location delegates use this run loop.
         location.delegate = self
         location.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        energyObservation = NotchMotionEnvironment.shared.$energySavingActive.removeDuplicates().dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.restart() }
         start()
     }
     func start() { if enabled && loop == nil { restart() } }
@@ -85,6 +91,7 @@ import CoreLocation
         lastAttempt = .distantPast
         lastLocationRequest = .distantPast
         guard enabled else { switchingToAutomatic = false; locationNotice = nil; snapshot = nil; status = "天气动效未开启"; return }
+        guard active else { snapshot = nil; status = "智能节能已暂停天气动效"; return }
         if !switchingToAutomatic { locationNotice = nil }
         status = "正在启动天气…"
         tick()
@@ -96,6 +103,7 @@ import CoreLocation
         }
     }
     private func tick() {
+        guard active else { return }
         if let current = snapshot, !current.fresh(at: .now) {
             snapshot = nil
             status = "天气已过期，暂用普通波浪"
@@ -143,13 +151,13 @@ import CoreLocation
                 let data = try await NotchWeatherAPI.data(from: url)
                 let displayPlace = self?.located.flatMap { $0.id == place.id ? $0 : nil } ?? place
                 let value = try NotchWeatherAPI.decode(data, place: displayPlace)
-                guard let self, !Task.isCancelled, self.generation == token else { return }
+                guard let self, self.active, !Task.isCancelled, self.generation == token else { return }
                 self.snapshot = value; self.cached = value
                 UserDefaults.standard.set(try? JSONEncoder().encode(value), forKey: "weatherSnapshot")
                 self.status = "\(value.place.name) · \(value.kind.label) · \(value.observed.formatted(date: .omitted, time: .shortened)) 更新"
                 self.request = nil
             } catch {
-                guard let self, !Task.isCancelled, self.generation == token else { return }
+                guard let self, self.active, !Task.isCancelled, self.generation == token else { return }
                 if self.snapshot?.fresh(at: .now) != true { self.snapshot = nil }
                 self.status = self.snapshot == nil ? "天气暂不可用，使用普通波浪；稍后自动更新" : "更新失败，暂用近期天气；稍后自动更新"
                 self.request = nil
@@ -157,13 +165,13 @@ import CoreLocation
         }
     }
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        guard enabled, (selected == nil || switchingToAutomatic), lastAuthorization != manager.authorizationStatus else { return }
+        guard active, (selected == nil || switchingToAutomatic), lastAuthorization != manager.authorizationStatus else { return }
         lastAuthorization = manager.authorizationStatus
         lastLocationRequest = .distantPast
         tick()
     }
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard enabled, (selected == nil || switchingToAutomatic), let value = locations.last, value.horizontalAccuracy >= 0,
+        guard active, (selected == nil || switchingToAutomatic), let value = locations.last, value.horizontalAccuracy >= 0,
               abs(value.timestamp.timeIntervalSinceNow) < 600 else { return }
         // Weather uses roughly 100 m coordinates; reverse geocoding uses the original fix.
         let place = WeatherPlace(name: "位置已获取", latitude: (value.coordinate.latitude * 1000).rounded() / 1000,
@@ -219,7 +227,7 @@ import CoreLocation
         }
     }
     private func finishCity(_ name: String?, place: WeatherPlace, token: UUID, timedOut: Bool) {
-        guard cityToken == token, enabled, selected == nil, located?.id == place.id else { return }
+        guard cityToken == token, active, selected == nil, located?.id == place.id else { return }
         cancelCityResolution()
         needsCityResolution = name == nil
         let previous = located?.name
@@ -236,7 +244,7 @@ import CoreLocation
         }
     }
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        guard enabled, selected == nil || switchingToAutomatic else { return }
+        guard active, selected == nil || switchingToAutomatic else { return }
         location.stopUpdatingLocation()
         if switchingToAutomatic {
             locationRetryInterval = 60

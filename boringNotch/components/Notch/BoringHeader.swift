@@ -20,11 +20,11 @@ struct BoringHeader: View {
         HStack(spacing: 0) {
             HStack(spacing: 4) {
                 if (!tvm.isEmpty || coordinator.alwaysShowTabs) && Defaults[.boringShelf] {
-                    TabSelectionView(compact: codex.enabled)
+                    TabSelectionView(compact: codex.presentationEnabled)
                 } else if vm.notchState == .open {
                     EmptyView()
                 }
-                if vm.notchState == .open && codex.enabled {
+                if vm.notchState == .open && codex.presentationEnabled {
                     Text(codex.headerAllowance + " · " + codex.headerModel)
                         .font(.system(size: 10, weight: .medium, design: .rounded))
                         .monospacedDigit()

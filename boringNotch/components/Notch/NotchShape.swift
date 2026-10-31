@@ -6,6 +6,8 @@
 // Original source: https://github.com/MrKai77/DynamicNotchKit
 // Modified by Alexander on 2025-05-18.
 
+import Combine
+import Defaults
 import SwiftUI
 
 struct NotchShape: Shape {
@@ -117,17 +119,55 @@ struct NotchShape: Shape {
     static func lyricsFrameInterval(lowPower: Bool) -> Double {
         lowPower ? 1.0 / 15 : 1.0 / 35
     }
+    nonisolated static func shouldSaveEnergy(enabled: Bool, onBattery: Bool, lowPower: Bool,
+                                             thermalState: ProcessInfo.ThermalState) -> Bool {
+        enabled && (onBattery || lowPower || thermalState == .serious || thermalState == .critical)
+    }
     @Published private(set) var suspended = false
     @Published private(set) var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
+    @Published private(set) var energySavingActive = false
+    private var onBattery = false
+    private var batteryObserver: Int?
+    private var preferenceObservation: AnyCancellable?
+
     private override init() {
         super.init()
+        let batteryManager = BatteryActivityManager.shared
+        updateBattery(batteryManager.initializeBatteryInfo())
+        batteryObserver = batteryManager.addObserver { [weak self] info in self?.updateBattery(info) }
+        preferenceObservation = Defaults.publisher(.smartEnergySaving)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.updateEnergySaving() }
         let center = NSWorkspace.shared.notificationCenter
         center.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.screensDidSleepNotification, object: nil)
         center.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.willSleepNotification, object: nil)
         center.addObserver(self, selector: #selector(waking), name: NSWorkspace.screensDidWakeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(powerChanged), name: .NSProcessInfoPowerStateDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(powerChanged), name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
     }
     @objc private func sleeping() { suspended = true }
-    @objc private func waking() { suspended = false; powerChanged() }
-    @objc private func powerChanged() { lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled }
+    @objc private func waking() {
+        suspended = false
+        updateBattery(BatteryActivityManager.shared.initializeBatteryInfo())
+        refreshPowerState()
+    }
+    @objc nonisolated private func powerChanged() {
+        Task { @MainActor [weak self] in self?.refreshPowerState() }
+    }
+    private func refreshPowerState() {
+        let value = ProcessInfo.processInfo.isLowPowerModeEnabled
+        if lowPower != value { lowPower = value }
+        updateEnergySaving()
+    }
+    private func updateBattery(_ info: BatteryInfo) {
+        // Missing battery data on desktops must not be mistaken for battery power.
+        onBattery = info.maxCapacity > 0 && !info.isPluggedIn
+        updateEnergySaving()
+    }
+    private func updateEnergySaving() {
+        let active = Self.shouldSaveEnergy(enabled: Defaults[.smartEnergySaving], onBattery: onBattery,
+                                          lowPower: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                                          thermalState: ProcessInfo.processInfo.thermalState)
+        if energySavingActive != active { energySavingActive = active }
+    }
 }

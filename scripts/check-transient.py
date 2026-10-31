@@ -13,8 +13,9 @@ check = '''import AppKit
 import Combine
 import SwiftUI
 enum Defaults {
-    enum Key { case hudReplacement, showPowerStatusNotifications }
-    static subscript(_ key: Key) -> Bool { true }
+    enum Key { case hudReplacement, showPowerStatusNotifications, smartEnergySaving }
+    static subscript(_ key: Key) -> Bool { key != .smartEnergySaving }
+    static func publisher(_ key: Key) -> AnyPublisher<Bool, Never> { Just(false).eraseToAnyPublisher() }
 }
 ''' + types + '''
 @MainActor final class Coordinator: ObservableObject {
@@ -95,7 +96,7 @@ with tempfile.TemporaryDirectory(prefix="notch-transient-") as directory:
     layout = (root / "boringNotch/ContentView.swift").read_text().split("private struct TransientHeaderID:", 1)[1]
     (path / "Check.swift").write_text(check + "\nprivate struct TransientHeaderID:" + layout)
     motion = (root / "boringNotch/components/Notch/NotchShape.swift").read_text().split("// One shared observer set", 1)[1]
-    (path / "Motion.swift").write_text("import SwiftUI\n// One shared observer set" + motion)
+    (path / "Motion.swift").write_text("import SwiftUI\nimport Combine\n// One shared observer set" + motion)
     battery = (root / "boringNotch/models/BatteryStatusViewModel.swift").read_text()
     (path / "Battery.swift").write_text(battery.replace("import Defaults\n", "").replace("private func updateBatteryInfo", "func updateBatteryInfo"))
     env = dict(os.environ, DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer")

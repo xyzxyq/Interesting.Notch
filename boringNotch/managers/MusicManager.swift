@@ -99,6 +99,10 @@ class MusicManager: ObservableObject {
 
         // Initialize deprecation check asynchronously
         Task { @MainActor in
+            NotchMotionEnvironment.shared.$energySavingActive.removeDuplicates()
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in self?.refreshLyrics() }
+                .store(in: &self.cancellables)
             do {
                 self.isNowPlayingDeprecated = try await self.mediaChecker.checkDeprecationStatus()
                 print("Deprecation check completed: \(self.isNowPlayingDeprecated)")
@@ -385,6 +389,10 @@ class MusicManager: ObservableObject {
     }
 
     // MARK: - Lyrics
+    @MainActor private var compactLyricsEnabled: Bool {
+        Defaults[.enableCompactLyrics] && !NotchMotionEnvironment.shared.energySavingActive
+    }
+
     private func invalidateLyrics() {
         lyricsTask?.cancel()
         lyricsTask = nil
@@ -401,7 +409,7 @@ class MusicManager: ObservableObject {
 
     @MainActor
     private func refreshLyrics(force: Bool = false, useCache: Bool = true) {
-        let compact = Defaults[.enableCompactLyrics]
+        let compact = compactLyricsEnabled
         let demand = isMusicSource ? (Defaults[.enableLyrics] ? 1 : 0) + (compact ? 2 : 0) : 0
         let track = LyricTrack(bundleID: bundleIdentifier ?? "", title: songTitle,
                                artist: artistName, album: album, duration: songDuration)
@@ -495,7 +503,7 @@ class MusicManager: ObservableObject {
         lyricsTask = nil
         lyricsGeneration &+= 1
         isFetchingLyrics = false
-        publishLyrics(candidate, track: track, compact: Defaults[.enableCompactLyrics],
+        publishLyrics(candidate, track: track, compact: compactLyricsEnabled,
                       origin: "已记住选择 · " + (candidate.source ?? "本地"))
     }
 

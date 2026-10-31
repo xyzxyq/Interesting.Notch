@@ -196,6 +196,8 @@ struct CodexFishQueue {
             dismissResolvedRequests()
         }
     }
+    @Published private(set) var energySavingActive = false
+    var presentationEnabled: Bool { enabled && !energySavingActive }
     @Published private(set) var tasks: [CodexTask] = [] { didSet { dismissResolvedRequests() } }
     @Published private(set) var completionSequence = 0
     @Published private(set) var connected = false { didSet { dismissResolvedRequests() } }
@@ -246,13 +248,13 @@ struct CodexFishQueue {
         .filter { $0.split(separator: "/", maxSplits: 2).count == 3 })
     private var dismissTask: Task<Void, Never>?
     private var panelTask: Task<Void, Never>?
-    var waiting: Bool { enabled && (preview == "waiting" || (preview == nil && !pending.isEmpty)) }
-    var running: Bool { enabled && (preview == "running" || (preview == nil && tasks.contains { $0.working })) }
+    var waiting: Bool { presentationEnabled && (preview == "waiting" || (preview == nil && !pending.isEmpty)) }
+    var running: Bool { presentationEnabled && (preview == "running" || (preview == nil && tasks.contains { $0.working })) }
     // Pending reminders live in the droplet; they must not hide active work.
     static func shouldShowRocket(enabled: Bool, running: Bool) -> Bool {
         enabled && running
     }
-    var rocketVisible: Bool { Self.shouldShowRocket(enabled: enabled, running: running) }
+    var rocketVisible: Bool { Self.shouldShowRocket(enabled: presentationEnabled, running: running) }
     // The bridge reports active tasks, not success/failure. Only a fresh, connected
     // transition to idle counts; old reminders may remain after work finishes.
     static func didFinishWork(previous: [CodexTask], current: [CodexTask], confirmedIdle: [String], continuousConnection: Bool) -> Bool {
@@ -348,21 +350,33 @@ struct CodexFishQueue {
     }
     var status: String {
         if !enabled { return "Codex 动效已关闭" }
+        if energySavingActive { return "智能节能中 · Codex 提醒与动效已暂停" }
         if preview != nil { return "视觉预览 · 20 秒后恢复实时状态" }
         if !connected { return "未连接 Codex 状态桥接服务" }
         if waiting { return "有 \(pending.count) 个请求需要处理" }
         return running ? "Codex 正在运行 · \(effort >= 0 ? CodexThrust.labels[effort] : "思考强度未知")" : "Codex 当前没有运行中的任务"
     }
     private init() {
-        motionObservation = NotchMotionEnvironment.shared.$suspended.removeDuplicates().sink { [weak self] value in
+        let motion = NotchMotionEnvironment.shared
+        motionObservation = motion.$suspended.combineLatest(motion.$energySavingActive)
+            .removeDuplicates { $0 == $1 }.sink { [weak self] suspended, saving in
             guard let self else { return }
-            self.suspended = value
+            self.suspended = suspended
+            self.energySavingActive = saving
             self.updatePolling()
         }
     }
     private func updatePolling() {
         pollTask?.cancel()
         pollTask = nil
+        if energySavingActive && enabled {
+            previewTask?.cancel(); previewTask = nil
+            preview = nil
+            stability.reset()
+            connected = false; replyToken = nil; lastSuccess = .distantPast
+            hideRequestsImmediately()
+            return
+        }
         guard enabled && !suspended else {
             previewTask?.cancel(); previewTask = nil
             tasks = []; preview = nil; stability.reset()
@@ -377,7 +391,7 @@ struct CodexFishQueue {
             let session = URLSession(configuration: configuration)
             defer { session.invalidateAndCancel() }
             while !Task.isCancelled {
-                guard let self, self.enabled, !self.suspended else { return }
+                guard let self, self.presentationEnabled, !self.suspended else { return }
                 do {
                     let (data, response) = try await session.data(from: URL(string: "http://127.0.0.1:19427/state")!)
                     try Task.checkCancellation()
@@ -433,6 +447,7 @@ struct CodexFishQueue {
         }
     }
     func demonstrate(_ state: String?) {
+        guard !energySavingActive else { return }
         previewTask?.cancel()
         if state == "waiting" { previewCount = 1 }
         preview = state
@@ -456,7 +471,7 @@ struct CodexFishQueue {
     }
     func submit(_ answer: String, for task: CodexTask) {
         let answer = answer.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard preview == nil, connected, CodexQuestion.validAnswer(answer),
+        guard presentationEnabled, preview == nil, connected, CodexQuestion.validAnswer(answer),
               let question = task.question, question.canReply,
               pending.contains(where: { $0.identity == task.identity }),
               let replyToken, !submitting.contains(task.identity) else { return }
@@ -509,6 +524,7 @@ struct CodexFishQueue {
         window = nil
     }
     private func dismissResolvedRequests() {
+        guard !energySavingActive else { hideRequestsImmediately(); return }
         let resolved = Self.shouldDismissRequests(enabled: enabled, preview: preview, connected: connected, pendingCount: pending.count)
         if resolved { releaseResolvedPanelIfHidden() }
         if usesGenie {
@@ -546,6 +562,21 @@ struct CodexFishQueue {
                 dismissTask = nil
             } catch { }
         }
+    }
+
+    private func hideRequestsImmediately() {
+        panelTask?.cancel(); panelTask = nil
+        dismissTask?.cancel(); dismissTask = nil
+        genie.cancel()
+        cardAnimating = false; cardPresented = false; panelReady = false
+        automaticCordDismiss = false
+        windowDissolve = 1; windowReveal = 1
+        editingRequestID = nil
+        window?.orderOut(nil)
+        window?.initialFirstResponder = nil
+        window?.contentView = nil
+        window?.close()
+        window = nil
     }
 
     func openRequestsFromKeyboard() {
@@ -674,6 +705,7 @@ struct CodexFishQueue {
     }
 
     func showRequests(anchor: CGPoint) {
+        guard presentationEnabled, !suspended, waiting else { return }
         navigationError = nil
         endAnswerEditing()
         keyboardRequestID = displayedRequests.first?.identity

@@ -759,6 +759,49 @@ struct DropFixture: View {
             assert(releasedTree == nil,
                    "\(style): resolved hosting tree must deallocate after AppKit autoreleases drain")
         }
+
+        for style in [CodexReminderStyle.droplet, .pullCord] {
+            for phase in ["opening", "open", "closing"] {
+                activity.energySavingActive = false
+                activity.reminderStyle = style
+                activity.preview = nil; activity.connected = true; activity.tasks = [optionTask]
+                activity.reconcileRequests([optionTask])
+                activity.showRequests(anchor: anchor)
+                advance(phase == "opening" ? 0.04 : cordSettle)
+                activity.selectOption(0, for: optionTask)
+                if phase == "closing" { activity.closeRequests(); advance(0.04) }
+                let drafts = activity.answerDrafts, ignored = activity.readReminders
+                let completion = activity.completionSequence
+                let preference = testDefaults.object(forKey: "codexRocketEnabled") as? Bool
+                let panel = activity.window!
+                activity.energySavingActive = true
+                activity.updatePolling()
+                assert(activity.window == nil && panel.contentView == nil && !panel.isVisible,
+                       "\(style)/\(phase): saving must synchronously release even an in-flight card")
+                assert(!activity.genie.isAnimating && !activity.cardAnimating && !activity.cardPresented
+                       && activity.panelTask == nil && activity.dismissTask == nil && activity.pollTask == nil)
+                assert(activity.tasks == [optionTask] && activity.answerDrafts == drafts && activity.readReminders == ignored,
+                       "Saving must preserve real pending items, input drafts and local ignore history")
+                assert(!activity.connected && activity.replyToken == nil && !activity.waiting && !activity.rocketVisible)
+                activity.showRequests(anchor: anchor)
+                activity.openRequestsFromKeyboard()
+                activity.demonstrate("waiting")
+                activity.submit("must not send", for: optionTask)
+                advance(0.15)
+                assert(activity.window == nil && activity.preview == nil && !activity.submitting.contains(optionTask.identity),
+                       "Card, preview or reply entry point bypassed saving")
+                assert(activity.completionSequence == completion && activity.enabled
+                       && (testDefaults.object(forKey: "codexRocketEnabled") as? Bool) == preference)
+                activity.energySavingActive = false
+                assert(activity.waiting && activity.window == nil, "Restoration must retain reminders without auto-opening")
+                activity.connected = true
+                activity.showRequests(anchor: anchor); advance(0.04)
+                assert(activity.window?.isVisible == true && activity.answerDrafts == drafts)
+                activity.energySavingActive = true; activity.updatePolling()
+            }
+        }
+        activity.energySavingActive = false
+        print("PASS: smart saving cancels opening/open/closing droplet and Genie cards, preserves drafts/queue/preferences, blocks shortcuts and preview, and restores manual access")
         print("PASS: resolved hidden panels release hosted trees; pending drafts and rapid reopening stay intact")
         print("PASS: cord/reminder style persistence/fallback, live appearance changes preserve the card and selection, flipped anchors, early keyboard input, snapshot cleanup, rapid reversal, automatic-dismiss recovery, reminder resign-key toggle and switching back to droplets")
         activity.previewTask?.cancel()
@@ -770,7 +813,17 @@ struct DropFixture: View {
 fixture = fixture.replace('PROPERTIES', '\n'.join(property(p) for p in ['rocketSideWidth', 'musicSideWidth', 'fuelGap']))
 fixture = fixture.replace('WIDTH', width).replace('SLOT', slot)
 shape = folder / 'NotchShape.swift'
-shape.write_text(re.sub(r'#Preview \{.*?\n\}', '', (root / 'boringNotch/components/Notch/NotchShape.swift').read_text(), flags=re.S))
+shape_source = (root / 'boringNotch/components/Notch/NotchShape.swift').read_text().split('// One shared observer set', 1)[0]
+shape_source = re.sub(r'#Preview \{.*?\n\}', '', shape_source, flags=re.S).replace('import Defaults\n', '')
+shape.write_text(shape_source + '''
+@MainActor final class NotchMotionEnvironment: ObservableObject {
+    static let shared = NotchMotionEnvironment()
+    @Published var suspended = false
+    @Published var energySavingActive = false
+    var lowPower = false
+    static func decorativeFrameInterval(lowPower: Bool) -> Double { lowPower ? 1.0 / 10 : 1.0 / 20 }
+}
+''')
 source = folder / 'InteractionCheck.swift'
 genie = folder / 'InteractionGenie.swift'
 # Expose diagnostics only in this generated fixture; production source retains its access control.

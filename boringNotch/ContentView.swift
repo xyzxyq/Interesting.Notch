@@ -29,6 +29,7 @@ struct ContentView: View {
     @State private var gestureProgress: CGFloat = .zero
 
     @ObservedObject private var codex = CodexActivity.shared
+    @ObservedObject private var motion = NotchMotionEnvironment.shared
     @Environment(\.accessibilityReduceMotion) private var reducedMotion
     @State private var liquidDepth: CGFloat = 0
     @State private var rocketProgress: CGFloat = 0
@@ -62,11 +63,11 @@ struct ContentView: View {
 
     private var rocketSurfaceAvailable: Bool {
         let hud = coordinator.sneakPeek.show && coordinator.sneakPeek.type != .music && coordinator.sneakPeek.type != .battery
-        return codex.enabled && vm.notchState == .closed && !vm.hideOnClosed && !hud
+        return codex.presentationEnabled && vm.notchState == .closed && !vm.hideOnClosed && !hud
     }
 
     private var rocketRequested: Bool { codex.rocketVisible && rocketSurfaceAvailable }
-    private var rocketPresented: Bool { codex.rocketVisible || rocketProgress > 0 }
+    private var rocketPresented: Bool { codex.presentationEnabled && (codex.rocketVisible || rocketProgress > 0) }
 
     private var currentNotchShape: NotchShape {
         NotchShape(
@@ -74,13 +75,13 @@ struct ContentView: View {
             bottomCornerRadius: ((vm.notchState == .open) && Defaults[.cornerRadiusScaling])
                 ? cornerRadiusInsets.opened.bottom
                 : cornerRadiusInsets.closed.bottom,
-            rocket: vm.notchState == .closed ? rocketProgress : 0,
-            liquid: vm.notchState == .closed ? liquidDepth : 0
+            rocket: vm.notchState == .closed && !motion.energySavingActive ? rocketProgress : 0,
+            liquid: vm.notchState == .closed && !motion.energySavingActive ? liquidDepth : 0
         )
     }
 
     private var compactLyricsMode: Bool {
-        musicManager.isMusicSource && enableCompactLyrics
+        musicManager.isMusicSource && enableCompactLyrics && !motion.energySavingActive
     }
 
     private var rocketSideWidth: CGFloat { max(0, vm.effectiveClosedNotchHeight - 12) }
@@ -137,7 +138,9 @@ struct ContentView: View {
                     .frame(width: vm.notchState == .open ? vm.notchSize.width : nil)
                     .background {
                         currentNotchShape.fill(.black)
-                            .overlay { CodexRocketSurface(shape: currentNotchShape) }
+                            .overlay {
+                                if !motion.energySavingActive { CodexRocketSurface(shape: currentNotchShape) }
+                            }
                     }
                     .overlay(alignment: .top) {
                         Rectangle()
@@ -146,10 +149,26 @@ struct ContentView: View {
                             .padding(.horizontal, topCornerRadius)
                     }
                     .clipShape(currentNotchShape)
-                    .overlay { MusicEdgeEffect(shape: currentNotchShape, isVisible: vm.notchState == .open || !vm.hideOnClosed) }
-                    .overlay { CodexSpeedLines(shape: currentNotchShape, effort: codex.effort, active: flameActive) }
-                    .overlay { CodexFlame(active: flameActive, effort: codex.effort) }
-                    .overlay { CodexConfetti(active: confettiActive) }
+                    .overlay {
+                        if !motion.energySavingActive {
+                            MusicEdgeEffect(shape: currentNotchShape, isVisible: vm.notchState == .open || !vm.hideOnClosed)
+                        }
+                    }
+                    .overlay {
+                        if !motion.energySavingActive {
+                            CodexSpeedLines(shape: currentNotchShape, effort: codex.effort, active: flameActive)
+                        }
+                    }
+                    .overlay {
+                        if !motion.energySavingActive {
+                            CodexFlame(active: flameActive, effort: codex.effort)
+                        }
+                    }
+                    .overlay {
+                        if !motion.energySavingActive {
+                            CodexConfetti(active: confettiActive)
+                        }
+                    }
                     .shadow(
                         color: ((vm.notchState == .open || isHovering) && Defaults[.enableShadow])
                             ? .black.opacity(0.7) : .clear, radius: Defaults[.cornerRadiusScaling] ? 6 : 4
@@ -234,21 +253,23 @@ struct ContentView: View {
                         //                    .keyboardShortcut("E", modifiers: .command)
                     }
                     .overlay(alignment: .bottom) {
-                        if codex.reminderStyle == .pullCord {
-                            CodexPullCordButton(waiting: codex.waiting && !vm.hideOnClosed,
+                        if !motion.energySavingActive {
+                            if codex.reminderStyle == .pullCord {
+                                CodexPullCordButton(waiting: codex.waiting && !vm.hideOnClosed,
+                                                    expanded: vm.notchState == .open,
+                                                    count: codex.preview == nil ? codex.pending.count : codex.previewCount,
+                                                    isOpen: codex.cardPresented,
+                                                    style: codex.pullCordStyle,
+                                                    waitingSince: codex.fishWaitingSince,
+                                                    action: codex.showRequests)
+                                    .offset(y: 82)
+                            } else {
+                                CodexDropButton(waiting: codex.waiting && !vm.hideOnClosed,
                                                 expanded: vm.notchState == .open,
                                                 count: codex.preview == nil ? codex.pending.count : codex.previewCount,
-                                                isOpen: codex.cardPresented,
-                                                style: codex.pullCordStyle,
-                                                waitingSince: codex.fishWaitingSince,
-                                                action: codex.showRequests)
-                                .offset(y: 82)
-                        } else {
-                            CodexDropButton(waiting: codex.waiting && !vm.hideOnClosed,
-                                            expanded: vm.notchState == .open,
-                                            count: codex.preview == nil ? codex.pending.count : codex.previewCount,
-                                            action: codex.showRequests, surface: $liquidDepth)
-                                .offset(y: 82)
+                                                action: codex.showRequests, surface: $liquidDepth)
+                                    .offset(y: 82)
+                            }
                         }
                     }
                 if vm.chinHeight > 0 {
@@ -270,13 +291,20 @@ struct ContentView: View {
         .preferredColorScheme(.dark)
         .environmentObject(vm)
         .onAppear { handledCompletion = codex.completionSequence }
-        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.completionSequence)-\(reducedMotion)-\(codex.enabled)-\(codex.preview ?? "live")") {
+        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.completionSequence)-\(reducedMotion)-\(codex.presentationEnabled)-\(motion.energySavingActive)-\(codex.preview ?? "live")") {
             let completed = codex.completionSequence > handledCompletion
             flameActive = false
             confettiActive = false
+            if motion.energySavingActive {
+                handledCompletion = codex.completionSequence
+                var reset = Transaction()
+                reset.disablesAnimations = true
+                withTransaction(reset) { rocketProgress = 0; liquidDepth = 0 }
+                return
+            }
             // Disabled/preview/reduced-motion cues are deliberately skipped. A busy
             // surface merely defers the cue until it can emit, including task cancellation.
-            if !codex.enabled || codex.preview != nil || reducedMotion {
+            if !codex.presentationEnabled || codex.preview != nil || reducedMotion {
                 handledCompletion = codex.completionSequence
             }
             if rocketRequested {

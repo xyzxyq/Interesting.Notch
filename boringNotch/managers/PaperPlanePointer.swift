@@ -292,6 +292,7 @@ final class PointerTheme {
     private var theme: PointerTheme?
     private var started = false
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
+    private var energyObservation: AnyCancellable?
     private var suspended = Set<String>()
     private let defaults = UserDefaults.standard
     private let preference = "paperPlanePointerEnabled"
@@ -299,6 +300,8 @@ final class PointerTheme {
     func start() {
         guard !started else { return }
         started = true
+        if NotchMotionEnvironment.shared.energySavingActive { suspended.insert("energy") }
+        else { suspended.remove("energy") }
         magnification = PaperPlaneArtwork.normalizedSize(
             defaults.object(forKey: "paperPlanePointerSize") as? Double ?? 1)
         do {
@@ -318,6 +321,10 @@ final class PointerTheme {
         let distributed = DistributedNotificationCenter.default()
         observe(distributed, .init("com.apple.screenIsLocked")) { $0.suspend("lock") }
         observe(distributed, .init("com.apple.screenIsUnlocked")) { $0.resume("lock") }
+        energyObservation = NotchMotionEnvironment.shared.$energySavingActive.removeDuplicates().dropFirst()
+            .sink { [weak self] saving in
+                if saving { self?.suspend("energy") } else { self?.resume("energy") }
+            }
     }
 
     func setEnabled(_ value: Bool) {
@@ -358,6 +365,7 @@ final class PointerTheme {
     }
 
     func stop() {
+        energyObservation?.cancel(); energyObservation = nil
         for (center, observer) in observers { center.removeObserver(observer) }
         observers.removeAll()
         do { try theme?.restore() } catch { fail(error) }
