@@ -12,7 +12,9 @@ enum AlbumArtwork {
                 kCGImageSourceThumbnailMaxPixelSize: 512,
                 kCGImageSourceShouldCacheImmediately: true
               ] as CFDictionary) else { return nil }
-        return NSImage(cgImage: thumbnail, size: NSSize(width: thumbnail.width, height: thumbnail.height))
+        let image = NSImage(size: NSSize(width: thumbnail.width, height: thumbnail.height))
+        image.addRepresentation(NSBitmapImageRep(cgImage: thumbnail))
+        return image
     }
 
     private struct Song: Decodable {

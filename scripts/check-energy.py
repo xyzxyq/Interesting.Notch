@@ -11,12 +11,14 @@ poll = '    func updateVideoPolling() {' + controller.split('    private func up
 audio = (root / 'boringNotch/managers/MusicEdgeAudio.swift').read_text()
 demand = '    func setDemand(' + audio.split('    func setDemand(', 1)[1].split('    private func configure(', 1)[0]
 spectrum = (root / 'boringNotch/components/Music/MusicVisualizer.swift').read_text().split('struct AudioSpectrumView:', 1)[0]
-manager = (root / 'boringNotch/managers/MusicManager.swift').read_text()
-decode = 'if let source = CGImageSourceCreateWithData' + manager.split('if let source = CGImageSourceCreateWithData', 1)[1].split('                DispatchQueue.main.async', 1)[0]
-decode = 'func decodeArtwork(_ artworkData: Data) -> NSImage? {\n' + decode + 'return artworkImage\n}\nreturn nil\n}\n'
 source = '''import AppKit
 import ImageIO
 import Combine
+struct Defaults {
+    enum Key { case immersiveFocusEnabled }
+    static var focus = false
+    static subscript(_ key: Key) -> Bool { focus }
+}
 @MainActor final class NotchMotionEnvironment {
     static let shared = NotchMotionEnvironment()
     var suspended = false
@@ -34,7 +36,6 @@ import Combine
     func configure(bundleID: String?, active: Bool) { requested = active ? bundleID : nil }
 ''' + demand + '''
 }
-''' + decode + '''
 @main struct Check {
     @MainActor static func main() {
         let poll = PollCheck()
@@ -46,6 +47,12 @@ import Combine
         assert(timer != nil)
         poll.updateVideoPolling()
         assert(timer === poll.videoAudioObserver, "Refresh must not accumulate timers")
+        Defaults.focus = true
+        poll.updateVideoPolling()
+        assert(poll.videoAudioObserver == nil, "Focus must stop unrelated video fallback polling")
+        Defaults.focus = false
+        poll.updateVideoPolling()
+        assert(poll.videoAudioObserver != nil, "Leaving focus must restore needed video polling")
         poll.remotePlaybackState.isPlaying = true
         poll.updateVideoPolling()
         assert(poll.videoAudioObserver == nil, "Native music/video events must disable fallback polling")
@@ -76,9 +83,9 @@ import Combine
             bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
             colorSpaceName: .deviceRGB, bytesPerRow: 8000, bitsPerPixel: 32)!
         bitmap.bitmapData!.initialize(repeating: 255, count: bitmap.bytesPerRow * bitmap.pixelsHigh)
-        let thumbnail = decodeArtwork(bitmap.representation(using: .png, properties: [:])!)!
+        let thumbnail = AlbumArtwork.decode(bitmap.representation(using: .png, properties: [:])!)!
         assert(thumbnail.representations[0].pixelsWide == 512 && thumbnail.representations[0].pixelsHigh == 256, "Thumbnail size: \(thumbnail.representations[0].pixelsWide)x\(thumbnail.representations[0].pixelsHigh)")
-        assert(decodeArtwork(Data([0, 1, 2])) == nil, "Corrupt artwork must be rejected")
+        assert(AlbumArtwork.decode(Data([0, 1, 2])) == nil, "Corrupt artwork must be rejected")
 
         let spectrum = AudioSpectrum(frame: .zero)
         spectrum.setPlaying(true)
@@ -104,5 +111,6 @@ with tempfile.TemporaryDirectory(prefix='notch-energy-check-') as temp:
     (temp / 'Spectrum.swift').write_text(spectrum)
     env = dict(os.environ, DEVELOPER_DIR='/Applications/Xcode.app/Contents/Developer')
     subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', str(root / 'boringNotch/models/PlaybackState.swift'),
+                    str(root / 'boringNotch/models/AlbumArtwork.swift'), str(root / 'boringNotch/models/CompactLyrics.swift'),
                     str(temp / 'Spectrum.swift'), str(temp / 'Check.swift'), '-o', str(temp / 'check')], env=env, check=True)
     subprocess.run([str(temp / 'check')], check=True)
