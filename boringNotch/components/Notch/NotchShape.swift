@@ -123,6 +123,7 @@ struct NotchShape: Shape {
                                              thermalState: ProcessInfo.ThermalState) -> Bool {
         enabled && (onBattery || lowPower || thermalState == .serious || thermalState == .critical)
     }
+    @Published private(set) var screenLocked = false
     @Published private(set) var suspended = false
     @Published private(set) var lowPower = ProcessInfo.processInfo.isLowPowerModeEnabled
     @Published private(set) var energySavingActive = false
@@ -139,12 +140,16 @@ struct NotchShape: Shape {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.updateEnergySaving() }
         let center = NSWorkspace.shared.notificationCenter
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(screenDidLock), name: .init("com.apple.screenIsLocked"), object: nil)
+        DistributedNotificationCenter.default().addObserver(self, selector: #selector(screenDidUnlock), name: .init("com.apple.screenIsUnlocked"), object: nil)
         center.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.screensDidSleepNotification, object: nil)
         center.addObserver(self, selector: #selector(sleeping), name: NSWorkspace.willSleepNotification, object: nil)
         center.addObserver(self, selector: #selector(waking), name: NSWorkspace.screensDidWakeNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(powerChanged), name: .NSProcessInfoPowerStateDidChange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(powerChanged), name: ProcessInfo.thermalStateDidChangeNotification, object: nil)
     }
+    @objc private func screenDidLock() { screenLocked = true }
+    @objc private func screenDidUnlock() { screenLocked = false }
     @objc private func sleeping() { suspended = true }
     @objc private func waking() {
         suspended = false

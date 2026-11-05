@@ -36,6 +36,7 @@ struct ContentView: View {
     @State private var flameActive = false
     @State private var confettiActive = false
     @State private var handledCompletion = 0
+    @State private var projectorWidth: CGFloat = 0
 
     @State private var haptics: Bool = false
 
@@ -45,6 +46,9 @@ struct ContentView: View {
     @Default(.lyricColorStyle) var lyricColorStyle
     @Default(.lyricColor) var lyricColor
     @Default(.enableCompactLyrics) var enableCompactLyrics
+    @Default(.immersiveFocusEnabled) private var immersiveFocusEnabled
+    @Default(.immersiveLyricStyle) private var immersiveLyricStyle
+    @Default(.hideFromScreenRecording) private var hideProjectionFromRecording
     @Default(.useMusicVisualizer) var useMusicVisualizer
 
     @Default(.showNotHumanFace) var showNotHumanFace
@@ -61,27 +65,37 @@ struct ContentView: View {
                 : cornerRadiusInsets.closed.top
     }
 
+    private var codexEffectsEnabled: Bool { codex.presentationEnabled && !immersiveFocusEnabled }
+
     private var rocketSurfaceAvailable: Bool {
         let hud = coordinator.sneakPeek.show && coordinator.sneakPeek.type != .music && coordinator.sneakPeek.type != .battery
-        return codex.presentationEnabled && vm.notchState == .closed && !vm.hideOnClosed && !hud
+        return codexEffectsEnabled && vm.notchState == .closed && !vm.hideOnClosed && !hud
+    }
+
+    private var immersivePresented: Bool {
+        ImmersiveFocus.eligible(enabled: immersiveFocusEnabled, music: musicManager.isMusicSource,
+            playing: musicManager.isPlaying, externalPower: batteryModel.isPluggedIn,
+            suspended: motion.suspended || motion.screenLocked, savingEnergy: motion.energySavingActive)
+            && vm.notchState == .closed && !vm.hideOnClosed && transientHeader == 0
+            && !coordinator.helloAnimationRunning
     }
 
     private var rocketRequested: Bool { codex.rocketVisible && rocketSurfaceAvailable }
-    private var rocketPresented: Bool { codex.presentationEnabled && (codex.rocketVisible || rocketProgress > 0) }
+    private var rocketPresented: Bool { codexEffectsEnabled && (codex.rocketVisible || rocketProgress > 0) }
 
     private var currentNotchShape: NotchShape {
         NotchShape(
             topCornerRadius: topCornerRadius,
             bottomCornerRadius: ((vm.notchState == .open) && Defaults[.cornerRadiusScaling])
                 ? cornerRadiusInsets.opened.bottom
-                : cornerRadiusInsets.closed.bottom,
-            rocket: vm.notchState == .closed && !motion.energySavingActive ? rocketProgress : 0,
-            liquid: vm.notchState == .closed && !motion.energySavingActive ? liquidDepth : 0
+                : immersivePresented ? 20 : cornerRadiusInsets.closed.bottom,
+            rocket: vm.notchState == .closed && codexEffectsEnabled ? rocketProgress : 0,
+            liquid: vm.notchState == .closed && codexEffectsEnabled ? liquidDepth : 0
         )
     }
 
     private var compactLyricsMode: Bool {
-        musicManager.isMusicSource && enableCompactLyrics && !motion.energySavingActive
+        musicManager.isMusicSource && enableCompactLyrics && !motion.energySavingActive && !immersiveFocusEnabled
     }
 
     private var rocketSideWidth: CGFloat { max(0, vm.effectiveClosedNotchHeight - 12) }
@@ -91,6 +105,8 @@ struct ContentView: View {
         return compactLyricsMode ? max(original, CompactLyricsLayout.slotWidth) : original
     }
 
+    private var focusSideWidth: CGFloat { musicSideWidth }
+
     private var computedChinWidth: CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
 
@@ -98,17 +114,13 @@ struct ContentView: View {
             && vm.notchState == .closed && Defaults[.showPowerStatusNotifications]
         {
             chinWidth = 640
-        } else if (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
-            && vm.notchState == .closed && (musicManager.isPlaying || !musicManager.isPlayerIdle)
-            && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
-        {
+        } else if musicPresented && vm.notchState == .closed {
             chinWidth += (2 * musicSideWidth + 20)
+        } else if focusIdlePresented && vm.notchState == .closed {
+            chinWidth += (2 * focusSideWidth + 20)
         } else if rocketPresented && vm.notchState == .closed && !vm.hideOnClosed {
             chinWidth += 2 * rocketSideWidth + 20
-        } else if !coordinator.expandingView.show && vm.notchState == .closed
-            && (!musicManager.isPlaying && musicManager.isPlayerIdle) && Defaults[.showNotHumanFace]
-            && !vm.hideOnClosed
-        {
+        } else if idleFacePresented && vm.notchState == .closed {
             chinWidth += (2 * max(0, vm.effectiveClosedNotchHeight - 12) + 20)
         }
 
@@ -136,10 +148,11 @@ struct ContentView: View {
                     )
                     .padding([.horizontal, .bottom], vm.notchState == .open ? 12 : 0)
                     .frame(width: vm.notchState == .open ? vm.notchSize.width : nil)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { projectorWidth = $0 }
                     .background {
                         currentNotchShape.fill(.black)
                             .overlay {
-                                if !motion.energySavingActive { CodexRocketSurface(shape: currentNotchShape) }
+                                if codexEffectsEnabled { CodexRocketSurface(shape: currentNotchShape) }
                             }
                     }
                     .overlay(alignment: .top) {
@@ -150,22 +163,22 @@ struct ContentView: View {
                     }
                     .clipShape(currentNotchShape)
                     .overlay {
-                        if !motion.energySavingActive {
+                        if !motion.energySavingActive && !immersiveFocusEnabled {
                             MusicEdgeEffect(shape: currentNotchShape, isVisible: vm.notchState == .open || !vm.hideOnClosed)
                         }
                     }
                     .overlay {
-                        if !motion.energySavingActive {
+                        if codexEffectsEnabled {
                             CodexSpeedLines(shape: currentNotchShape, effort: codex.effort, active: flameActive)
                         }
                     }
                     .overlay {
-                        if !motion.energySavingActive {
+                        if codexEffectsEnabled {
                             CodexFlame(active: flameActive, effort: codex.effort)
                         }
                     }
                     .overlay {
-                        if !motion.energySavingActive {
+                        if codexEffectsEnabled {
                             CodexConfetti(active: confettiActive)
                         }
                     }
@@ -253,7 +266,7 @@ struct ContentView: View {
                         //                    .keyboardShortcut("E", modifiers: .command)
                     }
                     .overlay(alignment: .bottom) {
-                        if !motion.energySavingActive {
+                        if codexEffectsEnabled {
                             if codex.reminderStyle == .pullCord {
                                 CodexPullCordButton(waiting: codex.waiting && !vm.hideOnClosed,
                                                     expanded: vm.notchState == .open,
@@ -287,15 +300,26 @@ struct ContentView: View {
             y: gestureScale,
             anchor: .top
         )
+        .background {
+            ImmersiveLyricsPanel(visible: immersivePresented,
+                topInset: max(0, vm.effectiveClosedNotchHeight - 2),
+                hideFromRecording: hideProjectionFromRecording,
+                content: ImmersiveLyricsView(segments: musicManager.compactSegments,
+                    position: musicManager.elapsedTime, sampleDate: musicManager.timestampDate,
+                    rate: musicManager.playbackRate, duration: musicManager.songDuration,
+                    offset: compactLyricsOffset,
+                    style: ImmersiveLyricStyle(rawValue: immersiveLyricStyle) ?? .particles,
+                    sourceWidth: max(1, (projectorWidth > 0 ? projectorWidth : computedChinWidth) - 2 * cornerRadiusInsets.closed.top)))
+        }
         .background(dragDetector)
         .preferredColorScheme(.dark)
         .environmentObject(vm)
         .onAppear { handledCompletion = codex.completionSequence }
-        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.completionSequence)-\(reducedMotion)-\(codex.presentationEnabled)-\(motion.energySavingActive)-\(codex.preview ?? "live")") {
+        .task(id: "\(rocketRequested)-\(rocketSurfaceAvailable)-\(codex.completionSequence)-\(reducedMotion)-\(codexEffectsEnabled)-\(motion.energySavingActive)-\(codex.preview ?? "live")") {
             let completed = codex.completionSequence > handledCompletion
             flameActive = false
             confettiActive = false
-            if motion.energySavingActive {
+            if motion.energySavingActive || !codexEffectsEnabled {
                 handledCompletion = codex.completionSequence
                 var reset = Transaction()
                 reset.disablesAnimations = true
@@ -460,7 +484,7 @@ struct ContentView: View {
                               .transition(playbackTransition)
                           }
                           // Old sneak peek music
-                          else if coordinator.sneakPeek.type == .music {
+                          else if coordinator.sneakPeek.type == .music && !immersiveFocusEnabled {
                               if vm.notchState == .closed && !vm.hideOnClosed && Defaults[.sneakPeekStyles] == .standard {
                                   HStack(alignment: .center) {
                                       Image(systemName: "music.note")
@@ -503,13 +527,20 @@ struct ContentView: View {
 
     private var musicPresented: Bool {
         (!coordinator.expandingView.show || coordinator.expandingView.type == .music)
-            && (musicManager.isPlaying || !musicManager.isPlayerIdle)
+            && ImmersiveFocus.presentsMedia(enabled: immersiveFocusEnabled, music: musicManager.isMusicSource,
+                playing: musicManager.isPlaying, idle: musicManager.isPlayerIdle)
             && coordinator.musicLiveActivityEnabled && !vm.hideOnClosed
     }
 
     private var idleFacePresented: Bool {
-        !coordinator.expandingView.show && !musicManager.isPlaying && musicManager.isPlayerIdle
+        !immersiveFocusEnabled && !coordinator.expandingView.show && !musicManager.isPlaying && musicManager.isPlayerIdle
             && Defaults[.showNotHumanFace] && !vm.hideOnClosed
+    }
+
+    private var focusIdlePresented: Bool {
+        ImmersiveFocus.presentsIdle(enabled: immersiveFocusEnabled, music: musicManager.isMusicSource,
+                                   playing: musicManager.isPlaying)
+            && !coordinator.expandingView.show && !vm.hideOnClosed
     }
 
     private var playbackTransition: AnyTransition {
@@ -521,13 +552,17 @@ struct ContentView: View {
     private var closedPlaybackContent: some View {
         let fuelVisible = rocketPresented && !vm.hideOnClosed && !musicPresented
         let width = musicPresented ? 2 * musicSideWidth + fuelGap
+            : focusIdlePresented ? 2 * focusSideWidth + fuelGap
             : fuelVisible ? 2 * rocketSideWidth + fuelGap
             : vm.closedNotchSize.width - 20
                 + (idleFacePresented ? max(0, vm.effectiveClosedNotchHeight - 12) + 30 + 16 : 0)
         return ZStack {
             if musicPresented {
                 MusicLiveActivity()
-                    .transition(playbackTransition)
+                    .transition(immersiveFocusEnabled ? .identity : playbackTransition)
+            } else if focusIdlePresented, let start = coordinator.immersiveFocusStartedAt {
+                FocusIdleView(startedAt: start, sideWidth: focusSideWidth,
+                              gap: fuelGap, iconSize: rocketSideWidth)
             } else if !fuelVisible && idleFacePresented {
                 BoringFaceAnimation()
                     .transition(.opacity)
@@ -540,7 +575,7 @@ struct ContentView: View {
             // Music owns the artwork slot; the quota gauge is only shown without music.
             if fuelVisible { fuelSlot }
         }
-        .animation(reducedMotion ? .easeInOut(duration: 0.18)
+        .animation(immersiveFocusEnabled ? nil : reducedMotion ? .easeInOut(duration: 0.18)
                    : .spring(response: 0.55, dampingFraction: 0.9), value: musicPresented)
         .animation(NotchMotionEnvironment.interactionAnimation, value: fuelVisible)
     }
@@ -594,6 +629,7 @@ struct ContentView: View {
                         cornerRadius: MusicPlayerImageSizes.cornerRadiusInset.closed)
                 )
                 .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
+                .opacity(immersiveFocusEnabled && musicManager.usingAppIconForArtwork ? 0 : 1)
                 .frame(
                     width: max(0, vm.effectiveClosedNotchHeight - 12),
                     height: max(0, vm.effectiveClosedNotchHeight - 12)
@@ -604,7 +640,7 @@ struct ContentView: View {
                 .fill(.black)
                 .overlay(
                     HStack(alignment: .top) {
-                        if coordinator.expandingView.show
+                        if !immersiveFocusEnabled && coordinator.expandingView.show
                             && coordinator.expandingView.type == .music
                         {
                             MarqueeText(
@@ -639,7 +675,7 @@ struct ContentView: View {
                     }
                 )
                 .frame(
-                    width: (coordinator.expandingView.show
+                    width: (!immersiveFocusEnabled && coordinator.expandingView.show
                         && coordinator.expandingView.type == .music
                         && Defaults[.sneakPeekStyles] == .inline)
                         ? 380

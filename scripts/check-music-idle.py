@@ -14,6 +14,15 @@ position = source.split('    public func estimatedPlaybackPosition(at date: Date
 empty_check = '''
 struct EmptySourceState { let bundleIdentifier = "" }
 @MainActor final class EmptySourceCheck: ObservableObject {
+    var bundleIdentifier: String?
+    var songTitle = "", artistName = "", album = ""
+    var usingAppIconForArtwork = false
+    var albumArt = 0
+    var artworkData: Data?
+    var artworkTask: Task<Void, Never>?
+    var artworkGeneration: UInt64 = 0
+    var lastArtworkBundleIdentifier: String?
+    func invalidateLyrics() { lyricsTask?.cancel(); lyricsTask = nil; lyricsTrack = nil }
     @Published var isPlaying = false
     @Published var isMusicSource = false
     @Published var isPlayerIdle = true
@@ -36,9 +45,13 @@ struct EmptySourceState { let bundleIdentifier = "" }
 harness = '''import Foundation
 import Combine
 struct Defaults {
-    enum Key { case waitInterval }
-    static subscript(_ key: Key) -> Double { 0.12 }
+    struct IntervalKey { static let waitInterval = Self() }
+    struct FlagKey { static let immersiveFocusEnabled = Self() }
+    static var focus = false
+    static subscript(_ key: IntervalKey) -> Double { 0.12 }
+    static subscript(_ key: FlagKey) -> Bool { focus }
 }
+let defaultImage = 0
 func withAnimation(_ action: () -> Void) { action() }
 @MainActor final class IdleCheck {
     var isPlaying = true
@@ -96,6 +109,17 @@ func withAnimation(_ action: () -> Void) { action() }
         source.updateFromPlaybackState(EmptySourceState())
         assert(source.elapsedTime == source.songDuration && publications == 1,
                "Deduplication must retain idle position clamping when the value actually changes")
+        Defaults.focus = true
+        source.bundleIdentifier = "test.video"; source.songTitle = "Video"
+        source.artistName = "Video author"; source.album = "Video album"
+        source.albumArt = 99; source.artworkData = Data([99])
+        source.updateFromPlaybackState(EmptySourceState())
+        assert(source.bundleIdentifier == nil && source.songTitle.isEmpty && source.artistName.isEmpty
+               && source.album.isEmpty && source.albumArt == defaultImage && source.artworkData == nil,
+               "An empty focused player must not retain video metadata in the expanded view")
+        publications = 0
+        source.updateFromPlaybackState(EmptySourceState())
+        assert(publications == 0, "Empty focus must remain publication-idle")
         withExtendedLifetime(observer) {}
         print("Music idle checks passed: pause/resume grace period, source-loss freeze/cancellation, no duplicate idle publications")
     }

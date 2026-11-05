@@ -197,7 +197,15 @@ struct CodexFishQueue {
         }
     }
     @Published private(set) var energySavingActive = false
-    var presentationEnabled: Bool { enabled && !energySavingActive }
+    @Published private(set) var immersiveFocusEnabled = UserDefaults.standard.bool(forKey: "immersiveFocusEnabled") {
+        didSet {
+            guard immersiveFocusEnabled, immersiveFocusEnabled != oldValue else { return }
+            previewTask?.cancel(); previewTask = nil
+            preview = nil
+            hideRequestsImmediately()
+        }
+    }
+    var presentationEnabled: Bool { enabled && !energySavingActive && !immersiveFocusEnabled }
     @Published private(set) var tasks: [CodexTask] = [] { didSet { dismissResolvedRequests() } }
     @Published private(set) var completionSequence = 0
     @Published private(set) var connected = false { didSet { dismissResolvedRequests() } }
@@ -219,6 +227,7 @@ struct CodexFishQueue {
     private var previewTask: Task<Void, Never>?
     private var pollTask: Task<Void, Never>?
     private var motionObservation: AnyCancellable?
+    private var focusObservation: AnyCancellable?
     private var suspended = false
     private var window: NSPanel?
     @Published var keyboardRequestID: String?
@@ -351,12 +360,20 @@ struct CodexFishQueue {
     var status: String {
         if !enabled { return "Codex 动效已关闭" }
         if energySavingActive { return "智能节能中 · Codex 提醒与动效已暂停" }
+        if immersiveFocusEnabled { return "沉浸专注中 · Codex 提醒与动效已隐藏" }
         if preview != nil { return "视觉预览 · 20 秒后恢复实时状态" }
         if !connected { return "未连接 Codex 状态桥接服务" }
         if waiting { return "有 \(pending.count) 个请求需要处理" }
         return running ? "Codex 正在运行 · \(effort >= 0 ? CodexThrust.labels[effort] : "思考强度未知")" : "Codex 当前没有运行中的任务"
     }
     private init() {
+        focusObservation = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                let enabled = UserDefaults.standard.bool(forKey: "immersiveFocusEnabled")
+                if self.immersiveFocusEnabled != enabled { self.immersiveFocusEnabled = enabled }
+            }
         let motion = NotchMotionEnvironment.shared
         motionObservation = motion.$suspended.combineLatest(motion.$energySavingActive)
             .removeDuplicates { $0 == $1 }.sink { [weak self] suspended, saving in
@@ -391,7 +408,8 @@ struct CodexFishQueue {
             let session = URLSession(configuration: configuration)
             defer { session.invalidateAndCancel() }
             while !Task.isCancelled {
-                guard let self, self.presentationEnabled, !self.suspended else { return }
+                // Keep pending requests current while focus suppresses their presentation.
+                guard let self, self.enabled, !self.energySavingActive, !self.suspended else { return }
                 do {
                     let (data, response) = try await session.data(from: URL(string: "http://127.0.0.1:19427/state")!)
                     try Task.checkCancellation()
@@ -419,7 +437,7 @@ struct CodexFishQueue {
                         self.tasks = stable
                         Self.log.info("Task state updated: active=\(stable.filter(\.working).count, privacy: .public), waiting=\(stable.filter(\.waiting).count, privacy: .public)")
                     }
-                    if finished && self.enabled && self.preview == nil {
+                    if finished && self.presentationEnabled && self.preview == nil {
                         self.completionSequence += 1
                         Self.log.info("Completion accepted: sequence=\(self.completionSequence, privacy: .public)")
                     }
@@ -447,7 +465,7 @@ struct CodexFishQueue {
         }
     }
     func demonstrate(_ state: String?) {
-        guard !energySavingActive else { return }
+        guard !energySavingActive && !immersiveFocusEnabled else { return }
         previewTask?.cancel()
         if state == "waiting" { previewCount = 1 }
         preview = state
@@ -524,7 +542,7 @@ struct CodexFishQueue {
         window = nil
     }
     private func dismissResolvedRequests() {
-        guard !energySavingActive else { hideRequestsImmediately(); return }
+        guard !energySavingActive && !immersiveFocusEnabled else { hideRequestsImmediately(); return }
         let resolved = Self.shouldDismissRequests(enabled: enabled, preview: preview, connected: connected, pendingCount: pending.count)
         if resolved { releaseResolvedPanelIfHidden() }
         if usesGenie {

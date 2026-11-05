@@ -64,12 +64,15 @@ class MusicManager: ObservableObject {
     @Published var isFavoriteTrack: Bool = false
 
     private var artworkData: Data? = nil
+    private var artworkTask: Task<Void, Never>?
+    private var artworkGeneration: UInt64 = 0
 
     // Store last values at the time artwork was changed
     private var lastArtworkTitle: String = "I'm Handsome"
     private var lastArtworkArtist: String = "Me"
     private var lastArtworkAlbum: String = "Self Love"
     private var lastArtworkBundleIdentifier: String? = nil
+    private var lastArtworkTrackIdentifier: String?
 
     @Published var isFlipping: Bool = false
     private var flipWorkItem: DispatchWorkItem?
@@ -88,6 +91,7 @@ class MusicManager: ObservableObject {
 
         Defaults.publisher(.enableLyrics)
             .merge(with: Defaults.publisher(.enableCompactLyrics))
+            .merge(with: Defaults.publisher(.immersiveFocusEnabled))
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.refreshLyrics(force: true) }
             .store(in: &cancellables)
@@ -121,6 +125,8 @@ class MusicManager: ObservableObject {
     }
     
     public func destroy() {
+        artworkTask?.cancel()
+        artworkGeneration &+= 1
         invalidateLyrics()
         debounceIdleTask?.cancel()
         cancellables.removeAll()
@@ -209,6 +215,21 @@ class MusicManager: ObservableObject {
     @MainActor
     private func updateFromPlaybackState(_ state: PlaybackState) {
         if state.bundleIdentifier.isEmpty {
+            if isMusicSource {
+                artworkTask?.cancel(); artworkTask = nil
+                artworkGeneration &+= 1
+                artworkData = nil
+                lastArtworkBundleIdentifier = nil
+            }
+            if Defaults[.immersiveFocusEnabled] && (!songTitle.isEmpty || bundleIdentifier != nil) {
+                // Empty focus must clear the expanded player as well as the compact surface.
+                bundleIdentifier = nil
+                songTitle = ""; artistName = ""; album = ""
+                usingAppIconForArtwork = true
+                albumArt = defaultImage
+                artworkData = nil
+                invalidateLyrics()
+            }
             // Source disappearance ends activity; video sources still use the
             // upstream app-artwork and visualizer presentation.
             debounceIdleTask?.cancel(); debounceIdleTask = nil
@@ -247,13 +268,17 @@ class MusicManager: ObservableObject {
         let artistChanged = state.artist != self.lastArtworkArtist
         let albumChanged = state.album != self.lastArtworkAlbum
         let bundleChanged = state.bundleIdentifier != self.lastArtworkBundleIdentifier
+        let trackChanged = state.trackIdentifier != self.lastArtworkTrackIdentifier
 
         // Check for artwork changes
         let artworkChanged = state.artwork != self.artworkData
-        let hasContentChange = titleChanged || artistChanged || albumChanged || artworkChanged || bundleChanged
+        let hasContentChange = titleChanged || artistChanged || albumChanged || artworkChanged || bundleChanged || trackChanged
 
         // Handle artwork and visual transitions for changed content
         if hasContentChange {
+            artworkTask?.cancel(); artworkTask = nil
+            artworkGeneration &+= 1
+            self.artworkData = state.artwork
             if state.isMusicSource { self.triggerFlipAnimation() }
 
             if !state.isMusicSource {
@@ -261,20 +286,20 @@ class MusicManager: ObservableObject {
                     usingAppIconForArtwork = true
                     updateAlbumArt(newAlbumArt: AppIconAsNSImage(for: state.bundleIdentifier) ?? defaultImage)
                 }
-            } else if artworkChanged, let artwork = state.artwork {
-                self.updateArtwork(artwork)
-            } else if state.artwork == nil {
-                // Try to use app icon if no artwork but track changed
-                self.usingAppIconForArtwork = true
-                self.updateAlbumArt(newAlbumArt: AppIconAsNSImage(for: state.bundleIdentifier) ?? defaultImage)
+            } else {
+                if titleChanged || artistChanged || albumChanged || bundleChanged || trackChanged {
+                    self.usingAppIconForArtwork = true
+                    self.updateAlbumArt(newAlbumArt: AppIconAsNSImage(for: state.bundleIdentifier) ?? defaultImage)
+                }
+                self.updateArtwork(state)
             }
-            self.artworkData = state.artwork
 
             // Remember metadata even when two tracks share the same artwork.
             self.lastArtworkTitle = state.title
             self.lastArtworkArtist = state.artist
             self.lastArtworkAlbum = state.album
             self.lastArtworkBundleIdentifier = state.bundleIdentifier
+            self.lastArtworkTrackIdentifier = state.trackIdentifier
 
             // Only update sneak peek if there's actual content and something changed
             if !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
@@ -322,6 +347,7 @@ class MusicManager: ObservableObject {
             self.bundleIdentifier = state.bundleIdentifier
             // Update volume control support from active controller
             self.volumeControlSupported = activeController?.supportsVolumeControl ?? false
+            self.canFavoriteTrack = activeController?.supportsFavorite ?? false
         }
 
         if repeatModeChanged {
@@ -390,7 +416,8 @@ class MusicManager: ObservableObject {
 
     // MARK: - Lyrics
     @MainActor private var compactLyricsEnabled: Bool {
-        Defaults[.enableCompactLyrics] && !NotchMotionEnvironment.shared.energySavingActive
+        (Defaults[.enableCompactLyrics] || Defaults[.immersiveFocusEnabled])
+            && !NotchMotionEnvironment.shared.energySavingActive
     }
 
     private func invalidateLyrics() {
@@ -567,25 +594,32 @@ class MusicManager: ObservableObject {
         DispatchQueue.main.async(execute: workItem)
     }
 
-    private func updateArtwork(_ artworkData: Data) {
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-
-            if let source = CGImageSourceCreateWithData(artworkData as CFData, nil),
-               let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
-                   kCGImageSourceCreateThumbnailFromImageAlways: true,
-                   kCGImageSourceCreateThumbnailWithTransform: true,
-                   kCGImageSourceThumbnailMaxPixelSize: 512,
-                   kCGImageSourceShouldCacheImmediately: true
-               ] as CFDictionary) {
-                let artworkImage = NSImage(size: NSSize(width: thumbnail.width, height: thumbnail.height))
-                artworkImage.addRepresentation(NSBitmapImageRep(cgImage: thumbnail))
-                DispatchQueue.main.async { [weak self] in
-                    guard let self, self.isMusicSource, self.artworkData == artworkData else { return }
-                    self.usingAppIconForArtwork = false
-                    self.updateAlbumArt(newAlbumArt: artworkImage)
+    @MainActor private func updateArtwork(_ state: PlaybackState) {
+        let generation = artworkGeneration
+        artworkTask = Task { @MainActor [weak self] in
+            defer {
+                if self?.artworkGeneration == generation { self?.artworkTask = nil }
+            }
+            var image: NSImage?
+            if let data = state.artwork {
+                image = await Task.detached(priority: .userInitiated) { AlbumArtwork.decode(data) }.value
+            }
+            if image == nil && state.bundleIdentifier == "com.apple.Music" {
+                for delay in [0, 2, 8] {
+                    do {
+                        try Task.checkCancellation()
+                        if delay > 0 { try await Task.sleep(for: .seconds(delay)) }
+                        guard let data = try await AlbumArtwork.fetch(for: state) else { break }
+                        image = await Task.detached(priority: .utility) { AlbumArtwork.decode(data) }.value
+                        if image != nil { break }
+                    } catch is CancellationError { return }
+                    catch { if Task.isCancelled { return } }
                 }
             }
+            guard !Task.isCancelled, let self, let image, self.isMusicSource,
+                  self.artworkGeneration == generation else { return }
+            self.usingAppIconForArtwork = false
+            self.updateAlbumArt(newAlbumArt: image)
         }
     }
 
@@ -629,10 +663,12 @@ class MusicManager: ObservableObject {
     }
 
     func calculateAverageColor() {
-        albumArt.averageColor { [weak self] color in
+        let image = albumArt
+        image.averageColor { [weak self] color in
             DispatchQueue.main.async {
+                guard let self, self.albumArt === image else { return }
                 withAnimation(.smooth) {
-                    self?.avgColor = color ?? .white
+                    self.avgColor = color ?? .white
                 }
             }
         }
@@ -736,6 +772,10 @@ class MusicManager: ObservableObject {
     }
 
     func forceUpdate() {
+        // A later explicit refresh can recover after the bounded network retries ran out.
+        if isMusicSource && usingAppIconForArtwork && artworkTask == nil {
+            lastArtworkBundleIdentifier = nil
+        }
         // Request immediate update from the active controller
         Task { [weak self] in
             if self?.activeController?.isActive() == true {

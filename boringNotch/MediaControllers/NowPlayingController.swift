@@ -9,9 +9,11 @@ import AppKit
 import Combine
 import Foundation
 import CoreAudio
+import Defaults
 
 final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     func updatePlaybackInfo() async {
+        if let focusedController { await focusedController.updatePlaybackInfo(); return }
         await fetchFavoriteStateIfSupported()
     }
 
@@ -35,6 +37,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     }
 
     func setFavorite(_ favorite: Bool) async {
+        if let focusedController { await focusedController.setFavorite(favorite); return }
         let bundleID = playbackState.bundleIdentifier
         
         if bundleID == "com.apple.Music" {
@@ -78,6 +81,16 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     private var metadataTask: Task<Void, Never>?
     private var metadataURL: URL?
     private var localizedMetadata: LocalizedMusicMetadata?
+    private var focusedController: (any MediaControllerProtocol)?
+    private var focusedSource: String?
+    private var focusedState: PlaybackState?
+    private var focusedSubscription: AnyCancellable?
+    private var focusPreferenceObserver: AnyCancellable?
+
+    private var canSendSystemCommands: Bool {
+        !Defaults[.immersiveFocusEnabled]
+            || (playbackState.isMusicSource && playbackState.bundleIdentifier == remotePlaybackState.bundleIdentifier)
+    }
 
     // MARK: - Initialization
     init?() {
@@ -105,6 +118,12 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
             MRMediaRemoteSetShuffleModePointer, to: (@convention(c) (Int) -> Void).self)
         MRMediaRemoteSetRepeatModeFunction = unsafeBitCast(
             MRMediaRemoteSetRepeatModePointer, to: (@convention(c) (Int) -> Void).self)
+
+        focusPreferenceObserver = Defaults.publisher(.immersiveFocusEnabled)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refreshVideoAudio(forceNative: true) }
+            }
 
         terminationObserver = NSWorkspace.shared.notificationCenter
             .publisher(for: NSWorkspace.didTerminateApplicationNotification)
@@ -162,32 +181,38 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     // MARK: - Protocol Implementation
     func play() async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.play(); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         MRMediaRemoteSendCommandFunction(0, nil)
     }
 
     func pause() async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.pause(); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         MRMediaRemoteSendCommandFunction(1, nil)
     }
 
     func togglePlay() async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.togglePlay(); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         MRMediaRemoteSendCommandFunction(2, nil)
     }
 
     func nextTrack() async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.nextTrack(); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         MRMediaRemoteSendCommandFunction(4, nil)
     }
 
     func previousTrack() async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.previousTrack(); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         MRMediaRemoteSendCommandFunction(5, nil)
     }
 
     func seek(to time: Double) async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.seek(to: time); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         MRMediaRemoteSetElapsedTimeFunction(time)
     }
 
@@ -196,14 +221,16 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     }
     
     func toggleShuffle() async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.toggleShuffle(); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         // MRMediaRemoteSendCommandFunction(6, nil)
         MRMediaRemoteSetShuffleModeFunction(playbackState.isShuffled ? 1 : 3)
         playbackState.isShuffled.toggle()
     }
     
     func toggleRepeat() async {
-        guard !playbackState.isAudioFallback else { return }
+        if let focusedController { await focusedController.toggleRepeat(); return }
+        guard !playbackState.isAudioFallback, canSendSystemCommands else { return }
         // MRMediaRemoteSendCommandFunction(7, nil)
         let newRepeatMode = (playbackState.repeatMode == .off) ? 3 : (playbackState.repeatMode.rawValue - 1)
         playbackState.repeatMode = RepeatMode(rawValue: newRepeatMode) ?? .off
@@ -211,6 +238,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     }
     
     func setVolume(_ level: Double) async {
+        if let focusedController { await focusedController.setVolume(level); return }
         // MediaRemote framework doesn't provide direct volume control for the active audio session
         // As a workaround, try to control the currently active music app directly
         let clampedLevel = max(0.0, min(1.0, level))
@@ -270,6 +298,36 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     // MARK: - Update Methods
     @MainActor
+    private func refreshFocusedController() {
+        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let source = PlaybackState.focusedMusicSource(enabled: Defaults[.immersiveFocusEnabled],
+            current: focusedSource, system: remotePlaybackState.bundleIdentifier, running: running)
+        guard source != focusedSource else { return }
+        focusedSubscription = nil
+        focusedController = nil
+        focusedSource = source
+        focusedState = nil
+        guard let source else { return }
+        let controller: any MediaControllerProtocol
+        switch source {
+        case "com.apple.Music": controller = AppleMusicController()
+        case "com.spotify.client": controller = SpotifyController()
+        case "com.github.th-ch.youtube-music": controller = YouTubeMusicController()
+        default: return
+        }
+        focusedController = controller
+        focusedSubscription = controller.playbackStatePublisher
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak controller] state in
+                guard let self, let controller, self.focusedController === controller,
+                      Defaults[.immersiveFocusEnabled], state.lastUpdated != .distantPast else { return }
+                self.focusedState = state
+                self.refreshVideoAudio(forceNative: true)
+            }
+        NSLog("Focused music source: %@", source)
+    }
+
+    @MainActor
     private func handleAdapterUpdate(_ update: NowPlayingUpdate) async {
         let next = remotePlaybackState.applying(update)
         if terminatedSources.contains(next.bundleIdentifier) {
@@ -284,13 +342,15 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     @MainActor
     private func refreshVideoAudio(forceNative: Bool = false) {
+        refreshFocusedController()
         updateVideoPolling()
         guard forceNative || !NotchMotionEnvironment.shared.suspended else { return }
-        let videos = remotePlaybackState.isPlaying
+        let videos = remotePlaybackState.isPlaying || Defaults[.immersiveFocusEnabled]
             ? [:] : VideoAudioActivity.snapshot(applications: videoApplications)
-        var next = remotePlaybackState.withVideoAudioFallback(
-            activeSources: videos.filter { $0.value }.map(\.key),
-            runningSources: Set(videos.keys), previous: playbackState)
+        var next = Defaults[.immersiveFocusEnabled]
+            ? remotePlaybackState.focusingMusic(on: focusedState, hasDedicatedController: focusedController != nil)
+            : remotePlaybackState.withVideoAudioFallback(activeSources: videos.filter { $0.value }.map(\.key),
+                runningSources: Set(videos.keys), previous: playbackState)
         if next.bundleIdentifier == "com.apple.Music", !next.isAudioFallback,
            let metadata = localizedMetadata, metadata.trackId == next.catalogID {
             next.title = metadata.trackName
@@ -317,7 +377,7 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
 
     @MainActor
     private func updateVideoPolling() {
-        let needed = !videoApplications.isEmpty && !remotePlaybackState.isPlaying
+        let needed = !Defaults[.immersiveFocusEnabled] && !videoApplications.isEmpty && !remotePlaybackState.isPlaying
             && !NotchMotionEnvironment.shared.suspended
         guard needed else { videoAudioObserver = nil; return }
         guard videoAudioObserver == nil else { return }

@@ -104,12 +104,15 @@ class BatteryActivityManager {
                 throw BatteryError.powerSourceUnavailable
             }
             
-            guard let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef],
-                !sources.isEmpty else {
-                throw BatteryError.batteryInfoUnavailable("No power sources available")
+            guard let sources = IOPSCopyPowerSourcesList(snapshot)?.takeRetainedValue() as? [CFTypeRef] else {
+                throw BatteryError.batteryInfoUnavailable("Power sources unavailable")
             }
-            
-            let source = sources.first!
+            guard let source = sources.first else {
+                var info = defaultBatteryInfo
+                info.isPluggedIn = IOPSGetProvidingPowerSourceType(snapshot)?.takeUnretainedValue() as String? == kIOPSACPowerValue
+                info.isInLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+                return info
+            }
             
             guard let description = IOPSGetPowerSourceDescription(snapshot, source)?.takeUnretainedValue() as? [String: Any] else {
                 throw BatteryError.batteryInfoUnavailable("Could not get power source description")

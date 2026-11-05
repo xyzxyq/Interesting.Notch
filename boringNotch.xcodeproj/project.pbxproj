@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F0C600000000000000000002 /* FocusIdleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C600000000000000000001 /* FocusIdleView.swift */; };
+		FA2600000000000000000002 /* AlbumArtwork.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA2600000000000000000001 /* AlbumArtwork.swift */; };
+		F0C500000000000000000008 /* ImmersiveLyrics.metal in Sources */ = {isa = PBXBuildFile; fileRef = F0C500000000000000000007 /* ImmersiveLyrics.metal */; };
+		F0C500000000000000000006 /* ImmersiveLyricsPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C500000000000000000005 /* ImmersiveLyricsPanel.swift */; };
+		F0C500000000000000000004 /* ImmersiveLyricsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C500000000000000000003 /* ImmersiveLyricsView.swift */; };
+		F0C500000000000000000002 /* ImmersiveFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0C500000000000000000001 /* ImmersiveFocus.swift */; };
 		CF2100000000000000000002 /* CodexShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2100000000000000000001 /* CodexShortcuts.swift */; };
 		CF1800000000000000000002 /* PaperPlanePointer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1800000000000000000001 /* PaperPlanePointer.swift */; };
 		CF1100000000000000000004 /* CompactLyricsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF1100000000000000000003 /* CompactLyricsView.swift */; };
@@ -196,6 +202,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		F0C600000000000000000001 /* FocusIdleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusIdleView.swift; sourceTree = "<group>"; };
+		FA2600000000000000000001 /* AlbumArtwork.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumArtwork.swift; sourceTree = "<group>"; };
+		F0C500000000000000000007 /* ImmersiveLyrics.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = ImmersiveLyrics.metal; sourceTree = "<group>"; };
+		F0C500000000000000000005 /* ImmersiveLyricsPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveLyricsPanel.swift; sourceTree = "<group>"; };
+		F0C500000000000000000003 /* ImmersiveLyricsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveLyricsView.swift; sourceTree = "<group>"; };
+		F0C500000000000000000001 /* ImmersiveFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImmersiveFocus.swift; sourceTree = "<group>"; };
 		CF2100000000000000000001 /* CodexShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CodexShortcuts.swift; sourceTree = "<group>"; };
 		CF1800000000000000000001 /* PaperPlanePointer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaperPlanePointer.swift; sourceTree = "<group>"; };
 		CF1100000000000000000003 /* CompactLyricsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompactLyricsView.swift; sourceTree = "<group>"; };
@@ -679,9 +691,11 @@
 				14D570C82C5F38890011E668 /* BoringViewModel.swift */,
 				14D570CA2C5F4B2C0011E668 /* BatteryStatusViewModel.swift */,
 				CF1100000000000000000001 /* CompactLyrics.swift */,
+				F0C500000000000000000001 /* ImmersiveFocus.swift */,
 				CF1600000000000000000001 /* LyricsRepository.swift */,
 				CF1200000000000000000001 /* NotchWeather.swift */,
 				1153BD902D986DB300979FB0 /* PlaybackState.swift */,
+				FA2600000000000000000001 /* AlbumArtwork.swift */,
 			);
 			path = models;
 			sourceTree = "<group>";
@@ -745,6 +759,9 @@
 			children = (
 				B19424082CD0FEFE003E5DC2 /* LottieAnimationView.swift */,
 				CF1100000000000000000003 /* CompactLyricsView.swift */,
+				F0C500000000000000000005 /* ImmersiveLyricsPanel.swift */,
+				F0C500000000000000000003 /* ImmersiveLyricsView.swift */,
+				F0C500000000000000000007 /* ImmersiveLyrics.metal */,
 				CF1700000000000000000001 /* LyricsPicker.swift */,
 				147163972C5D35B70068B555 /* MusicVisualizer.swift */,
 			);
@@ -761,6 +778,7 @@
 				F7105F56B1FE489AA6EF6C67 /* CodexGenieTransition.swift */,
 				31EDA599C3FD47BF9AEBB2C6 /* CodexPullCord.swift */,
 				9AB0C6BB2C73C9CB00F7CD30 /* NotchHomeView.swift */,
+				F0C600000000000000000001 /* FocusIdleView.swift */,
 				14D570C52C5F38210011E668 /* BoringHeader.swift */,
 				14D570D12C5F6C6A0011E668 /* BoringExtrasMenu.swift */,
 				1471A8582C6281BD0058408D /* BoringNotchWindow.swift */,
@@ -966,6 +984,10 @@
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
 				1100292A2E8691B400035A57 /* FileShareView.swift in Sources */,
 				CF1100000000000000000004 /* CompactLyricsView.swift in Sources */,
+				F0C500000000000000000006 /* ImmersiveLyricsPanel.swift in Sources */,
+				F0C500000000000000000004 /* ImmersiveLyricsView.swift in Sources */,
+				F0C500000000000000000008 /* ImmersiveLyrics.metal in Sources */,
+				F0C500000000000000000002 /* ImmersiveFocus.swift in Sources */,
 				CF1700000000000000000002 /* LyricsPicker.swift in Sources */,
 				147163982C5D35B70068B555 /* MusicVisualizer.swift in Sources */,
 				11CC44A22CEE614100C7244B /* BoringViewCoordinator.swift in Sources */,
@@ -1028,6 +1050,7 @@
 				111BEA612ED09B1B0079DD4E /* NSScreen+UUID.swift in Sources */,
 				1153BD8F2D986B1F00979FB0 /* MediaControllerProtocol.swift in Sources */,
 				9AB0C6BD2C73C9CB00F7CD30 /* NotchHomeView.swift in Sources */,
+				F0C600000000000000000002 /* FocusIdleView.swift in Sources */,
 				B172AAC02C95DA0B001623F1 /* InlineHUD.swift in Sources */,
 				14E9FEAA2C70BF610062E83F /* DownloadView.swift in Sources */,
 				B1B112912C6A572100093D8F /* EditPanelView.swift in Sources */,
@@ -1036,6 +1059,7 @@
 				CF1600000000000000000002 /* LyricsRepository.swift in Sources */,
 				CF1200000000000000000002 /* NotchWeather.swift in Sources */,
 				1153BD912D986DB300979FB0 /* PlaybackState.swift in Sources */,
+				FA2600000000000000000002 /* AlbumArtwork.swift in Sources */,
 				B1A78C822C8BA08100BD51B0 /* FullscreenMediaDetection.swift in Sources */,
 				14E9FEAE2C7325770062E83F /* Button+Bouncing.swift in Sources */,
 				14D570C92C5F38890011E668 /* BoringViewModel.swift in Sources */,
@@ -1112,14 +1136,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 315;
+				CURRENT_PROJECT_VERSION = 3100;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.0.15;
+				MARKETING_VERSION = 3.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1137,14 +1161,14 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 315;
+				CURRENT_PROJECT_VERSION = 3100;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = BoringNotchXPCHelper/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = BoringNotchXPCHelper;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.0.15;
+				MARKETING_VERSION = 3.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.BoringNotchXPCHelper;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				REGISTER_APP_GROUPS = YES;
@@ -1291,7 +1315,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 315;
+				CURRENT_PROJECT_VERSION = 3100;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1318,7 +1342,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.0.15;
+				MARKETING_VERSION = 3.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch.preview;
 				PRODUCT_NAME = "Interesting Notch";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1345,7 +1369,7 @@
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 315;
+				CURRENT_PROJECT_VERSION = 3100;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_ASSET_PATHS = "\"boringNotch/Preview Content\"";
 				DEVELOPMENT_TEAM = "";
@@ -1371,7 +1395,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 3.0.15;
+				MARKETING_VERSION = 3.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = theboringteam.boringnotch;
 				PRODUCT_NAME = "Interesting Notch";
 				PROVISIONING_PROFILE_SPECIFIER = "";

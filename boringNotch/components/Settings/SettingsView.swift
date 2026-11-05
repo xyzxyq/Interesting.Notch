@@ -619,6 +619,8 @@ struct Media: View {
     @Default(.enableSneakPeek) private var enableSneakPeek
     @Default(.sneakPeekStyles) var sneakPeekStyles
 
+    @Default(.immersiveFocusEnabled) private var immersiveFocusEnabled
+    @Default(.immersiveLyricStyle) private var immersiveLyricStyle
     @Default(.enableCompactLyrics) var compactLyricsEnabled
     @Default(.compactLyricsOffset) var compactLyricsOffset
     @Default(.lyricColorStyle) var lyricColorStyle
@@ -664,6 +666,26 @@ struct Media: View {
             }
             
             Section {
+                Defaults.Toggle("沉浸专注模式", key: .immersiveFocusEnabled)
+                Picker("投影歌词样式", selection: $immersiveLyricStyle) {
+                    ForEach(ImmersiveLyricStyle.allCases, id: \.rawValue) { style in
+                        Text(style.title).tag(style.rawValue)
+                    }
+                }
+                .disabled(!immersiveFocusEnabled)
+                if immersiveLyricStyle == "particles" {
+                    Text("一道透明折射波按每句时长从左向右掠过，字形轻微扭曲后恢复；句末再化为粒子消散，约 0.4 秒完成。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                Text("开启后，音乐播放时显示专辑封面；没有音乐播放时，左侧显示聚焦图标，右侧显示本次专注时长。播放音乐期间继续计时，关闭专注后重置。其他媒体、火箭和 Codex 提醒动画隐藏。歌词投影仅在接通外部电源时显示，展开灵动岛时暂时收起。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("动态效果会增加资源消耗；微光样式更安静。开启系统“减少动态效果”后显示静态投影。")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("沉浸专注")
+            }
+
+            Section {
                 Toggle(
                     "Show music live activity",
                     isOn: $coordinator.musicLiveActivityEnabled.animation()
@@ -703,7 +725,7 @@ struct Media: View {
                     Button(Brand.localized("Choose or import lyrics…")) {
                         lyricsPickerRequest = LyricsPicker.Request(track: musicManager.currentLyricTrack)
                     }
-                        .disabled(!compactLyricsEnabled || !musicManager.currentLyricTrack.isReady)
+                        .disabled(!(compactLyricsEnabled || immersiveFocusEnabled) || !musicManager.currentLyricTrack.isReady)
                         .sheet(item: $lyricsPickerRequest) { request in
                             LyricsPicker(track: request.track)
                         }

@@ -52,6 +52,7 @@ class BoringViewCoordinator: ObservableObject {
 
     @Published var currentView: NotchViews = .home
     @Published var helloAnimationRunning: Bool = false
+    @Published private(set) var immersiveFocusStartedAt: Date? = nil
     private var sneakPeekDispatch: DispatchWorkItem?
     private var expandingViewDispatch: DispatchWorkItem?
     private var hudEnableTask: Task<Void, Never>?
@@ -100,8 +101,19 @@ class BoringViewCoordinator: ObservableObject {
     @Published var optionKeyPressed: Bool = true
     private var accessibilityObserver: Any?
     private var hudReplacementCancellable: AnyCancellable?
+    private var immersiveFocusCancellable: AnyCancellable?
 
     private init() {
+        updateFocusSession(enabled: Defaults[.immersiveFocusEnabled])
+        immersiveFocusCancellable = Defaults.publisher(.immersiveFocusEnabled)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] change in
+                guard let self else { return }
+                self.updateFocusSession(enabled: change.newValue)
+                guard change.newValue else { return }
+                if self.sneakPeek.type == .music { self.sneakPeek.show = false }
+                if self.expandingView.type == .music { self.expandingView.show = false }
+            }
         // Perform migration from name-based to UUID-based storage
         if preferredScreenUUID == nil, let legacyName = legacyPreferredScreenName {
             // Try to find screen by name and migrate to UUID
@@ -179,6 +191,13 @@ class BoringViewCoordinator: ObservableObject {
         }
     }
     
+    private func updateFocusSession(enabled: Bool) {
+        let stored = Defaults[.immersiveFocusStartedAt]
+        let start = ImmersiveFocus.sessionStart(enabled: enabled, stored: stored)
+        if stored != start { Defaults[.immersiveFocusStartedAt] = start }
+        if immersiveFocusStartedAt != start { immersiveFocusStartedAt = start }
+    }
+
     @objc func sneakPeekEvent(_ notification: Notification) {
         let decoder = JSONDecoder()
         if let decodedData = try? decoder.decode(
@@ -214,6 +233,7 @@ class BoringViewCoordinator: ObservableObject {
         icon: String = ""
     ) {
         sneakPeekDuration = duration
+        if status && type == .music && Defaults[.immersiveFocusEnabled] { return }
         if type != .music {
             // close()
             if !Defaults[.hudReplacement] {
@@ -263,6 +283,7 @@ class BoringViewCoordinator: ObservableObject {
         value: CGFloat = 0,
         browser: BrowserType = .chromium
     ) {
+        if status && type == .music && Defaults[.immersiveFocusEnabled] { return }
         withAnimation(NotchMotionEnvironment.transientAnimation) {
             expandingView = .init(show: status, type: type, value: value, browser: browser)
         }

@@ -30,9 +30,24 @@ struct PlaybackState {
     var isFavorite: Bool = false
     var isAudioFallback: Bool = false
     var catalogID: Int?
+    var trackIdentifier: String?
 }
 
 extension PlaybackState {
+    static func focusedMusicSource(enabled: Bool, current: String?, system: String, running: Set<String>) -> String? {
+        guard enabled else { return nil }
+        let direct = ["com.apple.Music", "com.spotify.client", "com.github.th-ch.youtube-music"]
+        if let current, running.contains(current), direct.contains(current) { return current }
+        if running.contains(system), direct.contains(system) { return system }
+        if PlaybackState(bundleIdentifier: system).isMusicSource { return nil }
+        return direct.first { running.contains($0) }
+    }
+
+    func focusingMusic(on dedicated: PlaybackState?, hasDedicatedController: Bool) -> PlaybackState {
+        if hasDedicatedController { return dedicated ?? PlaybackState(bundleIdentifier: "") }
+        return isMusicSource ? self : PlaybackState(bundleIdentifier: "")
+    }
+
     /// Dedicated music clients get lyrics and music effects. Other MediaRemote
     /// sources retain the basic artwork/icon and playback visualizer.
     var isMusicSource: Bool {
@@ -75,6 +90,7 @@ extension PlaybackState: Equatable {
         return lhs.bundleIdentifier == rhs.bundleIdentifier
             && lhs.isPlaying == rhs.isPlaying
             && lhs.catalogID == rhs.catalogID
+            && lhs.trackIdentifier == rhs.trackIdentifier
             && lhs.title == rhs.title
             && lhs.artist == rhs.artist
             && lhs.album == rhs.album
@@ -121,11 +137,18 @@ extension PlaybackState {
         let diff = update.diff == true && (source == nil || source == bundleIdentifier)
         var state = diff ? self : PlaybackState(bundleIdentifier: source ?? "")
         state.bundleIdentifier = source ?? (diff ? bundleIdentifier : "")
+        let identifier = payload.uniqueIdentifier?.key
+        let trackChanged = (identifier != nil && identifier != trackIdentifier)
+            || (payload.title != nil && payload.title != title)
+            || (payload.artist != nil && payload.artist != artist)
+            || (payload.album != nil && payload.album != album)
+        state.trackIdentifier = identifier ?? (diff && !trackChanged ? trackIdentifier : nil)
+        if trackChanged { state.artwork = nil }
         // A title change without an ID must not retain the previous catalog identity.
         if let identifier = payload.uniqueIdentifier {
             state.catalogID = identifier.catalogID
         } else {
-            state.catalogID = diff && (payload.title == nil || payload.title == title) ? catalogID : nil
+            state.catalogID = diff && !trackChanged ? catalogID : nil
         }
         state.title = payload.title ?? (diff ? title : "")
         state.artist = payload.artist ?? (diff ? artist : "")
@@ -192,6 +215,13 @@ extension PlaybackState {
 enum MediaItemIdentifier: Codable {
     case number(Int)
     case string(String)
+
+    var key: String {
+        switch self {
+        case .number(let id): return String(id)
+        case .string(let id): return id
+        }
+    }
 
     init(from decoder: Decoder) throws {
         let value = try decoder.singleValueContainer()

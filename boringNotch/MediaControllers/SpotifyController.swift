@@ -36,6 +36,7 @@ class SpotifyController: MediaControllerProtocol {
 
     private var lastArtworkURL: String?
     private var artworkFetchTask: Task<Void, Never>?
+    @MainActor private var queryGeneration = 0
     
     init() {
         setupPlaybackStateChangeObserver()
@@ -93,12 +94,18 @@ class SpotifyController: MediaControllerProtocol {
     }
     
     func isActive() -> Bool {
-        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == playbackState.bundleIdentifier }
+        NSWorkspace.shared.runningApplications.contains { $0.bundleIdentifier == "com.spotify.client" }
     }
     
-    func updatePlaybackInfo() async {
-        guard let descriptor = try? await fetchPlaybackInfoAsync() else { return }
-        guard descriptor.numberOfItems >= 10 else { return }
+    @MainActor func updatePlaybackInfo() async {
+        queryGeneration += 1
+        let generation = queryGeneration
+        guard isActive() else { playbackState = playbackState.endingPlayback(); return }
+        guard let descriptor = try? await fetchPlaybackInfoAsync(), descriptor.numberOfItems >= 10 else {
+            if generation == queryGeneration { playbackState = playbackState.endingPlayback() }
+            return
+        }
+        guard generation == queryGeneration, isActive() else { return }
         
         let isPlaying = descriptor.atIndex(1)?.booleanValue ?? false
         let currentTrack = descriptor.atIndex(2)?.stringValue ?? "Unknown"
@@ -119,7 +126,7 @@ class SpotifyController: MediaControllerProtocol {
             album: currentTrackAlbum,
             currentTime: currentTime,
             duration: duration,
-            playbackRate: 1,
+            playbackRate: isPlaying ? 1 : 0,
             isShuffled: isShuffled,
             repeatMode: isRepeating ? .all : .off,
             lastUpdated: Date(),
@@ -137,15 +144,13 @@ class SpotifyController: MediaControllerProtocol {
             guard artworkURL != lastArtworkURL || state.artwork == nil else { return }
             artworkFetchTask?.cancel()
 
-            let currentState = state
-
             artworkFetchTask = Task {
                 do {
                     let data = try await ImageService.shared.fetchImageData(from: url)
 
                     await MainActor.run { [weak self] in
-                        guard let self = self else { return }
-                        var updatedState = currentState
+                        guard let self, self.queryGeneration == generation else { return }
+                        var updatedState = self.playbackState
                         updatedState.artwork = data
                         self.playbackState = updatedState
                         self.lastArtworkURL = artworkURL
@@ -163,6 +168,7 @@ class SpotifyController: MediaControllerProtocol {
 // MARK: - Private Methods
     
     private func executeCommand(_ command: String) async {
+        guard isActive() else { return }
         let script = "tell application \"Spotify\" to \(command)"
         try? await AppleScriptHelper.executeVoid(script)
     }
@@ -176,6 +182,7 @@ class SpotifyController: MediaControllerProtocol {
     private func fetchPlaybackInfoAsync() async throws -> NSAppleEventDescriptor? {
         let script = """
         tell application "Spotify"
+            if not running then return {}
             set isRunning to true
             try
                 set playerState to player state is playing

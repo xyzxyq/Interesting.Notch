@@ -50,6 +50,7 @@ struct LayoutFixture {
     var vm = LayoutVM()
     var compactLyricsMode = false
     var musicPresented = false
+    var focusIdlePresented = false
     var rocketPresented = true
     var idleFacePresented = false
     let cornerRadiusInsets = (closed: (top: CGFloat(6), bottom: CGFloat(14)), opened: 0)
@@ -134,6 +135,11 @@ struct DropFixture: View {
         assert(layout.width() == compact, "Old music metadata widened the Codex-only rocket")
         layout.musicPresented = true
         assert(layout.width() > compact, "Music needs its original lyric slots")
+        layout.compactLyricsMode = false
+        let musicWidth = layout.width()
+        layout.musicPresented = false
+        layout.focusIdlePresented = true
+        assert(layout.width() == musicWidth, "Focus idle must use the same width as music playback")
         activity.preview = "waiting"
         activity.tasks = []
         let screen = NSScreen.main!.frame
@@ -801,6 +807,46 @@ struct DropFixture: View {
             }
         }
         activity.energySavingActive = false
+        for style in [CodexReminderStyle.droplet, .pullCord] {
+            for phase in ["opening", "open", "closing"] {
+                activity.reminderStyle = style
+                activity.preview = nil; activity.connected = true; activity.tasks = [optionTask]
+                activity.reconcileRequests([optionTask])
+                activity.showRequests(anchor: anchor)
+                advance(phase == "opening" ? 0.04 : cordSettle)
+                activity.selectOption(0, for: optionTask)
+                if phase == "closing" { activity.closeRequests(); advance(0.04) }
+                let drafts = activity.answerDrafts, ignored = activity.readReminders
+                let completion = activity.completionSequence
+                let panel = activity.window!
+                testDefaults.set(true, forKey: "immersiveFocusEnabled")
+                advance(0.08)
+                assert(activity.immersiveFocusEnabled && !activity.presentationEnabled,
+                       "The focus preference observer must suppress every Codex presentation")
+                assert(activity.window == nil && panel.contentView == nil && !panel.isVisible,
+                       "\\(style)/\\(phase): focus must release an in-flight reminder immediately")
+                assert(!activity.genie.isAnimating && !activity.cardAnimating && !activity.cardPresented
+                       && activity.panelTask == nil && activity.dismissTask == nil)
+                assert(activity.tasks == [optionTask] && activity.connected
+                       && activity.answerDrafts == drafts && activity.readReminders == ignored,
+                       "Focus must preserve pending requests and drafts without disconnecting the bridge")
+                activity.showRequests(anchor: anchor)
+                activity.openRequestsFromKeyboard()
+                activity.demonstrate("waiting")
+                activity.demonstrate("running")
+                assert(activity.window == nil && activity.preview == nil && !activity.waiting && !activity.rocketVisible)
+                assert(activity.completionSequence == completion && activity.enabled)
+                testDefaults.set(false, forKey: "immersiveFocusEnabled")
+                advance(0.08)
+                assert(!activity.immersiveFocusEnabled && activity.waiting && activity.window == nil,
+                       "Leaving focus restores pending reminders without automatically opening a card")
+                activity.showRequests(anchor: anchor); advance(0.04)
+                assert(activity.window?.isVisible == true && activity.answerDrafts == drafts)
+                activity.hideRequestsImmediately()
+            }
+        }
+        testDefaults.removeObject(forKey: "immersiveFocusEnabled")
+        print("PASS: focus preference hides rocket/reminders, cancels opening/open/closing cards, preserves pending requests and drafts, and restores manual access")
         print("PASS: smart saving cancels opening/open/closing droplet and Genie cards, preserves drafts/queue/preferences, blocks shortcuts and preview, and restores manual access")
         print("PASS: resolved hidden panels release hosted trees; pending drafts and rapid reopening stay intact")
         print("PASS: cord/reminder style persistence/fallback, live appearance changes preserve the card and selection, flipped anchors, early keyboard input, snapshot cleanup, rapid reversal, automatic-dismiss recovery, reminder resign-key toggle and switching back to droplets")
@@ -810,7 +856,7 @@ struct DropFixture: View {
     }
 }
 '''
-fixture = fixture.replace('PROPERTIES', '\n'.join(property(p) for p in ['rocketSideWidth', 'musicSideWidth', 'fuelGap']))
+fixture = fixture.replace('PROPERTIES', '\n'.join(property(p) for p in ['rocketSideWidth', 'musicSideWidth', 'focusSideWidth', 'fuelGap']))
 fixture = fixture.replace('WIDTH', width).replace('SLOT', slot)
 shape = folder / 'NotchShape.swift'
 shape_source = (root / 'boringNotch/components/Notch/NotchShape.swift').read_text().split('// One shared observer set', 1)[0]
