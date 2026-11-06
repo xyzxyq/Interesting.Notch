@@ -1,38 +1,68 @@
 import SwiftUI
 
 struct FocusModeIcon: View {
+    var breathing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    static func path(in rect: CGRect) -> Path {
+        var arcs = Path()
+        for index in 0..<4 {
+            let angle = Double(index) * .pi / 2 + .pi / 15
+            arcs.move(to: CGPoint(x: 12 + cos(angle) * 8.4, y: 12 + sin(angle) * 8.4))
+            arcs.addArc(center: CGPoint(x: 12, y: 12), radius: 8.4,
+                startAngle: .degrees(Double(index) * 90 + 12),
+                endAngle: .degrees(Double(index) * 90 + 78), clockwise: false)
+        }
+        var symbol = arcs.strokedPath(StrokeStyle(lineWidth: 2.2, lineCap: .round))
+        symbol.addEllipse(in: CGRect(x: 8.7, y: 8.7, width: 6.6, height: 6.6))
+        return symbol.applying(CGAffineTransform(scaleX: rect.width / 24, y: rect.height / 24))
+    }
+
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                ForEach(0..<4) { index in
-                    let arc = Path { path in
-                        path.addArc(center: CGPoint(x: 12, y: 12), radius: 8.4,
-                            startAngle: .degrees(Double(index) * 90 + 12),
-                            endAngle: .degrees(Double(index) * 90 + 78), clockwise: false)
-                    }
-                    arc.stroke(LinearGradient(stops: [
-                        .init(color: .white.opacity(0.96), location: 0),
-                        .init(color: .white.opacity(0.76), location: 0.45),
-                        .init(color: .white.opacity(0.92), location: 0.65),
-                        .init(color: .white.opacity(0.50), location: 1)
-                    ], startPoint: .topLeading, endPoint: .bottomTrailing),
-                        style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
-                    arc.stroke(.white.opacity(0.35), style: StrokeStyle(lineWidth: 0.55, lineCap: .round))
-                        .offset(y: -0.35)
+        Group {
+            if breathing && !reduceMotion {
+                FocusIconBreath()
+            } else {
+                GeometryReader { geometry in
+                    Self.path(in: CGRect(origin: .zero, size: geometry.size)).fill(.white)
                 }
-                Circle()
-                    .fill(RadialGradient(colors: [.white, Color(white: 0.84), Color(white: 0.40)],
-                        center: .init(x: 0.3, y: 0.2), startRadius: 0, endRadius: 6))
-                    .overlay(Circle().stroke(LinearGradient(colors: [.white.opacity(0.9), .white.opacity(0.1)],
-                        startPoint: .top, endPoint: .bottom), lineWidth: 0.45))
-                    .frame(width: 6.6, height: 6.6)
-                    .position(x: 12, y: 12)
             }
-            .frame(width: 24, height: 24)
-            .scaleEffect(geometry.size.width / 24, anchor: .topLeading)
         }
         .aspectRatio(1, contentMode: .fit)
         .accessibilityHidden(true)
+    }
+}
+
+struct FocusIconBreath: NSViewRepresentable {
+    func makeNSView(context: Context) -> SymbolView { SymbolView() }
+    func updateNSView(_ view: SymbolView, context: Context) {}
+    static func dismantleNSView(_ view: SymbolView, coordinator: ()) { view.layer?.removeAllAnimations() }
+
+    final class SymbolView: NSView {
+        override var isFlipped: Bool { true }
+        init() {
+            super.init(frame: CGRect(x: 0, y: 0, width: 24, height: 24))
+            let symbol = CAShapeLayer()
+            symbol.fillColor = NSColor.white.cgColor
+            symbol.path = FocusModeIcon.path(in: bounds).cgPath
+            layer = symbol
+            wantsLayer = true
+            let breath = CAKeyframeAnimation(keyPath: "opacity")
+            breath.values = [0.55, 1, 0.55]
+            breath.duration = 4.8
+            breath.repeatCount = .infinity
+            breath.calculationMode = .cubic
+            breath.preferredFrameRateRange = CAFrameRateRange(minimum: 15, maximum: 30, preferred: 15)
+            symbol.add(breath, forKey: "breath")
+        }
+        required init?(coder: NSCoder) { nil }
+        override func layout() {
+            super.layout()
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            (layer as? CAShapeLayer)?.path = FocusModeIcon.path(in: bounds).cgPath
+            CATransaction.commit()
+        }
     }
 }
 
@@ -65,10 +95,11 @@ struct FocusIdleView: View {
     let sideWidth: CGFloat
     let gap: CGFloat
     let iconSize: CGFloat
+    var breathing = false
 
     var body: some View {
         HStack(spacing: 0) {
-            FocusModeIcon()
+            FocusModeIcon(breathing: breathing)
                 .frame(width: iconSize, height: iconSize)
                 .frame(width: sideWidth, alignment: .trailing)
             Color.clear.frame(width: gap)

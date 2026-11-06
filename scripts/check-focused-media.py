@@ -78,6 +78,28 @@ final class YouTubeMusicController: MockPlayer {}
         return try JSONDecoder().decode(NowPlayingUpdate.self, from: data)
     }
     static func main() async throws {
+        var native = PlaybackState(bundleIdentifier: "com.apple.Music", isPlaying: true, title: "Same song",
+            artist: "Singer", album: "Album", currentTime: 90, duration: 220, artwork: Data([1, 2]))
+        native.catalogID = 42
+        var dedicated = native
+        dedicated.artwork = nil; dedicated.catalogID = nil; dedicated.currentTime = 10
+        let recovered = native.focusingMusic(on: dedicated, hasDedicatedController: true)
+        assert(recovered.artwork == native.artwork && recovered.catalogID == 42 && recovered.currentTime == 10,
+               "Same-song native artwork must fill the AppleScript gap without borrowing its clock")
+        var wrongID = dedicated; wrongID.catalogID = 99
+        assert(native.focusingMusic(on: wrongID, hasDedicatedController: true).artwork == nil)
+        for mismatch in 0..<5 {
+            var other = native
+            switch mismatch {
+            case 0: other.bundleIdentifier = "test.video"
+            case 1: other.title = "Different song"
+            case 2: other.artist = "Different singer"
+            case 3: other.album = "Live album"
+            default: other.duration += 10
+            }
+            assert(other.focusingMusic(on: dedicated, hasDedicatedController: true).artwork == nil,
+                   "A different source/edition must never supply the cover")
+        }
         for source in ["com.apple.Music", "com.spotify.client", "com.github.th-ch.youtube-music"] {
             Defaults.focus(true); Fixture.running = [source]
             let router = NowPlayingController()!

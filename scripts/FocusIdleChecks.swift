@@ -38,6 +38,11 @@ import SwiftUI
                 for x in 0..<bitmap.pixelsWide {
                     let pixel = bitmap.colorAt(x: x, y: y)!
                     if pixel.alphaComponent > 0.3 { visible += 1 }
+                    if pixel.alphaComponent > 0.9 {
+                        let rgb = pixel.usingColorSpace(.deviceRGB)!
+                        assert(min(rgb.redComponent, rgb.greenComponent, rgb.blueComponent) > 0.99,
+                               "Flat focus symbol must not contain shaded or beveled pixels")
+                    }
                     if x == 0 || y == 0 || x == bitmap.pixelsWide - 1 || y == bitmap.pixelsHigh - 1 {
                         assert(pixel.alphaComponent < 0.02, "Icon clipped at \(size) points")
                     }
@@ -67,11 +72,11 @@ import SwiftUI
         let output = URL(fileURLWithPath: CommandLine.arguments[1])
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
         let preview = VStack(alignment: .leading, spacing: 22) {
-            Text("聚焦 · 圆润精修版").font(.system(size: 23, weight: .semibold))
+            Text("聚焦 · 二维图标").font(.system(size: 23, weight: .semibold))
             HStack(spacing: 28) {
                 FocusModeIcon().frame(width: 80, height: 80)
                 VStack(alignment: .leading, spacing: 12) {
-                    Text("圆润弧面 · 柔和高光 · 玻璃光珠").font(.system(size: 14))
+                    Text("纯色圆弧 · 平面圆点 · 轻柔呼吸").font(.system(size: 14))
                     HStack(spacing: 14) {
                         FocusModeIcon().frame(width: 24, height: 24)
                         Text("24 pt 实际尺寸").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
@@ -86,7 +91,7 @@ import SwiftUI
                         bottomTrailingRadius: 15, topTrailingRadius: 4))
                     .frame(maxWidth: .infinity)
             }
-            Text("分钟累计 · 音乐暂停时显示 · 关闭专注后重置")
+            Text("分钟累计 · 音乐播放与暂停均显示 · 关闭专注后重置")
                 .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6))
         }
         .padding(30).frame(width: 480).foregroundStyle(.white).background(Color(white: 0.075))
@@ -95,5 +100,11 @@ import SwiftUI
         try NSBitmapImageRep(cgImage: renderer.cgImage!).representation(using: .png, properties: [:])!
             .write(to: output.appendingPathComponent("focus-idle-refined.png"))
         print("PASS focus idle: minute/hour boundaries, shared/persistent session start, enable/reset, music/source gates, 18/24/26-point icon rendering")
+        let native = FocusIconBreath.SymbolView()
+        native.layoutSubtreeIfNeeded()
+        assert((native.layer as? CAShapeLayer)?.path != nil, "Breathing symbol must be drawn before the first resize")
+        assert(native.layer?.animation(forKey: "breath")?.duration == 4.8)
+        FocusIconBreath.dismantleNSView(native, coordinator: ())
+        assert(native.layer?.animationKeys()?.isEmpty ?? true, "Removing the focus icon must stop its animation")
     }
 }

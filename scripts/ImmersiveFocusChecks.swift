@@ -47,7 +47,6 @@ import IOKit.ps
         assert(ImmersiveFocus.waveProgress(at: 1, start: 1, end: 1) == -1)
         assert(ImmersiveFocus.waveProgress(at: 1, start: 2, end: 1) == -1)
         assert(ImmersiveFocus.waveProgress(at: 1, start: 1, end: .infinity) == -1)
-        assert(ImmersiveLyricStyle.allCases.count == 3)
         let info = BatteryActivityManager.shared.initializeBatteryInfo()
         if let snapshot = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
            let source = IOPSGetProvidingPowerSourceType(snapshot)?.takeUnretainedValue() as String? {

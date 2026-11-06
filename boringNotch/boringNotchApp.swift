@@ -356,6 +356,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
         }
 
+        KeyboardShortcuts.onKeyUp(for: .toggleImmersiveFocus) {
+            Defaults[.immersiveFocusEnabled].toggle()
+        }
+
         KeyboardShortcuts.onKeyDown(for: .openCodexRequests) {
             CodexActivity.shared.openRequestsFromKeyboard()
         }

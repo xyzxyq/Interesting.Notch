@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the production artwork pipeline with reordered completions and catalog fixtures."""
 from pathlib import Path
-import os, subprocess, tempfile, sys
+import os, subprocess, tempfile, sys, json
 root = Path(__file__).resolve().parents[1]
 source = (root/'boringNotch/managers/MusicManager.swift').read_text()
 block = source.split('        // Check for changes in track metadata using last artwork change values\n',1)[1].split('        let timeChanged',1)[0]
@@ -24,6 +24,7 @@ func AppIconAsNSImage(for bundle: String) -> NSImage? { nil }
     var artworkData: Data?
     var artworkTask: Task<Void, Never>?
     var artworkGeneration: UInt64 = 0
+    var lastArtworkCatalogID: Int?
     var lastArtworkTitle = "", lastArtworkArtist = "", lastArtworkAlbum = ""
     var lastArtworkBundleIdentifier: String?, lastArtworkTrackIdentifier: String?
     var usingAppIconForArtwork = true, isMusicSource = true
@@ -79,6 +80,13 @@ func AppIconAsNSImage(for bundle: String) -> NSImage? { nil }
                     HTTPURLResponse(url: request.url!, statusCode:200, httpVersion:nil, headerFields:nil)!)
         }
         assert(downloaded == redData && requests == 2)
+        var failedRegion = false
+        let regionRecovery = try await AlbumArtwork.fetch(for: song) { request in
+            if !failedRegion { failedRegion = true; throw URLError(.timedOut) }
+            return (request.url!.host!.contains("itunes") ? payload : redData,
+                    HTTPURLResponse(url: request.url!, statusCode:200, httpVersion:nil, headerFields:nil)!)
+        }
+        assert(regionRecovery == redData, "One failed storefront must not prevent a healthy fallback")
         do {
             _ = try await AlbumArtwork.fetch(for: song) { request in
                 (Data(), HTTPURLResponse(url:request.url!,statusCode:503,httpVersion:nil,headerFields:nil)!)
@@ -120,8 +128,15 @@ func AppIconAsNSImage(for bundle: String) -> NSImage? { nil }
         manager.apply(state("native",art:redData)); await settle()
         manager.apply(state("native")); await settle()
         assert(!manager.usingAppIconForArtwork && red(manager.albumArt), "A temporary gap hid this track's valid cover")
-        Fixture.pending.removeValue(forKey:"native")!.resume(returning:nil); await settle()
+        assert(Fixture.pending["native"] == nil, "A resolved native cover must not start a redundant catalog request")
         assert(!manager.usingAppIconForArtwork && red(manager.albumArt))
+        manager.apply(state("catalog-late")); await settle()
+        Fixture.pending.removeValue(forKey:"catalog-late")!.resume(returning:nil); await settle()
+        var withID = state("catalog-late"); withID.catalogID = 99
+        manager.apply(withID); await settle()
+        assert(Fixture.pending["catalog-late"] != nil, "Late catalog ID must retry a previously missing cover")
+        Fixture.pending.removeValue(forKey:"catalog-late")!.resume(returning:blueData); await settle()
+        assert(!manager.usingAppIconForArtwork)
         func update(_ text: String) throws -> NowPlayingUpdate { try JSONDecoder().decode(NowPlayingUpdate.self, from:Data(text.utf8)) }
         let a = state("A",art:redData)
         let unchanged = a.applying(try update(#"{"diff":true,"payload":{"playing":false}}"#))
@@ -149,11 +164,14 @@ if '--live' in sys.argv:
         _ = NSApplication.shared
         Task { @MainActor in
             let player = AppleMusicController(), manager = Manager()
+            let update = try! JSONDecoder().decode(NowPlayingUpdate.self,
+                from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))
+            let native = PlaybackState(bundleIdentifier: "").applying(update)
             var latest = PlaybackState(bundleIdentifier: "")
             let observer = player.playbackStatePublisher.receive(on: DispatchQueue.main).sink { state in
                 guard state.lastUpdated != .distantPast else { return }
                 latest = state
-                manager.apply(state)
+                manager.apply(native.focusingMusic(on: state, hasDedicatedController: true))
             }
             await player.updatePlaybackInfo()
             let deadline = Date().addingTimeInterval(50)
@@ -179,4 +197,12 @@ with tempfile.TemporaryDirectory(prefix='notch-artwork-') as directory:
     subprocess.run(['xcrun','swiftc','-swift-version','5','-parse-as-library',
         str(root/'boringNotch/models/PlaybackState.swift'),str(root/'boringNotch/models/CompactLyrics.swift'),
         str(root/'boringNotch/models/AlbumArtwork.swift'),str(swift),*extra_sources,'-o',str(folder/'check')],env=env,check=True)
-    subprocess.run([str(folder/'check')],check=True)
+    args = [str(folder/'check')]
+    if '--live' in sys.argv:
+        app = Path('/Applications/Interesting Notch.app/Contents')
+        snapshot = json.loads(subprocess.check_output(['/usr/bin/perl', str(app/'Resources/mediaremote-adapter.pl'),
+            str(app/'Frameworks/MediaRemoteAdapter.framework'), 'get'], text=True))
+        data = folder/'native.json'
+        data.write_text(json.dumps({'diff': False, 'payload': snapshot}))
+        args.append(str(data))
+    subprocess.run(args,check=True)

@@ -620,7 +620,6 @@ struct Media: View {
     @Default(.sneakPeekStyles) var sneakPeekStyles
 
     @Default(.immersiveFocusEnabled) private var immersiveFocusEnabled
-    @Default(.immersiveLyricStyle) private var immersiveLyricStyle
     @Default(.enableCompactLyrics) var compactLyricsEnabled
     @Default(.compactLyricsOffset) var compactLyricsOffset
     @Default(.lyricColorStyle) var lyricColorStyle
@@ -667,19 +666,12 @@ struct Media: View {
             
             Section {
                 Defaults.Toggle("沉浸专注模式", key: .immersiveFocusEnabled)
-                Picker("投影歌词样式", selection: $immersiveLyricStyle) {
-                    ForEach(ImmersiveLyricStyle.allCases, id: \.rawValue) { style in
-                        Text(style.title).tag(style.rawValue)
-                    }
-                }
-                .disabled(!immersiveFocusEnabled)
-                if immersiveLyricStyle == "particles" {
-                    Text("一道透明折射波按每句时长从左向右掠过，字形轻微扭曲后恢复；句末再化为粒子消散，约 0.4 秒完成。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Text("开启后，音乐播放时显示专辑封面；没有音乐播放时，左侧显示聚焦图标，右侧显示本次专注时长。播放音乐期间继续计时，关闭专注后重置。其他媒体、火箭和 Codex 提醒动画隐藏。歌词投影仅在接通外部电源时显示，展开灵动岛时暂时收起。")
+                KeyboardShortcuts.Recorder("切换沉浸专注", name: .toggleImmersiveFocus)
+                Text("歌词从持续的 V 字投影中浮现，句末化为细小的彩色粒子；间奏时，三个光点在投影下轻盈游动。")
                     .font(.caption).foregroundStyle(.secondary)
-                Text("动态效果会增加资源消耗；微光样式更安静。开启系统“减少动态效果”后显示静态投影。")
+                Text("开启后显示二维呼吸聚焦图标和专注时长。默认快捷键 ⌃⌥⌘F，再按一次关闭并重置计时；可在上方修改。其他媒体、火箭和 Codex 提醒动画隐藏。歌词投影仅在接通外部电源时显示，展开灵动岛时暂时收起。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("开启系统“减少动态效果”后，聚焦图标、投影与间奏光点静态显示。")
                     .font(.caption).foregroundStyle(.secondary)
             } header: {
                 Text("沉浸专注")
@@ -1893,6 +1885,7 @@ struct Shortcuts: View {
                 Text("自定义提醒与交互卡片的打开、回答、收起和忽略快捷键。")
             }
             Section {
+                KeyboardShortcuts.Recorder("切换沉浸专注", name: .toggleImmersiveFocus)
                 KeyboardShortcuts.Recorder("Toggle Sneak Peek:", name: .toggleSneakPeek)
             } header: {
                 Text("Media")
@@ -1919,7 +1912,7 @@ private struct CodexShortcutCustomization: View {
     @ObservedObject private var shortcuts = CodexShortcuts.shared
     @State private var previousOpen = KeyboardShortcuts.getShortcut(for: .openCodexRequests)
     @State private var suspendedShortcuts: [KeyboardShortcuts.Name] = []
-    private let globalNames: [KeyboardShortcuts.Name] = [.openCodexRequests, .toggleNotchOpen, .toggleSneakPeek]
+    private let globalNames: [KeyboardShortcuts.Name] = [.openCodexRequests, .toggleNotchOpen, .toggleSneakPeek, .toggleImmersiveFocus]
 
     private func binding(_ shortcut: KeyboardShortcuts.Shortcut) -> CodexKeyBinding {
         CodexKeyBinding(keyCode: UInt16(shortcut.carbonKeyCode), modifiers: shortcut.modifiers, characters: "")

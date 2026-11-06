@@ -6,6 +6,12 @@ import UniformTypeIdentifiers
 
 @main @MainActor struct ImmersiveProjectionChecks {
     static func main() throws {
+        if CommandLine.arguments.count > 1 {
+            let folder = URL(fileURLWithPath: CommandLine.arguments[1])
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            freopen(folder.appendingPathComponent("checks.log").path, "w", stdout)
+            freopen(folder.appendingPathComponent("checks.err").path, "w", stderr)
+        }
         setbuf(stdout, nil)
         _ = NSApplication.shared
         guard let device = MTLCreateSystemDefaultDevice() else { fatalError("Metal device unavailable") }
@@ -15,16 +21,23 @@ import UniformTypeIdentifiers
         assert(library.functionNames.contains("immersiveParticleDissolve"))
         assert(library.functionNames.contains("immersiveLyricOutline"))
         print("Loaded projection shaders on \(device.name)")
+        assert(ImmersiveLyricLine.measure("") == 0)
+        for line in ["让这一刻，慢慢流淌", "a long English lyric", "🎵✨"] {
+            let expected = (line as NSString).size(withAttributes: [
+                .font: NSFont.systemFont(ofSize: 26, weight: .medium), .kern: 1]).width
+            assert(ImmersiveLyricLine.measure(line) == expected)
+            assert(ImmersiveLyricLine.measure(line) == expected, "Cached glyph width must preserve layout")
+        }
         let output = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? "/tmp/immersive-projection")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        func content(_ style: ImmersiveLyricStyle, text: String = "让这一刻，慢慢流淌") -> ImmersiveLyricsView {
+        func content(text: String = "让这一刻，慢慢流淌") -> ImmersiveLyricsView {
             ImmersiveLyricsView(segments: [.init(id: 0, start: 0, end: 120, text: text)],
                 position: 60, sampleDate: Date(), rate: 0,
-                duration: 180, offset: 0, style: style,
+                duration: 180, offset: 0,
                 sourceWidth: 280)
         }
         func particleImage(text: String = "让这一刻，慢慢流淌", time: Double, progress: Double) -> CGImage {
-            let view = ImmersiveLyricLine(text: text, time: time, dissolve: progress)
+            let view = ImmersiveLyricLine(text: text, dissolve: progress)
                 .frame(width: 640, height: 66)
                 .background(Color(red: 0.08, green: 0.13, blue: 0.17))
             let renderer = ImageRenderer(content: view)
@@ -80,7 +93,7 @@ import UniformTypeIdentifiers
                         ZStack {
                             if progress < 1 {
                                 ImmersiveProjectorBackdrop(sourceWidth: 280, time: time)
-                                ImmersiveLyricLine(text: line, time: time, dissolve: progress, waveProgress: min(1, time / 3.2))
+                                ImmersiveLyricLine(text: line, dissolve: progress, waveProgress: min(1, time / 3.2))
                             }
                         }.frame(width: 640, height: 66)
                     }
@@ -150,7 +163,7 @@ import UniformTypeIdentifiers
         print("Single transparent lens: one crest, peak displacement \(peak / 2) points, half-height width \(halfHeightWidth) points")
 
         func waveFrame(_ progress: Double, text: String = "让这一刻，慢慢流淌") -> NSBitmapImageRep {
-            let renderer = ImageRenderer(content: ImmersiveLyricLine(text: text, time: 1, dissolve: -1,
+            let renderer = ImageRenderer(content: ImmersiveLyricLine(text: text, dissolve: -1,
                 waveProgress: progress).frame(width: 640, height: 66))
             renderer.scale = 2
             return NSBitmapImageRep(cgImage: renderer.cgImage!)
@@ -263,7 +276,7 @@ import UniformTypeIdentifiers
             func linear(_ value: Double) -> Double { value <= 0.04045 ? value / 12.92 : pow((value + 0.055) / 1.055, 2.4) }
             return 0.2126 * linear(c.redComponent) + 0.7152 * linear(c.greenComponent) + 0.0722 * linear(c.blueComponent)
         }
-        let letterRenderer = ImageRenderer(content: ImmersiveLyricLine(text: "让这一刻，慢慢流淌", time: 1, dissolve: -1)
+        let letterRenderer = ImageRenderer(content: ImmersiveLyricLine(text: "让这一刻，慢慢流淌", dissolve: -1)
             .frame(width: 640, height: 66))
         letterRenderer.scale = 2
         let letters = NSBitmapImageRep(cgImage: letterRenderer.cgImage!)
@@ -304,7 +317,7 @@ import UniformTypeIdentifiers
         assert(solidFill > 500, "Reduce Transparency must restore opaque letter interiors")
         var contrastCounts: [Int] = []
         for background in [Color.white, .black, Color(white: 0.5), .yellow, .blue] {
-            let renderer = ImageRenderer(content: ImmersiveLyricLine(text: "让这一刻，慢慢流淌", time: 1, dissolve: -1)
+            let renderer = ImageRenderer(content: ImmersiveLyricLine(text: "让这一刻，慢慢流淌", dissolve: -1)
                 .frame(width: 640, height: 66).background(background))
             renderer.scale = 2
             let bitmap = NSBitmapImageRep(cgImage: renderer.cgImage!)
@@ -320,28 +333,31 @@ import UniformTypeIdentifiers
             contrastCounts.append(visible)
         }
         print("Glass glyph samples: dark contour \(darkContour), transmissive fill \(glassInk), reflective rim \(glassRim), opaque white \(opaqueWhite); visible on five backgrounds: \(contrastCounts)")
-        var rendered: [String: Data] = [:]
-        for style in ImmersiveLyricStyle.allCases {
-            let view = content(style).frame(width: 640, height: 66)
-                .background(Color(red: 0.08, green: 0.13, blue: 0.17))
-            let renderer = ImageRenderer(content: view)
-            renderer.scale = 2
-            guard let image = renderer.cgImage,
-                  let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else {
-                fatalError("Could not render \(style.rawValue)")
+        let view = content().frame(width: 640, height: 66)
+            .background(Color(red: 0.08, green: 0.13, blue: 0.17))
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 2
+        let image = renderer.cgImage!
+        let data = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])!
+        assert(NSBitmapImageRep(cgImage: image).colorAt(x: 640, y: 4)!.redComponent > 0.4)
+        try data.write(to: output.appendingPathComponent("particles.png"))
+        let dust = NSBitmapImageRep(cgImage: particleImage(time: 1, progress: 0.35))
+        var hueBins = Set<Int>()
+        for y in 0..<dust.pixelsHigh {
+            for x in 0..<dust.pixelsWide {
+                let color = dust.colorAt(x: x, y: y)!.usingColorSpace(.deviceRGB)!
+                if color.saturationComponent > 0.25 && color.brightnessComponent > 0.45 {
+                    hueBins.insert(Int(color.hueComponent * 12))
+                }
             }
-            rendered[style.rawValue] = data
-            let bitmap = NSBitmapImageRep(cgImage: image)
-            let emitter = bitmap.colorAt(x: 640, y: 4)!.usingColorSpace(.sRGB)!
-            assert(emitter.redComponent > 0.4,
-                   "Every lyric style must include the shared projector: \(style.rawValue)")
-            try data.write(to: output.appendingPathComponent("\(style.rawValue).png"))
         }
+        assert(hueBins.count >= 8, "Particles must retain many independent colors through the outline shader")
+        print("Colored particles retain \(hueBins.count) hue bins")
         for (name, line) in [("light", "你总是有办法轻易做到"), ("long", "Even a longer lyric stays on a single line close to the notch"), ("empty", "")] {
             let view = VStack(spacing: 0) {
                 UnevenRoundedRectangle(bottomLeadingRadius: 16, bottomTrailingRadius: 16)
                     .fill(.black).frame(width: 280, height: 30)
-                content(.particles, text: line).frame(width: 640, height: 66)
+                content(text: line).frame(width: 640, height: 66)
             }
             .frame(width: 680, height: 112, alignment: .top)
             .background(Color(white: 0.96))
@@ -354,13 +370,12 @@ import UniformTypeIdentifiers
             assert(image.width == 1360 && image.height == 224)
             try data.write(to: output.appendingPathComponent("\(name).png"))
         }
-        assert(rendered["glow"] != rendered["ripple"], "Water shader did not change the rendered image")
         let parent = BoringNotchWindow(contentRect: NSRect(x: 100, y: 400, width: 788, height: 292),
             styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         let anchor = ImmersiveLyricsPanel.Anchor()
         parent.contentView = anchor
         anchor.presentation = ImmersiveLyricsPanel(visible: true, topInset: 35,
-                                                   hideFromRecording: true, content: content(.ripple))
+                                                   hideFromRecording: true, content: content())
         anchor.updatePanel()
         guard let panel = parent.childWindows?.first else { fatalError("Projection was not attached") }
         assert(panel.ignoresMouseEvents && !panel.canBecomeKey && !panel.canBecomeMain)
@@ -371,16 +386,40 @@ import UniformTypeIdentifiers
         anchor.updatePanel()
         assert(parent.childWindows?.count == 1, "Repeated updates created duplicate windows")
         anchor.presentation = ImmersiveLyricsPanel(visible: false, topInset: 35,
-                                                   hideFromRecording: true, content: content(.ripple))
+                                                   hideFromRecording: true, content: content())
         anchor.updatePanel()
         assert(parent.childWindows?.isEmpty ?? true)
         assert(!panel.isVisible && panel.contentView == nil, "Inactive mode kept its renderer alive")
         anchor.presentation = ImmersiveLyricsPanel(visible: true, topInset: 35,
-                                                   hideFromRecording: false, content: content(.glow))
+                                                   hideFromRecording: false, content: content())
         anchor.updatePanel()
         assert(parent.childWindows?.first?.sharingType == .readOnly)
         anchor.removePanel()
         assert(parent.childWindows?.isEmpty ?? true)
-        print("Projection lifecycle, click-through, privacy and three rendered styles passed: \(output.path)")
+        func focus(_ visible: Bool, allowed: Bool = true) {
+            anchor.presentation = ImmersiveLyricsPanel(visible: visible, topInset: 35,
+                hideFromRecording: true, focusEnabled: visible, allowsFocusTransition: allowed, content: content())
+            anchor.updatePanel()
+        }
+        focus(true)
+        let transitioning = parent.childWindows!.first!
+        focus(false)
+        assert(parent.childWindows?.first === transitioning, "Focus exit must remain attached while fading")
+        RunLoop.main.run(until: Date().addingTimeInterval(0.08))
+        focus(true)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        assert(parent.childWindows?.first === transitioning && transitioning.isVisible,
+               "An interrupted exit must not remove the reopened projection")
+        focus(false)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.45))
+        assert(parent.childWindows?.isEmpty ?? true, "Completed focus exit must release its renderer")
+        focus(true)
+        focus(false, allowed: false)
+        assert(parent.childWindows?.isEmpty ?? true, "Lock/sleep visibility loss must remove projection immediately")
+        assert(ImmersiveFocus.transitionDuration(enabled: true, reducedMotion: true) == 0.12)
+        assert(ImmersiveFocus.transitionDuration(enabled: false, reducedMotion: false)
+               < ImmersiveFocus.transitionDuration(enabled: true, reducedMotion: false))
+        print("Focus entry/exit, interruption, immediate privacy teardown and reduced motion passed")
+        print("Projection lifecycle, click-through, privacy and particle projection passed: \(output.path)")
     }
 }

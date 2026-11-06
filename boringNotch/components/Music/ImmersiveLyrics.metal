@@ -72,27 +72,20 @@ static float focusHash(float2 p) {
     half opacity = reducedTransparency > 0.5 ? 1.0h
         : half(min(0.97, 0.90 + highlight * 0.04 + rim * 0.03));
     half glass = mix(0.985h, 1.0h, half(highlight));
-    half luminance = mix(ink.a, dot(ink.rgb, half3(0.2126, 0.7152, 0.0722)), 0.15h);
     half outline = expanded * (1.0h - ink.a) * 0.88h;
-    return half4(half3(luminance * glass * opacity + 0.03h * outline),
+    return half4(ink.rgb * glass * opacity + half3(0.03h * outline),
                  ink.a * opacity + outline);
 }
 
 [[ stitchable ]] half4 immersiveParticleDissolve(float2 position, SwiftUI::Layer layer,
-                                                 float time, float progress) {
+                                                 float progress) {
     if (progress >= 1.0) { return half4(0); }
     half4 original = layer.sample(position);
-    if (progress < 0.0) {
-        float seed = focusHash(floor(position / 2.5));
-        float flow = 0.5 + 0.5 * sin(position.x * 0.045 - position.y * 0.10 - time * 2.6);
-        float sparkle = smoothstep(0.84, 1.0, sin(time * 2.2 + seed * 30.0));
-        half3 hue = mix(half3(0.94, 0.96, 1.0), half3(1.0), half(flow));
-        return half4(original.rgb * hue * half(0.96 + sparkle * 0.04), original.a);
-    }
+    if (progress < 0.0) { return original; }
 
     float p = clamp(progress, 0.0, 1.0);
     float2 drift = float2(48.0 * p, -14.0 * p);
-    const float grid = 3.0;
+    const float grid = 2.0;
     float2 cell = floor((position - drift) / grid);
     half4 dust = half4(0);
     // Local scatter stays within two cells; sample glyph alpha only for a visible dot.
@@ -100,15 +93,18 @@ static float focusHash(float2 p) {
         for (int x = -2; x <= 2; ++x) {
             float2 origin = (cell + float2(x, y) + 0.5) * grid;
             float seed = focusHash(cell + float2(x, y));
-            float2 curl = float2(sin(seed * 31.0 + p * 4.0), cos(seed * 23.0 + p * 3.0)) * (5.4 * p);
+            float2 curl = float2(sin(seed * 31.0 + p * 4.0), cos(seed * 23.0 + p * 3.0)) * (3.6 * p);
             float2 center = origin + drift + curl;
             float distance = length(position - center);
-            float radius = (0.6 + seed * 0.6) * (1.0 - 0.45 * p);
-            float dot = 1.0 - smoothstep(radius * 0.5, radius + 0.45, distance);
+            float radius = (0.35 + seed * 0.35) * (1.0 - 0.45 * p);
+            float dot = 1.0 - smoothstep(radius * 0.5, radius + 0.3, distance);
             if (dot <= 0.0) { continue; }
             half4 sample = layer.sample(origin);
             half alpha = sample.a * half(dot * pow(1.0 - p, 0.8));
-            half3 tint = mix(half3(0.50, 0.76, 1.0), half3(1.0, 0.85, 0.98), half(seed));
+            // The source cell owns one hue for its whole flight; no animated color cycling.
+            float hue = fract(seed * 19.17);
+            float3 rainbow = clamp(abs(fract(hue + float3(0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0) - 1.0, 0.0, 1.0);
+            half3 tint = half3(mix(float3(1), rainbow, 0.72));
             dust += half4(tint * alpha, alpha);
         }
     }

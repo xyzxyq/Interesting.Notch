@@ -50,6 +50,7 @@ enum AlbumArtwork {
         guard state.catalogID != nil || (!state.album.isEmpty && state.duration.isFinite && state.duration > 0) else { return nil }
         let chinese = Locale.preferredLanguages.first?.hasPrefix("zh") == true
         let countries = chinese ? ["tw", "us"] : [Locale.current.region?.identifier.lowercased() ?? "us", "tw"]
+        var lastError: Error?
         for (index, country) in countries.enumerated() where index == 0 || country != countries[0] {
             try Task.checkCancellation()
             var components = URLComponents(string: "https://itunes.apple.com/\(state.catalogID == nil ? "search" : "lookup")")!
@@ -60,14 +61,21 @@ enum AlbumArtwork {
             } else {
                 components.queryItems?.append(URLQueryItem(name: "term", value: "\(state.artist) \(state.title)"))
             }
-            let (data, response) = try await transport(URLRequest(url: components.url!, timeoutInterval: 10))
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-            guard let url = try matchedURL(in: data, for: state) else { continue }
-            try Task.checkCancellation()
-            let (image, imageResponse) = try await transport(URLRequest(url: url, timeoutInterval: 10))
-            guard (imageResponse as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-            return image
+            do {
+                let (data, response) = try await transport(URLRequest(url: components.url!, timeoutInterval: 10))
+                guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+                guard let url = try matchedURL(in: data, for: state) else { continue }
+                try Task.checkCancellation()
+                let (image, imageResponse) = try await transport(URLRequest(url: url, timeoutInterval: 10))
+                guard (imageResponse as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
+                return image
+            } catch {
+                try Task.checkCancellation()
+                if error is CancellationError { throw error }
+                lastError = error
+            }
         }
+        if let lastError { throw lastError }
         return nil
     }
 }

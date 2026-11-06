@@ -47,7 +47,6 @@ struct ContentView: View {
     @Default(.lyricColor) var lyricColor
     @Default(.enableCompactLyrics) var enableCompactLyrics
     @Default(.immersiveFocusEnabled) private var immersiveFocusEnabled
-    @Default(.immersiveLyricStyle) private var immersiveLyricStyle
     @Default(.hideFromScreenRecording) private var hideProjectionFromRecording
     @Default(.useMusicVisualizer) var useMusicVisualizer
 
@@ -106,6 +105,11 @@ struct ContentView: View {
     }
 
     private var focusSideWidth: CGFloat { musicSideWidth }
+
+    private var focusIconBreathing: Bool {
+        !reducedMotion && !motion.suspended && !motion.screenLocked && !motion.energySavingActive
+            && vm.notchState == .closed && !vm.hideOnClosed
+    }
 
     private var computedChinWidth: CGFloat {
         var chinWidth: CGFloat = vm.closedNotchSize.width
@@ -197,6 +201,7 @@ struct ContentView: View {
                                                                         reduced: reducedMotion), value: vm.notchState)
                     .animation(NotchMotionEnvironment.transientAnimation, value: transientHeader)
                     .animation(NotchMotionEnvironment.transientAnimation, value: coordinator.sneakPeek.show)
+                    .animation(focusModeAnimation, value: immersiveFocusEnabled)
                     .contentShape(Rectangle())
                     .onHover { hovering in
                         handleHover(hovering)
@@ -304,11 +309,12 @@ struct ContentView: View {
             ImmersiveLyricsPanel(visible: immersivePresented,
                 topInset: max(0, vm.effectiveClosedNotchHeight - 2),
                 hideFromRecording: hideProjectionFromRecording,
+                focusEnabled: immersiveFocusEnabled,
+                allowsFocusTransition: !motion.suspended && !motion.screenLocked,
                 content: ImmersiveLyricsView(segments: musicManager.compactSegments,
                     position: musicManager.elapsedTime, sampleDate: musicManager.timestampDate,
                     rate: musicManager.playbackRate, duration: musicManager.songDuration,
                     offset: compactLyricsOffset,
-                    style: ImmersiveLyricStyle(rawValue: immersiveLyricStyle) ?? .particles,
                     sourceWidth: max(1, (projectorWidth > 0 ? projectorWidth : computedChinWidth) - 2 * cornerRadiusInsets.closed.top)))
         }
         .background(dragDetector)
@@ -549,6 +555,17 @@ struct ContentView: View {
             .combined(with: .offset(y: -6))
     }
 
+    private var focusModeAnimation: Animation {
+        .timingCurve(0.22, 1, 0.36, 1, duration: ImmersiveFocus.transitionDuration(
+            enabled: immersiveFocusEnabled, reducedMotion: reducedMotion))
+    }
+
+    private var focusModeTransition: AnyTransition {
+        reducedMotion ? .opacity : .asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 1.05)).combined(with: .offset(y: 1)),
+            removal: .opacity.combined(with: .scale(scale: 0.94)).combined(with: .offset(y: -2)))
+    }
+
     private var closedPlaybackContent: some View {
         let fuelVisible = rocketPresented && !vm.hideOnClosed && !musicPresented
         let width = musicPresented ? 2 * musicSideWidth + fuelGap
@@ -557,12 +574,13 @@ struct ContentView: View {
             : vm.closedNotchSize.width - 20
                 + (idleFacePresented ? max(0, vm.effectiveClosedNotchHeight - 12) + 30 + 16 : 0)
         return ZStack {
-            if musicPresented {
+            if immersiveFocusEnabled && (musicPresented || focusIdlePresented) {
+                FocusIdleView(startedAt: coordinator.immersiveFocusStartedAt ?? Date(), sideWidth: focusSideWidth,
+                              gap: fuelGap, iconSize: rocketSideWidth, breathing: focusIconBreathing)
+                    .transition(focusModeTransition)
+            } else if musicPresented {
                 MusicLiveActivity()
-                    .transition(immersiveFocusEnabled ? .identity : playbackTransition)
-            } else if focusIdlePresented, let start = coordinator.immersiveFocusStartedAt {
-                FocusIdleView(startedAt: start, sideWidth: focusSideWidth,
-                              gap: fuelGap, iconSize: rocketSideWidth)
+                    .transition(playbackTransition)
             } else if !fuelVisible && idleFacePresented {
                 BoringFaceAnimation()
                     .transition(.opacity)
@@ -578,6 +596,7 @@ struct ContentView: View {
         .animation(immersiveFocusEnabled ? nil : reducedMotion ? .easeInOut(duration: 0.18)
                    : .spring(response: 0.55, dampingFraction: 0.9), value: musicPresented)
         .animation(NotchMotionEnvironment.interactionAnimation, value: fuelVisible)
+        .animation(focusModeAnimation, value: immersiveFocusEnabled)
     }
 
     @ViewBuilder
@@ -624,17 +643,10 @@ struct ContentView: View {
             Image(nsImage: musicManager.albumArt)
                 .resizable()
                 .clipped()
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: MusicPlayerImageSizes.cornerRadiusInset.closed)
-                )
+                .clipShape(RoundedRectangle(cornerRadius: MusicPlayerImageSizes.cornerRadiusInset.closed))
                 .matchedGeometryEffect(id: "albumArt", in: albumArtNamespace)
-                .opacity(immersiveFocusEnabled && musicManager.usingAppIconForArtwork ? 0 : 1)
-                .frame(
-                    width: max(0, vm.effectiveClosedNotchHeight - 12),
-                    height: max(0, vm.effectiveClosedNotchHeight - 12)
-                )
-                .frame(width: musicSideWidth, alignment: .trailing)
+            .frame(width: rocketSideWidth, height: rocketSideWidth)
+            .frame(width: musicSideWidth, alignment: .trailing)
 
             Rectangle()
                 .fill(.black)

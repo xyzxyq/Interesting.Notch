@@ -44,7 +44,20 @@ extension PlaybackState {
     }
 
     func focusingMusic(on dedicated: PlaybackState?, hasDedicatedController: Bool) -> PlaybackState {
-        if hasDedicatedController { return dedicated ?? PlaybackState(bundleIdentifier: "") }
+        if hasDedicatedController {
+            guard var dedicated else { return PlaybackState(bundleIdentifier: "") }
+            // The native stream may have artwork when AppleScript has none. Never borrow another track's clock or art.
+            if bundleIdentifier == dedicated.bundleIdentifier,
+               !title.isEmpty, !artist.isEmpty, !album.isEmpty,
+               title == dedicated.title, artist == dedicated.artist, album == dedicated.album,
+               catalogID == nil || dedicated.catalogID == nil || catalogID == dedicated.catalogID,
+               duration.isFinite, dedicated.duration.isFinite, duration > 0, dedicated.duration > 0,
+               abs(duration - dedicated.duration) <= 3 {
+                if dedicated.artwork?.isEmpty != false { dedicated.artwork = artwork }
+                if dedicated.catalogID == nil { dedicated.catalogID = catalogID }
+            }
+            return dedicated
+        }
         return isMusicSource ? self : PlaybackState(bundleIdentifier: "")
     }
 

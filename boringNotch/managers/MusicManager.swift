@@ -73,6 +73,7 @@ class MusicManager: ObservableObject {
     private var lastArtworkAlbum: String = "Self Love"
     private var lastArtworkBundleIdentifier: String? = nil
     private var lastArtworkTrackIdentifier: String?
+    private var lastArtworkCatalogID: Int?
 
     @Published var isFlipping: Bool = false
     private var flipWorkItem: DispatchWorkItem?
@@ -269,10 +270,12 @@ class MusicManager: ObservableObject {
         let albumChanged = state.album != self.lastArtworkAlbum
         let bundleChanged = state.bundleIdentifier != self.lastArtworkBundleIdentifier
         let trackChanged = state.trackIdentifier != self.lastArtworkTrackIdentifier
+        let catalogChanged = state.catalogID != nil && state.catalogID != self.lastArtworkCatalogID
 
         // Check for artwork changes
         let artworkChanged = state.artwork != self.artworkData
         let hasContentChange = titleChanged || artistChanged || albumChanged || artworkChanged || bundleChanged || trackChanged
+            || (catalogChanged && usingAppIconForArtwork)
 
         // Handle artwork and visual transitions for changed content
         if hasContentChange {
@@ -291,7 +294,7 @@ class MusicManager: ObservableObject {
                     self.usingAppIconForArtwork = true
                     self.updateAlbumArt(newAlbumArt: AppIconAsNSImage(for: state.bundleIdentifier) ?? defaultImage)
                 }
-                self.updateArtwork(state)
+                if state.artwork != nil || usingAppIconForArtwork { self.updateArtwork(state) }
             }
 
             // Remember metadata even when two tracks share the same artwork.
@@ -300,6 +303,7 @@ class MusicManager: ObservableObject {
             self.lastArtworkAlbum = state.album
             self.lastArtworkBundleIdentifier = state.bundleIdentifier
             self.lastArtworkTrackIdentifier = state.trackIdentifier
+            self.lastArtworkCatalogID = state.catalogID
 
             // Only update sneak peek if there's actual content and something changed
             if !state.title.isEmpty && !state.artist.isEmpty && state.isPlaying {
@@ -605,7 +609,7 @@ class MusicManager: ObservableObject {
                 image = await Task.detached(priority: .userInitiated) { AlbumArtwork.decode(data) }.value
             }
             if image == nil && state.bundleIdentifier == "com.apple.Music" {
-                for delay in [0, 2, 8] {
+                for delay in [0, 2, 8, 30] {
                     do {
                         try Task.checkCancellation()
                         if delay > 0 { try await Task.sleep(for: .seconds(delay)) }

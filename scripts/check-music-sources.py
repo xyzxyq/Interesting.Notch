@@ -89,5 +89,6 @@ with tempfile.TemporaryDirectory(prefix='notch-source-check-') as temp:
     sdk = subprocess.check_output(['xcrun', '--sdk', 'macosx', '--show-sdk-path'], env=env, text=True).strip()
     subprocess.run(['xcrun', 'swiftc', '-sdk', sdk, str(root / 'boringNotch/models/PlaybackState.swift'),
                     str(root / 'boringNotch/models/ImmersiveFocus.swift'),
+                    str(root / 'boringNotch/models/CompactLyrics.swift'),
                     str(swift), '-o', str(binary)], env=env, check=True)
     subprocess.run([str(binary)], check=True)

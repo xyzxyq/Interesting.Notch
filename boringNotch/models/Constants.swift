@@ -146,7 +146,6 @@ extension Defaults.Keys {
     static let lyricColor = Key<Color>("lyricColor", default: .white)
     static let immersiveFocusEnabled = Key<Bool>("immersiveFocusEnabled", default: false)
     static let immersiveFocusStartedAt = Key<Date?>("immersiveFocusStartedAt", default: nil)
-    static let immersiveLyricStyle = Key<String>("immersiveLyricStyle", default: "particles")
     static let enableCompactLyrics = Key<Bool>("enableCompactLyrics", default: false)
     static let enableLyrics = Key<Bool>("enableLyrics", default: false)
     static let musicControlSlots = Key<[MusicControlButton]>(
