@@ -74,16 +74,19 @@ struct ImmersiveLyricsPanel: NSViewRepresentable {
                 if presentation.focusEnabled && presentation.allowsFocusTransition { newPanel.alphaValue = 0 }
             }
             guard let panel else { return }
-            hosting?.rootView = presentation.content
-            panel.sharingType = presentation.hideFromRecording ? .none : .readOnly
-            panel.setFrame(NSRect(x: parent.frame.midX - width / 2,
-                                  y: parent.frame.maxY - presentation.topInset - ImmersiveLyricsView.projectionSize.height,
-                                  width: width, height: ImmersiveLyricsView.projectionSize.height), display: true)
+            // Unrelated notch updates must not rebuild the lyric schedule or redraw its window.
+            if hosting?.rootView != presentation.content { hosting?.rootView = presentation.content }
+            let sharing: NSWindow.SharingType = presentation.hideFromRecording ? .none : .readOnly
+            if panel.sharingType != sharing { panel.sharingType = sharing }
+            let frame = NSRect(x: parent.frame.midX - width / 2,
+                               y: parent.frame.maxY - presentation.topInset - ImmersiveLyricsView.projectionSize.height,
+                               width: width, height: ImmersiveLyricsView.projectionSize.height)
+            if panel.frame != frame { panel.setFrame(frame, display: true) }
             if panel.parent !== parent {
                 panel.parent?.removeChildWindow(panel)
                 parent.addChildWindow(panel, ordered: .below)
             }
-            panel.orderFrontRegardless()
+            if !panel.isVisible { panel.orderFrontRegardless() }
             if panel.alphaValue < 1 || reversingExit {
                 NSAnimationContext.runAnimationGroup { context in
                     context.duration = presentation.allowsFocusTransition

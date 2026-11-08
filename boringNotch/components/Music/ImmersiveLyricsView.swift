@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The playback clock is shared with compact lyrics; only this small surface redraws.
-struct ImmersiveLyricsView: View {
+struct ImmersiveLyricsView: View, Equatable {
     static let projectionSize = CGSize(width: 640, height: 66)
     let segments: [LyricSegment]
     let position: Double
@@ -12,6 +12,13 @@ struct ImmersiveLyricsView: View {
     let sourceWidth: CGFloat
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.segments == rhs.segments && lhs.position == rhs.position
+            && lhs.sampleDate == rhs.sampleDate && lhs.rate == rhs.rate
+            && lhs.duration == rhs.duration && lhs.offset == rhs.offset
+            && lhs.sourceWidth == rhs.sourceWidth
+    }
 
     var body: some View {
         ZStack(alignment: .top) {

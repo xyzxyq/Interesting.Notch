@@ -202,6 +202,8 @@ struct ContentView: View {
                     .animation(NotchMotionEnvironment.transientAnimation, value: transientHeader)
                     .animation(NotchMotionEnvironment.transientAnimation, value: coordinator.sneakPeek.show)
                     .animation(focusModeAnimation, value: immersiveFocusEnabled)
+                    .modifier(NotchActivationMotion(sequence: vm.activationSequence,
+                        expanded: vm.notchState == .open, reduced: reducedMotion))
                     .contentShape(Rectangle())
                     .onHover { hovering in
                         handleHover(hovering)
@@ -461,6 +463,7 @@ struct ContentView: View {
                                .frame(height: max(24, vm.effectiveClosedNotchHeight))
                                .opacity(gestureProgress != 0 ? 1.0 - min(abs(gestureProgress) * 0.1, 0.3) : 1.0)
                                .layoutValue(key: TransientHeaderID.self, value: 3)
+                               .transition(playbackTransition)
                        } else {
                            Rectangle().fill(.clear).frame(width: vm.closedNotchSize.width - 20, height: vm.effectiveClosedNotchHeight)
                        }
@@ -509,14 +512,18 @@ struct ContentView: View {
               .fixedSize(horizontal: vm.notchState == .closed, vertical: true)
               .zIndex(2)
             if vm.notchState == .open {
-                VStack {
+                ZStack(alignment: .top) {
                     switch coordinator.currentView {
                     case .home:
                         NotchHomeView(albumArtNamespace: albumArtNamespace)
+                            .transition(.opacity)
                     case .shelf:
                         ShelfView()
+                            .transition(.opacity)
                     }
                 }
+                .animation(reducedMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.2),
+                           value: coordinator.currentView)
                 // The player can exceed its proposal; it must not widen the header above it.
                 .frame(minWidth: 0, maxWidth: .infinity)
                 .transition(

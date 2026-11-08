@@ -72,6 +72,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return false
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        guard !isScreenLocked else { return false }
+        if coordinator.firstLaunch {
+            showOnboardingWindow()
+            return false
+        }
+        if window == nil && windows.isEmpty { adjustWindowPosition() }
+        animateNotchActivation()
+        return true
+    }
+
+    private func animateNotchActivation() {
+        guard !isScreenLocked, !coordinator.firstLaunch, !coordinator.helloAnimationRunning else { return }
+        if Defaults[.showOnAllDisplays] {
+            for (uuid, window) in windows where window.alphaValue > 0 {
+                window.orderFrontRegardless()
+                viewModels[uuid]?.animateActivation()
+            }
+        } else if let window, window.alphaValue > 0 {
+            window.orderFrontRegardless()
+            vm.animateActivation()
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         NotificationCenter.default.removeObserver(self)
         if let observer = screenLockedObserver {
@@ -452,6 +476,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         previousScreens = NSScreen.screens
+        animateNotchActivation()
     }
 
     func playWelcomeSound() {

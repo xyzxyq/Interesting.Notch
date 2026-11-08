@@ -122,6 +122,30 @@ struct HelloAnimation: View {
     }
 }
 
+// Returning launches acknowledge the app without replaying onboarding or changing the open tab.
+struct NotchActivationMotion: ViewModifier {
+    let sequence: Int
+    let expanded: Bool
+    let reduced: Bool
+    @State private var pulse: CGFloat = 0
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(x: reduced ? 1 : 1 + pulse * (expanded ? 0.02 : 0.08),
+                         y: reduced ? 1 : 1 + pulse * (expanded ? 0.03 : 0.22), anchor: .top)
+            .opacity(reduced ? 1 - pulse * 0.25 : 1)
+            .task(id: sequence) {
+                guard sequence > 0 else { return }
+                withAnimation(.easeOut(duration: 0.16)) { pulse = 1 }
+                do {
+                    try await Task.sleep(for: .milliseconds(160))
+                    withAnimation(reduced ? .easeOut(duration: 0.16)
+                                  : .spring(response: 0.42, dampingFraction: 0.86)) { pulse = 0 }
+                } catch { /* A newer activation owns the return animation. */ }
+            }
+    }
+}
+
 extension View where Self: Shape {
     func glow(
         fill: some ShapeStyle,

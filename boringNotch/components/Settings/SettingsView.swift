@@ -610,21 +610,95 @@ struct HUD: View {
 }
 
 struct Media: View {
-    @State private var lyricsPickerRequest: LyricsPicker.Request?
-    @ObservedObject private var musicManager = MusicManager.shared
-    @Default(.waitInterval) var waitInterval
-    @Default(.mediaController) var mediaController
-    @ObservedObject var coordinator = BoringViewCoordinator.shared
-    @Default(.hideNotchOption) var hideNotchOption
-    @Default(.enableSneakPeek) private var enableSneakPeek
-    @Default(.sneakPeekStyles) var sneakPeekStyles
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    NavigationLink {
+                        MediaPlaybackSettings()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Playback and controls")
+                                Text("Music source and player layout")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        } icon: {
+                            Image(systemName: "play.circle")
+                        }
+                    }
+                    NavigationLink {
+                        MediaLyricsSettings()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Lyrics")
+                                Text("Scrolling, colors, import, and timing")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        } icon: {
+                            Image(systemName: "text.quote")
+                        }
+                    }
+                    NavigationLink {
+                        MediaFocusSettings()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Immersive focus")
+                                Text("Focus timer, lyric projection, and shortcut")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        } icon: {
+                            Image(systemName: "scope")
+                        }
+                    }
+                    NavigationLink {
+                        MediaActivitySettings()
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Activity and appearance")
+                                Text("Live activity, previews, music effects, and weather")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        } icon: {
+                            Image(systemName: "waveform")
+                        }
+                    }
+                    NavigationLink {
+                        Form {
+                            Section {
+                                CodexActivitySettings()
+                            }
+                        }
+                        .navigationTitle("Codex reminders")
+                    } label: {
+                        Label {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Codex reminders")
+                                Text("Task reminders and animation style")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
+                        } icon: {
+                            Image(systemName: "bell")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Media")
+        }
+        .accentColor(.effectiveAccent)
+    }
+}
 
-    @Default(.immersiveFocusEnabled) private var immersiveFocusEnabled
-    @Default(.enableCompactLyrics) var compactLyricsEnabled
-    @Default(.compactLyricsOffset) var compactLyricsOffset
-    @Default(.lyricColorStyle) var lyricColorStyle
-    @Default(.lyricColor) var lyricColor
-    @Default(.enableLyrics) var enableLyrics
+private struct MediaPlaybackSettings: View {
+    @Default(.mediaController) private var mediaController
 
     var body: some View {
         Form {
@@ -663,25 +737,42 @@ struct Media: View {
                     .font(.caption)
                 }
             }
-            
-            Section {
-                Defaults.Toggle("沉浸专注模式", key: .immersiveFocusEnabled)
-                KeyboardShortcuts.Recorder("切换沉浸专注", name: .toggleImmersiveFocus)
-                Text("歌词从持续的 V 字投影中浮现，句末化为细小的彩色粒子；间奏时，三个光点在投影下轻盈游动。")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text("开启后显示二维呼吸聚焦图标和专注时长。默认快捷键 ⌃⌥⌘F，再按一次关闭并重置计时；可在上方修改。其他媒体、火箭和 Codex 提醒动画隐藏。歌词投影仅在接通外部电源时显示，展开灵动岛时暂时收起。")
-                    .font(.caption).foregroundStyle(.secondary)
-                Text("开启系统“减少动态效果”后，聚焦图标、投影与间奏光点静态显示。")
-                    .font(.caption).foregroundStyle(.secondary)
-            } header: {
-                Text("沉浸专注")
-            }
 
             Section {
-                Toggle(
-                    "Show music live activity",
-                    isOn: $coordinator.musicLiveActivityEnabled.animation()
-                )
+                MusicSlotConfigurationView()
+            } header: {
+                Text("Media controls")
+            }  footer: {
+                Text("Customize which controls appear in the music player. Volume expands when active.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Playback and controls")
+    }
+
+    // Only show controller options that are available on this macOS version
+    private var availableMediaControllers: [MediaControllerType] {
+        if MusicManager.shared.isNowPlayingDeprecated {
+            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
+        } else {
+            return MediaControllerType.allCases
+        }
+    }
+}
+
+private struct MediaLyricsSettings: View {
+    @State private var lyricsPickerRequest: LyricsPicker.Request?
+    @ObservedObject private var musicManager = MusicManager.shared
+    @Default(.immersiveFocusEnabled) private var immersiveFocusEnabled
+    @Default(.enableCompactLyrics) private var compactLyricsEnabled
+    @Default(.compactLyricsOffset) private var compactLyricsOffset
+    @Default(.lyricColorStyle) private var lyricColorStyle
+    @Default(.lyricColor) private var lyricColor
+
+    var body: some View {
+        Form {
+            Section {
                 Defaults.Toggle(key: .enableCompactLyrics) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Scrolling lyrics")
@@ -710,6 +801,10 @@ struct Media: View {
                     .padding(8)
                     .frame(maxWidth: .infinity)
                     .background(.black, in: RoundedRectangle(cornerRadius: 8))
+            } header: {
+                Text("Scrolling lyrics")
+            }
+            Section {
                 HStack {
                     Text(LocalizedStringKey(musicManager.lyricsStatus))
                         .font(.caption).foregroundStyle(.secondary)
@@ -724,9 +819,6 @@ struct Media: View {
                     Button(Brand.localized("Retry fetching lyrics")) { musicManager.retryLyrics() }
                         .disabled(musicManager.isFetchingLyrics)
                 }
-                CodexActivitySettings()
-                MusicEdgeSettings()
-                NotchWeatherSettings()
                 Stepper(value: $compactLyricsOffset, in: -10...10, step: 0.1) {
                     Text("Lyric timing adjustment")
                     Text(String(format: "%+.1f s", compactLyricsOffset))
@@ -734,6 +826,58 @@ struct Media: View {
                 }
                 Text("Positive values advance lyrics; negative values delay them.")
                     .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Lyrics and timing")
+            }
+            Section {
+                Defaults.Toggle(key: .enableLyrics) {
+                    HStack {
+                        Text("Show lyrics below artist name")
+                        customBadge(text: "Beta")
+                    }
+                }
+            } header: {
+                Text("Open Notch")
+            }
+        }
+        .navigationTitle("Lyrics")
+    }
+}
+
+private struct MediaFocusSettings: View {
+    var body: some View {
+        Form {
+            Section {
+                Defaults.Toggle("沉浸专注模式", key: .immersiveFocusEnabled)
+                KeyboardShortcuts.Recorder("切换沉浸专注", name: .toggleImmersiveFocus)
+                Text("歌词从持续的 V 字投影中浮现，句末化为细小的彩色粒子；间奏时，三个光点在投影下轻盈游动。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("开启后显示二维呼吸聚焦图标和专注时长。默认快捷键 ⌃⌥⌘F，再按一次关闭并重置计时；可在上方修改。其他媒体、火箭和 Codex 提醒动画隐藏。歌词投影仅在接通外部电源时显示，展开灵动岛时暂时收起。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Text("开启系统“减少动态效果”后，聚焦图标、投影与间奏光点静态显示。")
+                    .font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("沉浸专注")
+            }
+        }
+        .navigationTitle("Immersive focus")
+    }
+}
+
+private struct MediaActivitySettings: View {
+    @ObservedObject private var coordinator = BoringViewCoordinator.shared
+    @Default(.waitInterval) private var waitInterval
+    @Default(.hideNotchOption) private var hideNotchOption
+    @Default(.enableSneakPeek) private var enableSneakPeek
+    @Default(.sneakPeekStyles) private var sneakPeekStyles
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle(
+                    "Show music live activity",
+                    isOn: $coordinator.musicLiveActivityEnabled.animation()
+                )
                 Toggle("Show sneak peek on playback changes", isOn: $enableSneakPeek)
                 Picker("Sneak Peek Style", selection: $sneakPeekStyles) {
                     ForEach(SneakPeekStyle.allCases) { style in
@@ -766,34 +910,18 @@ struct Media: View {
             } header: {
                 Text("Media playback live activity")
             }
-            
             Section {
-                MusicSlotConfigurationView()
-                Defaults.Toggle(key: .enableLyrics) {
-                    HStack {
-                        Text("Show lyrics below artist name")
-                        customBadge(text: "Beta")
-                    }
-                }
+                MusicEdgeSettings()
             } header: {
-                Text("Media controls")
-            }  footer: {
-                Text("Customize which controls appear in the music player. Volume expands when active.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                Text("Music effects")
+            }
+            Section {
+                NotchWeatherSettings()
+            } header: {
+                Text("Weather")
             }
         }
-        .accentColor(.effectiveAccent)
-        .navigationTitle("Media")
-    }
-
-    // Only show controller options that are available on this macOS version
-    private var availableMediaControllers: [MediaControllerType] {
-        if MusicManager.shared.isNowPlayingDeprecated {
-            return MediaControllerType.allCases.filter { $0 != .nowPlaying }
-        } else {
-            return MediaControllerType.allCases
-        }
+        .navigationTitle("Activity and appearance")
     }
 }
 

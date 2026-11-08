@@ -30,11 +30,19 @@ import UniformTypeIdentifiers
         }
         let output = URL(fileURLWithPath: CommandLine.arguments.dropFirst().first ?? "/tmp/immersive-projection")
         try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        func content(text: String = "让这一刻，慢慢流淌") -> ImmersiveLyricsView {
+        let sampleDate = Date()
+        func content(text: String = "让这一刻，慢慢流淌", position: Double = 60,
+                     date: Date? = nil, rate: Double = 0, duration: Double = 180,
+                     offset: Double = 0, sourceWidth: CGFloat = 280) -> ImmersiveLyricsView {
             ImmersiveLyricsView(segments: [.init(id: 0, start: 0, end: 120, text: text)],
-                position: 60, sampleDate: Date(), rate: 0,
-                duration: 180, offset: 0,
-                sourceWidth: 280)
+                position: position, sampleDate: date ?? sampleDate, rate: rate,
+                duration: duration, offset: offset, sourceWidth: sourceWidth)
+        }
+        assert(content() == content(), "Unchanged projection content must not restart its clock")
+        for changed in [content(text: "下一句"), content(position: 61),
+                        content(date: sampleDate.addingTimeInterval(1)), content(rate: 1),
+                        content(duration: 181), content(offset: 1), content(sourceWidth: 300)] {
+            assert(changed != content(), "Projection deduplication must preserve every content input")
         }
         func particleImage(text: String = "让这一刻，慢慢流淌", time: Double, progress: Double) -> CGImage {
             let view = ImmersiveLyricLine(text: text, dissolve: progress)
@@ -385,6 +393,15 @@ import UniformTypeIdentifiers
         assert(abs(panel.frame.maxY - (parent.frame.maxY - 35)) < 1)
         anchor.updatePanel()
         assert(parent.childWindows?.count == 1, "Repeated updates created duplicate windows")
+        let host = panel.contentView as! NSHostingView<ImmersiveLyricsView>
+        let updatedContent = content(position: 61, rate: 1, offset: 0.5)
+        anchor.presentation = ImmersiveLyricsPanel(visible: true, topInset: 40,
+            hideFromRecording: true, content: updatedContent)
+        anchor.updatePanel()
+        assert(panel.contentView === host && host.rootView == updatedContent,
+               "Real clock changes must update the existing renderer")
+        assert(panel.sharingType == .none && abs(panel.frame.maxY - (parent.frame.maxY - 40)) < 1,
+               "Content deduplication must preserve privacy and geometry changes: sharing=\(panel.sharingType.rawValue), panel=\(panel.frame), parent=\(parent.frame)")
         anchor.presentation = ImmersiveLyricsPanel(visible: false, topInset: 35,
                                                    hideFromRecording: true, content: content())
         anchor.updatePanel()

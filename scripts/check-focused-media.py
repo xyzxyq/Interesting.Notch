@@ -23,11 +23,15 @@ source = source[:start] + '''    init?() {
         MRMediaRemoteSetRepeatModeFunction = { _ in systemCommands += 1 }
     }
 ''' + source[end:]
-source = source.replace('Set(NSWorkspace.shared.runningApplications.compactMap(\\.bundleIdentifier))', 'Fixture.running')
+source = source.replace('Set(NSWorkspace.shared.runningApplications.compactMap(\\.bundleIdentifier))', 'Fixture.runningSnapshot')
 fixture = r'''
 import SwiftUI
 var systemCommands = 0
-enum Fixture { static var running: Set<String> = [] }
+enum Fixture {
+    static var running: Set<String> = []
+    static var runningReads = 0
+    static var runningSnapshot: Set<String> { runningReads += 1; return running }
+}
 enum Defaults {
     enum Key { case immersiveFocusEnabled }
     struct Change { var newValue: Bool }
@@ -131,7 +135,9 @@ final class YouTubeMusicController: MockPlayer {}
             await router.setFavorite(true); await router.updatePlaybackInfo()
             assert(player.calls == ["play", "pause", "toggle", "next", "previous", "seek", "shuffle", "repeat", "volume", "favorite", "refresh"])
             assert(systemCommands == 0, "Focused controls reached the system's unrelated video player")
+            Fixture.runningReads = 0
             Defaults.focus(false); router.refreshVideoAudio(forceNative: true)
+            assert(Fixture.runningReads == 0, "Ordinary media updates must not enumerate focused music applications")
             assert(router.focusedController == nil && router.playbackState.bundleIdentifier == "test.video",
                    "Disabling focus must restore the current system source")
             player.subject.send(music); await settle()

@@ -101,7 +101,7 @@ python3 scripts/codex-notch-bridge-install.py --binary ./codex-notch-bridge
 
 **旧 Python 桥接也通过此命令迁移；应用内更新不会更新独立桥接。** 桥接读取本机任务状态、待回答问题与额度，通过带令牌保护的回环接口发送回答；客户端私有接口变化可能影响兼容性。[安装、卸载与接口说明 →](docs/guide.md#codex-状态桥接)
 
-**3.1.1 的桥接与 3.0.14、3.0.15、3.1.0 相同，已安装这些版本桥接的用户无需重装。** 从更早版本升级时，请同步安装桥接附件，以获得交互请求恢复、所属对话模型与快速模式信息，以及无效历史扫描优化；应用内更新不会升级独立桥接。
+**3.1.2 的桥接与 3.0.14、3.0.15、3.1.0、3.1.1 相同，已安装这些版本桥接的用户无需重装。** 从更早版本升级时，请同步安装桥接附件，以获得交互请求恢复、所属对话模型与快速模式信息，以及无效历史扫描优化；应用内更新不会升级独立桥接。
 
 ### 播放器与权限
 
@@ -116,7 +116,7 @@ python3 scripts/codex-notch-bridge-install.py --binary ./codex-notch-bridge
 
 ## 开发与设计
 
-使用 **Xcode 26+**，应用部署目标为 **macOS 14**；Xcode 本身需要兼容的 macOS 版本。
+使用 **Xcode 26+ / Swift 6.2+**（KeyboardShortcuts 3.1 的工具链要求），应用部署目标为 **macOS 14**；Xcode 本身需要兼容的 macOS 版本。
 
 ```bash
 git clone https://github.com/xyzxyq/Interesting.Notch.git
@@ -132,6 +132,7 @@ open boringNotch.xcodeproj
 
 | 资料 | 内容 |
 | :--- | :--- |
+| [3.1.2 · 启动动效与媒体设置](docs/releases/3.1.2.md) | 常规启动与重复打开动画、媒体分类和重复工作优化 |
 | [3.1.1 · 专注动效与效率](docs/releases/3.1.1.md) | 专注开关动画、快捷键、灵动间奏、封面修复与歌词 CPU 优化 |
 | [3.1.0 · 沉浸专注](docs/releases/3.1.0.md) | 单句玻璃歌词投影、聚焦图标与计时、音乐独占及 Apple Music 封面修复 |
 | [3.0.15 · 智能节能](docs/releases/3.0.15.md) | 电池、低电量或严重热状态下自动回退基础功能；条件解除后恢复 |

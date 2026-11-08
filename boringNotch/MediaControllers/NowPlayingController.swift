@@ -299,7 +299,8 @@ final class NowPlayingController: ObservableObject, MediaControllerProtocol {
     // MARK: - Update Methods
     @MainActor
     private func refreshFocusedController() {
-        let running = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        let running: Set<String> = Defaults[.immersiveFocusEnabled]
+            ? Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier)) : []
         let source = PlaybackState.focusedMusicSource(enabled: Defaults[.immersiveFocusEnabled],
             current: focusedSource, system: remotePlaybackState.bundleIdentifier, running: running)
         guard source != focusedSource else { return }

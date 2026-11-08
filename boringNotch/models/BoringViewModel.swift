@@ -18,6 +18,7 @@ class BoringViewModel: NSObject, ObservableObject {
 
     @Published var contentType: ContentType = .normal
     @Published private(set) var notchState: NotchState = .closed
+    @Published private(set) var activationSequence = 0
 
     @Published var dragDetectorTargeting: Bool = false
     @Published var generalDropTargeting: Bool = false
@@ -187,6 +188,10 @@ class BoringViewModel: NSObject, ObservableObject {
         }
         
         return false
+    }
+
+    func animateActivation() {
+        activationSequence &+= 1
     }
 
     func open() {
