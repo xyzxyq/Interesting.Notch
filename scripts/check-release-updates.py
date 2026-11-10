@@ -21,6 +21,14 @@ view = (root / 'boringNotch/components/Settings/SoftwareUpdater.swift').read_tex
 assert 'updater.checkForUpdates()' in view
 assert 'automaticallyChecksForUpdates = $0' in view and 'automaticallyDownloadsUpdates = $0' in view
 assert 'TheBoredTeam' not in view
+assert 'updaterDelegate: SoftwareUpdateNotes.shared' in (root / 'boringNotch/boringNotchApp.swift').read_text()
+assert module.release_summary('# Version\n\n- First\n- Second\n\nOther details\n- Excluded') == '- First\n- Second'
+assert len(module.release_summary('\n'.join(f'- Item {i}' for i in range(7))).splitlines()) == 5
+try:
+    module.release_summary('# Version\nNo highlights')
+    raise AssertionError('Accepted release notes without highlights')
+except ValueError:
+    pass
 bundle = dict(info, CFBundleIdentifier='theboringteam.boringnotch', CFBundleShortVersionString='3.0.7', CFBundleVersion='307')
 module.validate_bundle(bundle, info, 'v3.0.7')
 for key, value in [('CFBundleIdentifier', 'theboringteam.boringnotch.preview'),
@@ -41,6 +49,8 @@ with tempfile.TemporaryDirectory() as temp:
     version = ET.SubElement(item, module.NS + 'shortVersionString')
     version.text = '3.0.7'
     ET.SubElement(item, module.NS + 'version').text = '307'
+    description = ET.SubElement(item, 'description', {module.NS + 'format': 'plain-text'})
+    description.text = '- First change\n- Second change & details'
     enclosure = ET.SubElement(item, 'enclosure', {
         'url': 'https://github.com/xyzxyq/Interesting.Notch/releases/download/v3.0.7/InterestingNotch.dmg',
         'length': str(archive.stat().st_size), module.NS + 'edSignature': base64.b64encode(bytes(64)).decode()})
@@ -48,6 +58,21 @@ with tempfile.TemporaryDirectory() as temp:
         ET.ElementTree(rss).write(feed)
         return module.validate_feed(feed, archive, 'v3.0.7')
     assert check() == base64.b64encode(bytes(64)).decode()
+    for invalid_summary in ('', '   '):
+        description.text = invalid_summary
+        try:
+            check()
+            raise AssertionError('Accepted empty release summary')
+        except ValueError:
+            pass
+    description.text = '- Valid summary'
+    description.set(module.NS + 'format', 'html')
+    try:
+        check()
+        raise AssertionError('Accepted unsupported release summary format')
+    except ValueError:
+        pass
+    description.set(module.NS + 'format', 'plain-text')
     for key, bad in [('url', 'https://github.com/TheBoredTeam/boring.notch/releases/download/v3.0.7/a.dmg'),
                      ('url', enclosure.get('url').replace('v3.0.7', 'v3.0.6')),
                      ('length', '1'), (module.NS + 'edSignature', ''), (module.NS + 'edSignature', 'malformed')]:
@@ -65,4 +90,4 @@ with tempfile.TemporaryDirectory() as temp:
         raise AssertionError('Accepted wrong version')
     except ValueError:
         pass
-print('Update checks passed: fork isolation, opt-in installation, version, URL, size and signature presence')
+print('Update checks passed: release summaries, fork isolation, opt-in installation, version, URL, size and signature presence')

@@ -80,3 +80,17 @@
 "Automatically download and install updates" = "自动下载并安装更新";
 
 "Checks GitHub releases daily. Automatic installation finishes when the app quits; you can also restart to update." = "每天检查 GitHub 正式版。自动安装在退出应用时完成，也可以重启以更新。";
+
+"New version available: %@" = "发现新版本：%@";
+"This release has no summary. Open GitHub Releases to read the update details." = "此版本未提供更新摘要，可打开 GitHub Releases 查看详情。";
+
+"Enter a name and a complete http:// or https:// address for a Lottie JSON file." = "请输入名称，以及以 http:// 或 https:// 开头的完整 Lottie JSON 文件地址。";
+"System accent color" = "系统强调色";
+"Blue" = "蓝色";
+"Purple" = "紫色";
+"Pink" = "粉色";
+"Red" = "红色";
+"Orange" = "橙色";
+"Yellow" = "黄色";
+"Green" = "绿色";
+"Graphite" = "石墨色";

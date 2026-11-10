@@ -22,7 +22,7 @@ struct DynamicNotchApp: App {
 
     init() {
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+            startingUpdater: true, updaterDelegate: SoftwareUpdateNotes.shared, userDriverDelegate: nil)
 
         // Initialize the settings window controller with the updater controller
         SettingsWindowController.shared.setUpdaterController(updaterController)
@@ -65,7 +65,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var screenLockedObserver: Any?
     private var screenUnlockedObserver: Any?
     private var isScreenLocked: Bool = false
-    private var windowScreenDidChangeObserver: Any?
     private var dragDetectors: [String: DragDetector] = [:] // UUID -> DragDetector
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -184,10 +183,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else if let window = window {
             window.close()
             NotchSpaceManager.shared.notchSpace.windows.remove(window)
-            if let obs = windowScreenDidChangeObserver {
-                NotificationCenter.default.removeObserver(obs)
-                windowScreenDidChangeObserver = nil
-            }
             self.window = nil
         }
     }
@@ -209,7 +204,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 setupDragDetectorForScreen(screen)
             }
         } else {
-            let preferredScreen: NSScreen? = window?.screen
+            guard let window else { return }
+            let preferredScreen: NSScreen? = window.screen
                 ?? NSScreen.screen(withUUID: coordinator.selectedScreenUUID)
                 ?? NSScreen.main
 
@@ -279,16 +275,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.orderFrontRegardless()
         NotchSpaceManager.shared.notchSpace.windows.insert(window)
 
-        // Observe when the window's screen changes so we can update drag detectors
-        windowScreenDidChangeObserver = NotificationCenter.default.addObserver(
-            forName: NSWindow.didChangeScreenNotification,
-            object: window,
-            queue: .main) { [weak self] _ in
-                Task { @MainActor in
-                    self?.setupDragDetectors()
-                }
-        }
         return window
+    }
+
+    @objc private func notchWindowDidChangeScreen(_ notification: Notification) {
+        guard let changedWindow = notification.object as? NSWindow,
+              changedWindow === window || windows.values.contains(where: { $0 === changedWindow }) else { return }
+        Task { @MainActor [weak self] in self?.setupDragDetectors() }
     }
 
     @MainActor
@@ -316,6 +309,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
+        // One lifetime observer covers all notch windows without accumulating tokens on reconnect.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(notchWindowDidChangeScreen(_:)),
+            name: NSWindow.didChangeScreenNotification, object: nil
+        )
 
         NotificationCenter.default.addObserver(
             forName: Notification.Name.selectedScreenChanged, object: nil, queue: nil
@@ -338,9 +336,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(
             forName: Notification.Name.automaticallySwitchDisplayChanged, object: nil, queue: nil
         ) { [weak self] _ in
-            guard let self = self, let window = self.window else { return }
             Task { @MainActor in
-                window.alphaValue = self.coordinator.selectedScreenUUID == self.coordinator.preferredScreenUUID ? 1 : 0
+                self?.adjustWindowPosition()
+                self?.setupDragDetectors()
             }
         }
 
@@ -564,9 +562,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 coordinator.selectedScreenUUID = mainUUID
                 selectedScreen = mainScreen
             } else {
-                if let window = window {
-                    window.alphaValue = 0
-                }
+                // Transparent hosting views still animate; release the unavailable display's window.
+                cleanupWindows()
+                cleanupDragDetectors()
                 return
             }
 

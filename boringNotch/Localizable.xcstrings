@@ -1,6 +1,7 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "%.1f×" : {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "%.1f×"}}, "zh-Hans": {"stringUnit": {"state": "translated", "value": "%.1f×"}}}},
     "Playback and controls" : {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Playback and controls"}}, "zh-Hans": {"stringUnit": {"state": "translated", "value": "播放与控制"}}}},
     "Music source and player layout" : {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Music source and player layout"}}, "zh-Hans": {"stringUnit": {"state": "translated", "value": "音乐来源与播放器按钮布局"}}}},
     "Lyrics" : {"localizations": {"en": {"stringUnit": {"state": "translated", "value": "Lyrics"}}, "zh-Hans": {"stringUnit": {"state": "translated", "value": "歌词"}}}},

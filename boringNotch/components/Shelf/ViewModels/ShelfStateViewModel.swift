@@ -44,8 +44,16 @@ final class ShelfStateViewModel: ObservableObject {
     }
 
     func remove(_ item: ShelfItem) {
-        item.cleanupStoredData()
+        guard let current = items.first(where: { $0.id == item.id }) else { return }
+        let fileURL = current.fileURL
+        current.cleanupStoredData()
         items.removeAll { $0.id == item.id }
+        if let fileURL {
+            Task { [weak self] in
+                guard let self, !self.items.contains(where: { $0.fileURL?.standardizedFileURL == fileURL.standardizedFileURL }) else { return }
+                await ThumbnailService.shared.clearCache(for: fileURL)
+            }
+        }
     }
 
     func updateBookmark(for item: ShelfItem, bookmark: Data) {

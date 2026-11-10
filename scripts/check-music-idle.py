@@ -11,6 +11,7 @@ method = source.split('    private func updateIdleState(state: Bool) {', 1)[1].s
 method = '    func updateIdleState(state: Bool) {' + method
 empty = source.split('    private func updateFromPlaybackState(_ state: PlaybackState) {', 1)[1].split('        if isMusicSource != state.isMusicSource', 1)[0]
 position = source.split('    public func estimatedPlaybackPosition(at date: Date = Date()) -> TimeInterval {', 1)[1].split('    func calculateAverageColor()', 1)[0]
+skip = source.split('    func skip(seconds: TimeInterval) {', 1)[1].split('    func setVolume(to level:', 1)[0]
 empty_check = '''
 struct EmptySourceState { let bundleIdentifier = "" }
 @MainActor final class EmptySourceCheck: ObservableObject {
@@ -32,6 +33,10 @@ struct EmptySourceState { let bundleIdentifier = "" }
     @Published var isFetchingLyrics = false
     @Published var lyricsStatus = "Lyrics idle"
     var songDuration: TimeInterval = 100
+    var lastSeek: TimeInterval = 0
+    func seek(to position: TimeInterval) { lastSeek = position }
+    func skip(seconds: TimeInterval) {
+''' + skip + '''
     var debounceIdleTask: Task<Void, Never>?
     var lyricsTask: Task<Void, Never>?
     var lyricsGeneration: UInt64 = 0
@@ -79,6 +84,22 @@ func withAnimation(_ action: () -> Void) { action() }
         model.isPlaying = true
         model.updateIdleState(state: true)
         assert(!model.isPlayerIdle, "Resume must immediately present music")
+        let transport = EmptySourceCheck()
+        transport.isPlaying = true
+        transport.elapsedTime = 10; transport.timestampDate = Date(timeIntervalSinceNow: -20)
+        transport.playbackRate = 1.5
+        transport.skip(seconds: 15)
+        assert(abs(transport.lastSeek - 55) < 0.5, "Skip must advance from the live clock, not stale sampled elapsedTime")
+        transport.skip(seconds: -15)
+        assert(abs(transport.lastSeek - 25) < 0.5, "Backward skip must also use the live clock")
+        transport.isPlaying = false
+        transport.skip(seconds: 15)
+        assert(transport.lastSeek == 25, "Paused skip must use the frozen position")
+        transport.skip(seconds: -15)
+        assert(transport.lastSeek == 0, "Backward skip must clamp to the track start")
+        transport.elapsedTime = 95
+        transport.skip(seconds: 15)
+        assert(transport.lastSeek == 100, "Forward skip must clamp to the track duration")
         let source = EmptySourceCheck()
         source.isPlaying = true; source.isMusicSource = true; source.isPlayerIdle = false
         source.elapsedTime = 10; source.timestampDate = Date(timeIntervalSinceNow: -2); source.playbackRate = 1.5
@@ -121,7 +142,7 @@ func withAnimation(_ action: () -> Void) { action() }
         source.updateFromPlaybackState(EmptySourceState())
         assert(publications == 0, "Empty focus must remain publication-idle")
         withExtendedLifetime(observer) {}
-        print("Music idle checks passed: pause/resume grace period, source-loss freeze/cancellation, no duplicate idle publications")
+        print("Music idle checks passed: live-clock forward/backward skip, pause/resume grace period, source-loss freeze/cancellation, no duplicate idle publications")
     }
 }
 '''

@@ -19,9 +19,6 @@ final class ShelfItemViewModel: ObservableObject {
     @Published var isDropTargeted: Bool = false
     @Published var isRenaming: Bool = false
     @Published var draftTitle: String = ""
-    private var sharingLifecycle: SharingLifecycleDelegate?
-    private var quickShareLifecycle: SharingLifecycleDelegate?
-    private var sharingAccessingURLs: [URL] = []
     private static var copiedURLs: [URL] = []
 
     private let selection = ShelfSelectionModel.shared
@@ -146,31 +143,21 @@ final class ShelfItemViewModel: ObservableObject {
             
             guard !itemsToShare.isEmpty else { return }
              
-            stopSharingAccessingURLs()
-            // Start security-scoped access for all file URLs and keep it active during sharing
-            sharingAccessingURLs = fileURLs.filter { $0.startAccessingSecurityScopedResource() }
-            
-            // Create and retain lifecycle delegate for the entire share operation
-            let lifecycle = SharingStateManager.shared.makeDelegate { [weak self] in
-                self?.sharingLifecycle = nil
-                self?.stopSharingAccessingURLs()
+            // Each transfer owns its access even if another share starts or this view disappears.
+            let accessingURLs = fileURLs.filter { $0.startAccessingSecurityScopedResource() }
+            let lifecycle = SharingStateManager.shared.makeDelegate {
+                accessingURLs.forEach { $0.stopAccessingSecurityScopedResource() }
             }
-            self.sharingLifecycle = lifecycle
             
             let picker = NSSharingServicePicker(items: itemsToShare)
             picker.delegate = lifecycle
             lifecycle.markPickerBegan()
             if let view {
                 picker.show(relativeTo: .zero, of: view, preferredEdge: .minY)
+            } else {
+                lifecycle.sharingServicePicker(picker, didChoose: nil)
             }
         }
-    }
-    
-    private func stopSharingAccessingURLs() {
-        for url in sharingAccessingURLs {
-            url.stopAccessingSecurityScopedResource()
-        }
-        sharingAccessingURLs.removeAll()
     }
 
     /// Call this closure to request a QuickLook preview for the given URLs.

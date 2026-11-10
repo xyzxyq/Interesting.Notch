@@ -76,16 +76,16 @@ class CalendarManager: ObservableObject {
                 return
             }
             self.calendarAuthorizationStatus = granted ? .fullAccess : .denied
-            if granted {
-                await reloadCalendarAndReminderLists()
-            }
+            await reloadCalendarAndReminderLists()
         case .restricted, .denied:
             NSLog("Calendar access denied or restricted")
+            await reloadCalendarAndReminderLists()
         case .fullAccess:
             NSLog("Full access")
             await reloadCalendarAndReminderLists()
         case .writeOnly:
             NSLog("Write only")
+            await reloadCalendarAndReminderLists()
         @unknown default:
             print("Unknown authorization status")
         }
@@ -102,16 +102,16 @@ class CalendarManager: ObservableObject {
                 return
             }
             self.reminderAuthorizationStatus = granted ? .fullAccess : .denied
-            if granted {
-                await reloadCalendarAndReminderLists()
-            }
+            await reloadCalendarAndReminderLists()
         case .restricted, .denied:
             NSLog("Reminder access denied or restricted")
+            await reloadCalendarAndReminderLists()
         case .fullAccess:
             NSLog("Full access")
             await reloadCalendarAndReminderLists()
         case .writeOnly:
             NSLog("Write only")
+            await reloadCalendarAndReminderLists()
         @unknown default:
             print("Unknown authorization status")
         }
@@ -167,7 +167,9 @@ class CalendarManager: ObservableObject {
     }
 
     func updateCurrentDate(_ date: Date) async {
-        currentWeekStartDate = Calendar.current.startOfDay(for: date)
+        let day = Calendar.current.startOfDay(for: date)
+        guard day != currentWeekStartDate else { return }
+        currentWeekStartDate = day
         await updateEvents()
     }
 

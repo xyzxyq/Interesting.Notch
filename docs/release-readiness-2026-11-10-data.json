@@ -1,0 +1,131 @@
+{
+  "date": "2026-11-10",
+  "comparison": "second-round baseline already includes first-round 2026-11-10 optimizations",
+  "configuration": "Debug, same development signing; closed single-display ambient white water",
+  "method": {
+    "order": "ABBA",
+    "warmup_seconds": 15,
+    "measure_seconds": 30,
+    "cpu_time_calibration_ratio": 0.999199384774384,
+    "runtime_flags": [
+      "-immersiveFocusEnabled",
+      "NO",
+      "-musicEdgeStyle",
+      "waterWhite",
+      "-musicEdgeAlwaysOn",
+      "YES",
+      "-musicEdgeReactive",
+      "NO",
+      "-codexRocketEnabled",
+      "NO",
+      "-smartEnergySaving",
+      "NO",
+      "-showOnAllDisplays",
+      "NO",
+      "-automaticallySwitchDisplay",
+      "YES",
+      "-hideNotchOption",
+      "never"
+    ],
+    "flags_persisted": false,
+    "candidate_restored_without_test_flags": true
+  },
+  "records": [
+    {
+      "variant": "baseline",
+      "summary": {
+        "seconds": 30.11842075,
+        "cpu_percent": 6.006703693674466,
+        "idle_wakeups_s": 29.2512016919081,
+        "interrupt_wakeups_s": 92.03669817249632,
+        "process_energy_mw": 10.093281202335286,
+        "footprint_mib": 71.42290496826172,
+        "instructions_s": 130975989.30382165,
+        "cycles_s": 112251831.09907913,
+        "host_busy_percent": 20.278855155811158
+      }
+    },
+    {
+      "variant": "candidate",
+      "summary": {
+        "seconds": 30.155500624999988,
+        "cpu_percent": 5.413263913715356,
+        "idle_wakeups_s": 23.77675664935177,
+        "interrupt_wakeups_s": 92.38778804057746,
+        "process_energy_mw": 11.334020292027573,
+        "footprint_mib": 71.01663208007812,
+        "instructions_s": 117805435.10708177,
+        "cycles_s": 124581514.05669132,
+        "host_busy_percent": 27.07671736586996
+      }
+    },
+    {
+      "variant": "candidate",
+      "summary": {
+        "seconds": 30.143972875000017,
+        "cpu_percent": 5.374902964467539,
+        "idle_wakeups_s": 25.842645335116583,
+        "interrupt_wakeups_s": 91.16250241450625,
+        "process_energy_mw": 10.463127116916231,
+        "footprint_mib": 71.07915496826172,
+        "instructions_s": 117446499.36094391,
+        "cycles_s": 115934345.49890922,
+        "host_busy_percent": 24.079954540896477
+      }
+    },
+    {
+      "variant": "baseline",
+      "summary": {
+        "seconds": 30.148352666999983,
+        "cpu_percent": 4.712409217486354,
+        "idle_wakeups_s": 34.7946042553835,
+        "interrupt_wakeups_s": 89.45762409606223,
+        "process_energy_mw": 9.48323867502542,
+        "footprint_mib": 70.93850708007812,
+        "instructions_s": 114347821.52371065,
+        "cycles_s": 101009248.48651206,
+        "host_busy_percent": 18.598049692759822
+      }
+    }
+  ],
+  "mean_by_variant": {
+    "baseline": {
+      "seconds": 30.13338670849999,
+      "cpu_percent": 5.35955645558041,
+      "idle_wakeups_s": 32.0229029736458,
+      "interrupt_wakeups_s": 90.74716113427928,
+      "process_energy_mw": 9.788259938680353,
+      "footprint_mib": 71.18070602416992,
+      "instructions_s": 122661905.41376615,
+      "cycles_s": 106630539.7927956,
+      "host_busy_percent": 19.43845242428549
+    },
+    "candidate": {
+      "seconds": 30.149736750000002,
+      "cpu_percent": 5.394083439091448,
+      "idle_wakeups_s": 24.809700992234177,
+      "interrupt_wakeups_s": 91.77514522754186,
+      "process_energy_mw": 10.898573704471902,
+      "footprint_mib": 71.04789352416992,
+      "instructions_s": 117625967.23401284,
+      "cycles_s": 120257929.77780026,
+      "host_busy_percent": 25.578335953383217
+    }
+  },
+  "limits": [
+    "Two short runs per variant; no statistical equivalence established.",
+    "Host CPU load differed between variants; attributed process energy is not battery/whole-system/GPU energy.",
+    "CPU and footprint are similar in this scenario; neither power savings nor power non-regression established.",
+    "Event-driven fixes validated separately by behavioral counters; idle deltas do not establish their causal effect."
+  ],
+  "relative_change_percent": {
+    "cpu_percent": 0.6442134493254148,
+    "idle_wakeups_s": -22.52513454931909,
+    "interrupt_wakeups_s": 1.1328002776213042,
+    "process_energy_mw": 11.343321210789604,
+    "footprint_mib": -0.18658497143159147,
+    "instructions_s": -4.105543740549233,
+    "cycles_s": 12.780006564240786,
+    "host_busy_percent": 31.586277523959904
+  }
+}

@@ -174,7 +174,7 @@ struct GeneralSettings: View {
                         Text(screen.name).tag(screen.uuid as String?)
                     }
                 }
-                .onChange(of: NSScreen.screens) {
+                .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
                     screens = NSScreen.screens.compactMap { screen in
                         guard let uuid = screen.displayUUID else { return nil }
                         return (uuid, screen.localizedName)
@@ -1602,10 +1602,14 @@ struct Appearance: View {
                             .padding(.vertical)
                         TextField("Name", text: $name)
                         TextField("Lottie JSON URL", text: $url)
+                        Text(Brand.localized("Enter a name and a complete http:// or https:// address for a Lottie JSON file."))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                         HStack {
                             Text("Speed")
                             Spacer(minLength: 80)
-                            Text("\(speed, specifier: "%.1f")s")
+                            Text("\(speed, specifier: "%.1f")×")
                                 .multilineTextAlignment(.trailing)
                                 .foregroundStyle(.secondary)
                             Slider(value: $speed, in: 0...2, step: 0.1)
@@ -1618,12 +1622,15 @@ struct Appearance: View {
                                 Text("Cancel")
                                     .frame(maxWidth: .infinity, alignment: .center)
                             }
+                            .keyboardShortcut(.cancelAction)
 
                             Button {
+                                let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !trimmedName.isEmpty, let validatedURL = Self.visualizerURL(url) else { return }
                                 let visualizer: CustomVisualizer = .init(
                                     UUID: UUID(),
-                                    name: name,
-                                    url: URL(string: url)!,
+                                    name: trimmedName,
+                                    url: validatedURL,
                                     speed: speed
                                 )
 
@@ -1637,6 +1644,8 @@ struct Appearance: View {
                                     .frame(maxWidth: .infinity, alignment: .center)
                             }
                             .buttonStyle(BorderedProminentButtonStyle())
+                            .keyboardShortcut(.defaultAction)
+                            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || Self.visualizerURL(url) == nil)
                         }
                     }
                     .textFieldStyle(RoundedBorderTextFieldStyle())
@@ -1675,6 +1684,14 @@ struct Appearance: View {
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("Appearance")
+    }
+
+    private static func visualizerURL(_ input: String) -> URL? {
+        guard let components = URLComponents(string: input.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let scheme = components.scheme?.lowercased(),
+              scheme == "https" || scheme == "http",
+              let host = components.host, !host.isEmpty else { return nil }
+        return components.url
     }
 
     func checkVideoInput() -> Bool {
@@ -1741,6 +1758,7 @@ struct Advanced: View {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack(spacing: 12) {
                                 AccentCircleButton(
+                                    label: Brand.localized("System accent color"),
                                     isSelected: true,
                                     color: .accentColor,
                                     isSystemDefault: true
@@ -1767,6 +1785,7 @@ struct Advanced: View {
                             HStack(spacing: 12) {
                                 ForEach(PresetAccentColor.allCases) { preset in
                                     AccentCircleButton(
+                                        label: Brand.localized(preset.rawValue),
                                         isSelected: selectedPresetColor == preset,
                                         color: preset.color,
                                         isMulticolor: false
@@ -1817,6 +1836,7 @@ struct Advanced: View {
                                     }
                                 }
                                 .labelsHidden()
+                                .accessibilityLabel(Text("Pick a Color"))
                             }
                         }
                     }
@@ -1964,6 +1984,7 @@ struct Advanced: View {
 
 // MARK: - Accent Circle Button Component
 struct AccentCircleButton: View {
+    let label: String
     let isSelected: Bool
     let color: Color
     var isSystemDefault: Bool = false
@@ -1995,7 +2016,9 @@ struct AccentCircleButton: View {
             }
         }
         .buttonStyle(.plain)
-        .help(isSystemDefault ? "Use your macOS system accent color" : "")
+        .accessibilityLabel(label)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .help(isSystemDefault ? String(localized: "Use your macOS system accent color") : label)
     }
 }
 

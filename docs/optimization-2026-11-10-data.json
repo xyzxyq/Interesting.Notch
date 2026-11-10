@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-10",
+  "timezone": "Asia/Shanghai",
+  "scope": "isolated production music-edge SwiftUI view; not full application, GPU or whole-system power",
+  "input": "20 Hz synthetic audio; unchanged shape, particle counts and configured frame intervals",
+  "sequence": "ABBA, 1 s warmup and 15 s measure per run, signed -O app with NSApp.run",
+  "results": [
+    {
+      "variant": "baseline",
+      "audio": 300,
+      "body": 598,
+      "Canvas": 599,
+      "CPU": 7.425377727964304,
+      "seconds": 15.00024700164795
+    },
+    {
+      "variant": "optimized",
+      "audio": 300,
+      "body": 0,
+      "Canvas": 300,
+      "CPU": 5.194973256219442,
+      "seconds": 15.000288963317871
+    },
+    {
+      "variant": "optimized",
+      "audio": 300,
+      "body": 0,
+      "Canvas": 300,
+      "CPU": 4.987418531624032,
+      "seconds": 15.000204920768738
+    },
+    {
+      "variant": "baseline",
+      "audio": 300,
+      "body": 598,
+      "Canvas": 599,
+      "CPU": 7.387138848801082,
+      "seconds": 15.000570893287659
+    }
+  ],
+  "mean_cpu_percent": {
+    "baseline": 7.406258288382693,
+    "optimized": 5.091195893921737
+  },
+  "relative_cpu_reduction_percent": 31.258191441855544,
+  "final_process": {
+    "pid": 55917,
+    "executable": "/Users/zxy/Applications/InterestingNotch Debug.app/Contents/MacOS/Interesting Notch"
+  },
+  "preexisting_changes_preserved": true
+}

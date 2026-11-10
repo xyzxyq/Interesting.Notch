@@ -159,7 +159,7 @@ actor YouTubeMusicWebSocketClient {
         task = newTask
         newTask.resume()
         
-        Task { await listenForMessages() }
+        Task { await listenForMessages(from: newTask) }
     }
     
     func disconnect() async {
@@ -167,12 +167,11 @@ actor YouTubeMusicWebSocketClient {
         task = nil
     }
     
-    private func listenForMessages() async {
-        guard let currentTask = task else { return }
-        
-        while !Task.isCancelled && task != nil {
+    private func listenForMessages(from currentTask: URLSessionWebSocketTask) async {
+        while !Task.isCancelled && task === currentTask {
             do {
                 let message = try await currentTask.receive()
+                guard task === currentTask else { return }
                 
                 let data: Data
                 switch message {
@@ -189,6 +188,7 @@ actor YouTubeMusicWebSocketClient {
                 break
             }
         }
+        guard task === currentTask else { return }
         task = nil
         await onDisconnect()
     }

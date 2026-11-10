@@ -10,7 +10,7 @@ import AppKit
         assert(CodexThrust.frameInterval(lowPower: false) == 1.0 / 20)
         assert(CodexThrust.frameInterval(lowPower: true) == 1.0 / 10)
         // Phase stays continuous when music/rocket speed changes or a screen sleeps.
-        var phase = MusicEdgePhase()
+        let phase = MusicEdgePhase()
         let start = Date(timeIntervalSinceReferenceDate: 1234)
         phase.update(target: 1, paused: false, at: start)
         let changed = start.addingTimeInterval(2)

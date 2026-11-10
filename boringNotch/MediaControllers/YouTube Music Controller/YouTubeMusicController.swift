@@ -9,6 +9,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import ImageIO
 
 final class YouTubeMusicController: MediaControllerProtocol {
     // MARK: - Published Properties
@@ -17,6 +18,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
     )
 
     private var artworkFetchTask: Task<Void, Never>?
+    private var artworkURL: URL?
     
     var playbackStatePublisher: AnyPublisher<PlaybackState, Never> {
         $playbackState.eraseToAnyPublisher()
@@ -51,6 +53,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
     
     private var updateTimer: Timer?
     private var appStateObserver: Task<Void, Never>?
+    private var reconnectTask: Task<Void, Never>?
     private var reconnectDelay: TimeInterval = 1.0
     
     // MARK: - Initialization
@@ -64,6 +67,15 @@ final class YouTubeMusicController: MediaControllerProtocol {
         Task {
             await initializeIfAppActive()
         }
+    }
+
+    deinit {
+        updateTimer?.invalidate()
+        appStateObserver?.cancel()
+        reconnectTask?.cancel()
+        artworkFetchTask?.cancel()
+        let client = webSocketClient
+        Task { await client?.disconnect() }
     }
     
     // MARK: - MediaControllerProtocol Implementation
@@ -105,7 +117,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
     
     func updatePlaybackInfo() async {
         guard isActive() else {
-            resetPlaybackState()
+            await resetPlaybackState()
             return
         }
         
@@ -185,7 +197,10 @@ final class YouTubeMusicController: MediaControllerProtocol {
         
         Task { @MainActor in
             stopPeriodicUpdates()
-            appStateObserver?.cancel()
+            reconnectTask?.cancel()
+            reconnectTask = nil
+            artworkFetchTask?.cancel()
+            artworkFetchTask = nil
         }
         
         Task {
@@ -193,14 +208,15 @@ final class YouTubeMusicController: MediaControllerProtocol {
             webSocketClient = nil
         }
         
-        resetPlaybackState()
+        await resetPlaybackState()
     }
     
     private func initializeIfAppActive() async {
-        guard isActive() else { return }
+        guard isActive(), !Task.isCancelled else { return }
         
         do {
             let token = try await authManager.authenticate()
+            guard isActive(), !Task.isCancelled else { return }
             await setupWebSocketIfPossible(token: token)
             await startPeriodicUpdates()
             await updatePlaybackInfo()
@@ -309,11 +325,16 @@ final class YouTubeMusicController: MediaControllerProtocol {
     }
     
     private func scheduleReconnect() async {
-        try? await Task.sleep(for: .seconds(reconnectDelay))
+        guard reconnectTask == nil, isActive(), !Task.isCancelled else { return }
+        let delay = reconnectDelay
         reconnectDelay = min(reconnectDelay * 2, configuration.reconnectDelay.upperBound)
-        
-        if isActive() {
-            await initializeIfAppActive()
+
+        // Release this controller between retries so switching players can tear it down.
+        reconnectTask = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+            guard !Task.isCancelled, let self else { return }
+            self.reconnectTask = nil
+            await self.initializeIfAppActive()
         }
     }
     
@@ -390,7 +411,7 @@ final class YouTubeMusicController: MediaControllerProtocol {
         }
     }
     
-    private func updatePlaybackState(with response: PlaybackResponse) async {
+    @MainActor private func updatePlaybackState(with response: PlaybackResponse) async {
         var newState = playbackState
         
         newState.isPlaying = !response.isPaused
@@ -434,28 +455,37 @@ final class YouTubeMusicController: MediaControllerProtocol {
             newState.volume = volume / 100.0
         }
 
-        if newState != playbackState {
-            playbackState = newState
-
+        let trackChanged = newState.title != playbackState.title
+            || newState.artist != playbackState.artist || newState.album != playbackState.album
+        let requestedURL = response.imageSrc.flatMap(URL.init(string:))
+        if trackChanged || (response.imageSrc != nil && requestedURL != artworkURL) {
             artworkFetchTask?.cancel()
             artworkFetchTask = nil
+            artworkURL = requestedURL
+            newState.artwork = nil
+        }
+        if newState != playbackState { playbackState = newState }
 
-            if let artworkURL = response.imageSrc,
-               let url = URL(string: artworkURL) {
-                artworkFetchTask = Task {
-                    do {
-                        let data = try await ImageService.shared.fetchImageData(from: url)
-                        await MainActor.run { [weak self] in
-                            self?.playbackState.artwork = data
-
-                        }
-                    } catch { /* ignore */ }
-                }
-            }
+        guard let url = artworkURL, playbackState.artwork == nil, artworkFetchTask == nil else { return }
+        artworkFetchTask = Task { @MainActor [weak self] in
+            // A cancelled request must not clear the replacement request's handle.
+            defer { if !Task.isCancelled { self?.artworkFetchTask = nil } }
+            do {
+                try Task.checkCancellation()
+                let data = try await ImageService.shared.fetchImageData(from: url)
+                try Task.checkCancellation()
+                guard let self, self.artworkURL == url, self.isActive(),
+                      let image = CGImageSourceCreateWithData(data as CFData, nil),
+                      CGImageSourceGetCount(image) > 0 else { return }
+                self.playbackState.artwork = data
+            } catch { /* Retry on a subsequent playback update. */ }
         }
     }
     
-    private func resetPlaybackState() {
+    @MainActor private func resetPlaybackState() {
+        artworkFetchTask?.cancel()
+        artworkFetchTask = nil
+        artworkURL = nil
         playbackState = PlaybackState(
             bundleIdentifier: configuration.bundleIdentifier,
             isPlaying: false

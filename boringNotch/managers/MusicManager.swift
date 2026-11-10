@@ -743,7 +743,7 @@ class MusicManager: ObservableObject {
         }
     }
     func skip(seconds: TimeInterval) {
-        let newPos = min(max(0, elapsedTime + seconds), songDuration)
+        let newPos = min(max(0, estimatedPlaybackPosition() + seconds), songDuration)
         seek(to: newPos)
     }
     

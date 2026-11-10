@@ -300,7 +300,7 @@ struct MusicEdgeFrame: View {
 }
 
 // Integrate the same exponential speed easing analytically, without per-frame state writes.
-struct MusicEdgePhase {
+final class MusicEdgePhase {
     private var phase = 0.0
     private var speed = 0.4
     private var target = 0.4
@@ -310,7 +310,7 @@ struct MusicEdgePhase {
         let dt = paused ? 0 : max(0, date.timeIntervalSince(anchor))
         return phase + target * dt + (speed - target) * 0.7 * (1 - exp(-dt / 0.7))
     }
-    mutating func update(target next: Double, paused nextPaused: Bool, at date: Date) {
+    func update(target next: Double, paused nextPaused: Bool, at date: Date) {
         let dt = paused ? 0 : max(0, date.timeIntervalSince(anchor))
         phase = value(at: date)
         speed = target + (speed - target) * exp(-dt / 0.7)
@@ -327,7 +327,7 @@ struct MusicEdgeEffect: View, Animatable {
         set { shape.animatableData = newValue }
     }
     @ObservedObject private var music = MusicManager.shared
-    @ObservedObject private var audio = MusicEdgeAudio.shared
+    private let audio = MusicEdgeAudio.shared
     @AppStorage("musicEdgeStyle") private var style = "off"
     @AppStorage("musicEdgeStrength") private var strength = 1.0
     @AppStorage("musicEdgeReactive") private var reactive = true
@@ -362,6 +362,12 @@ struct MusicEdgeEffect: View, Animatable {
         }
         .onChange(of: paused) { _, value in phase.update(target: playback.speed, paused: value, at: .now) }
         .onChange(of: playback.speed) { _, value in phase.update(target: value, paused: paused, at: .now) }
+        .onReceive(audio.$energy) { energy in
+            guard reactive && musicPlaying && !paused else { return }
+            // Audio changes the continuous phase; only the timeline requests a new frame.
+            phase.update(target: MusicEdgePlayback(style: style, alwaysOn: alwaysOn,
+                playing: musicPlaying, energy: energy).speed, paused: false, at: .now)
+        }
         .padding(-MusicEdgeFrame.drawingPadding(rocket: shape.rocket))
         .allowsHitTesting(false)
         .task(id: captureKey) { audio.setDemand(audioConsumer, bundleID: music.bundleIdentifier, active: onScreen && isVisible && style != "off" && reactive && musicPlaying && !reduced && !motion.suspended) }

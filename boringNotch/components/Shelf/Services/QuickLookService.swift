@@ -27,15 +27,12 @@ final class QuickLookService: ObservableObject {
         guard !urls.isEmpty else { return }
         stopAccessingCurrentURLs()
         accessingURLs = urls.filter { url in
-            if url.isFileURL {
-                return url.startAccessingSecurityScopedResource()
-            }
-            return true
+            url.isFileURL && url.startAccessingSecurityScopedResource()
         }
-        self.urls = accessingURLs
+        self.urls = urls
         self.isQuickLookOpen = true
         if selectFirst {
-            self.selectedURL = accessingURLs.first
+            self.selectedURL = urls.first
         }
         // Observe the shared Quick Look preview panel closing so we can relinquish security scope
         let panel = QLPreviewPanel.shared()

@@ -14,24 +14,26 @@ actor ThumbnailService {
     static let shared = ThumbnailService()
 
     private var cache: [String: NSImage] = [:]
-    private var pendingRequests: [String: Task<NSImage?, Never>] = [:]
+    private var pendingRequests: [String: (id: UUID, task: Task<NSImage?, Never>)] = [:]
     private let thumbnailGenerator = QLThumbnailGenerator.shared
 
     private init() {}
     
     func thumbnail(for url: URL, size: CGSize) async -> NSImage? {
-        let cacheKey = "\(url.path)_\(size.width)x\(size.height)"
+        let cacheKey = "\(url.standardizedFileURL.path)\u{0}\(size.width)x\(size.height)"
         
         if let cached = cache[cacheKey] {
             return cached
         }
         
         if let pending = pendingRequests[cacheKey] {
-            return await pending.value
+            return await pending.task.value
         }
-        
+
+        let requestID = UUID()
         let task = Task<NSImage?, Never> {
             let thumbnail = await generateQuickLookThumbnail(for: url, size: size)
+            guard !Task.isCancelled, pendingRequests[cacheKey]?.id == requestID else { return nil }
             if let thumbnail = thumbnail {
                 cache[cacheKey] = thumbnail
             }
@@ -39,16 +41,22 @@ actor ThumbnailService {
             return thumbnail
         }
         
-        pendingRequests[cacheKey] = task
+        pendingRequests[cacheKey] = (requestID, task)
         return await task.value
     }
     
     func clearCache() {
         cache.removeAll()
+        pendingRequests.values.forEach { $0.task.cancel() }
+        pendingRequests.removeAll()
     }
     
     func clearCache(for url: URL) {
-        cache = cache.filter { !$0.key.starts(with: url.path) }
+        let prefix = url.standardizedFileURL.path + "\u{0}"
+        cache = cache.filter { !$0.key.hasPrefix(prefix) }
+        for key in pendingRequests.keys.filter({ $0.hasPrefix(prefix) }) {
+            pendingRequests.removeValue(forKey: key)?.task.cancel()
+        }
     }
     
     // MARK: - Private Methods

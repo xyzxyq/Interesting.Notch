@@ -52,7 +52,6 @@ final class ImageProcessingService {
     static let shared = ImageProcessingService()
     
     private init() {}
-    private let ciContext = CIContext(options: nil)
     
     // MARK: - Remove Background
     
@@ -249,14 +248,15 @@ final class ImageProcessingService {
         let pdfDocument = PDFDocument()
         
         for (index, url) in imageURLs.enumerated() {
+            try Task.checkCancellation()
             guard let image = NSImage(contentsOf: url) else {
-                continue
+                throw ImageProcessingError.invalidImage
             }
-            
-            let pdfPage = PDFPage(image: image)
-            if let page = pdfPage {
-                pdfDocument.insert(page, at: index)
+
+            guard let page = PDFPage(image: image) else {
+                throw ImageProcessingError.pdfCreationFailed
             }
+            pdfDocument.insert(page, at: index)
         }
         
         guard pdfDocument.pageCount > 0 else {
@@ -270,6 +270,7 @@ final class ImageProcessingService {
         guard let pdfData = pdfDocument.dataRepresentation() else {
             throw ImageProcessingError.pdfCreationFailed
         }
+        try Task.checkCancellation()
         
         guard let tempURL = await TemporaryFileStorageService.shared.createTempFile(
             for: .data(pdfData, suggestedName: pdfName)

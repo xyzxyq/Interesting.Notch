@@ -113,7 +113,7 @@ import AppKit
         assert(stability.update([resumed, task], at: base.addingTimeInterval(5)) == [task])
         stability.reset()
         assert(stability.update([], at: base.addingTimeInterval(5.1)) == [])
-        var phase = MusicEdgePhase()
+        let phase = MusicEdgePhase()
         phase.update(target: 0.4, paused: false, at: base)
         assert(abs(phase.value(at: base.addingTimeInterval(2)) - 0.8) < 0.0001)
         phase.update(target: 1, paused: false, at: base.addingTimeInterval(2))

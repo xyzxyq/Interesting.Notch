@@ -7,6 +7,13 @@ opt-in. Preferences are persisted by Sparkle, and manual checks remain available
 when automatic checks are off. Installation completes at app quit or via Sparkle's
 restart action; playback controls and lyrics are not restarted by a version poll.
 
+When Sparkle discovers a valid update, Settings → About shows its version and a
+brief release summary, including updates discovered before Settings was opened.
+The existing Sparkle check drives this state; opening Settings adds no polling.
+Feeds without a plain-text summary show a link fallback. A completed check with
+no available update clears the previous summary; a network failure keeps the last
+known update. Full details remain available on GitHub Releases.
+
 The feed is the `appcast.xml` asset on the latest stable release:
 `https://github.com/xyzxyq/Interesting.Notch/releases/latest/download/appcast.xml`.
 Drafts and prereleases are not the update channel. Each stable release must include
@@ -19,10 +26,15 @@ A missing feed or failed download is reported by Sparkle and leaves the installe
 1. Increase `CFBundleVersion` / `CURRENT_PROJECT_VERSION` monotonically and update
    the marketing version. Build Release and sign the final app with the existing
    signing workflow. Keep `SUPublicEDKey`, bundle identity and the update URL intact.
+   Write `docs/releases/X.Y.Z.md` before packaging. Its first contiguous `- ` bullet
+   list supplies up to five plain-text highlights for Settings and Sparkle's update
+   dialog; keep these highlights concise and avoid Markdown formatting inside them.
 2. Run `scripts/package-release-dmg.sh <signed.app> <archive.dmg> <volume-name>`.
    This now creates `<archive.dmg>.update/appcast.xml` and a copy of the DMG, verifies
    the Ed25519 signature against the public key embedded in the source Info.plist,
    and checks release tag, URL and archive length. Use filenames without spaces.
+   The generated feed embeds those highlights and links to the version's full
+   GitHub Release notes. Packaging rejects a feed with an empty summary.
    Set `SPARKLE_BIN` if the resolved Sparkle tools are outside `build/*/SourcePackages`.
 3. Upload the verified DMG and `appcast.xml` together to a draft GitHub Release
    whose tag matches the app's `vX.Y.Z`, then publish it as the latest stable release.

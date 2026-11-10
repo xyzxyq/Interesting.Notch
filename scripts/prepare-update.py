@@ -16,6 +16,18 @@ FEED = 'https://github.com/xyzxyq/Interesting.Notch/releases/latest/download/app
 NS = '{http://www.andymatuschak.org/xml-namespaces/sparkle}'
 
 
+def release_summary(notes):
+    bullets = []
+    for line in notes.splitlines():
+        if line.startswith('- '):
+            bullets.append(line)
+        elif bullets:
+            break
+    if not bullets:
+        raise ValueError('Release notes must include a bullet list of update highlights')
+    return '\n'.join(bullets[:5])
+
+
 def validate_feed(path, archive, tag):
     items = ET.parse(path).getroot().findall('./channel/item')
     if len(items) != 1:
@@ -29,6 +41,10 @@ def validate_feed(path, archive, tag):
         raise ValueError('Update must download from this fork and exact release tag')
     if version != tag.removeprefix('v') or not build or not build.isdigit():
         raise ValueError('Release tag does not match the app version/build number')
+    description = item.find('description')
+    if (description is None or description.get(NS + 'format') != 'plain-text'
+            or not (description.text or '').strip()):
+        raise ValueError('Update feed must include an embedded plain-text release summary')
     if enclosure.get('length') != str(archive.stat().st_size) or not enclosure.get(NS + 'edSignature'):
         raise ValueError('Missing update signature or incorrect archive length')
     signature = enclosure.get(NS + 'edSignature')
@@ -84,6 +100,10 @@ def main():
         parser.error('Use a stable vX.Y.Z tag and an archive filename without spaces')
     if args.output.exists():
         parser.error('Output directory already exists; refusing to overwrite')
+    notes_path = ROOT / 'docs/releases' / f'{args.tag.removeprefix("v")}.md'
+    if not notes_path.is_file():
+        parser.error(f'Write release notes before packaging: {notes_path}')
+    summary = release_summary(notes_path.read_text())
     info = plistlib.loads((ROOT / 'boringNotch/Info.plist').read_bytes())
     if info.get('SUFeedURL') != FEED:
         parser.error('Unexpected update feed configuration')
@@ -94,7 +114,10 @@ def main():
         staging = Path(directory)
         copied = staging / archive.name
         shutil.copy2(archive, copied)
+        copied.with_suffix('.txt').write_text(summary)
         subprocess.run([str(tools / 'generate_appcast'), *signing, '--maximum-deltas', '0',
+                        '--embed-release-notes',
+                        '--full-release-notes-url', f'https://github.com/xyzxyq/Interesting.Notch/releases/tag/{args.tag}',
                         '--link', 'https://github.com/xyzxyq/Interesting.Notch/releases',
                         '--download-url-prefix', f'https://github.com/xyzxyq/Interesting.Notch/releases/download/{args.tag}/',
                         '-o', str(staging / 'appcast.xml'), str(staging)], check=True)

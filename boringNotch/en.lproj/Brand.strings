@@ -80,3 +80,17 @@
 "Automatically download and install updates" = "Automatically download and install updates";
 
 "Checks GitHub releases daily. Automatic installation finishes when the app quits; you can also restart to update." = "Checks GitHub releases daily. Automatic installation finishes when the app quits; you can also restart to update.";
+
+"New version available: %@" = "New version available: %@";
+"This release has no summary. Open GitHub Releases to read the update details." = "This release has no summary. Open GitHub Releases to read the update details.";
+
+"Enter a name and a complete http:// or https:// address for a Lottie JSON file." = "Enter a name and a complete http:// or https:// address for a Lottie JSON file.";
+"System accent color" = "System accent color";
+"Blue" = "Blue";
+"Purple" = "Purple";
+"Pink" = "Pink";
+"Red" = "Red";
+"Orange" = "Orange";
+"Yellow" = "Yellow";
+"Green" = "Green";
+"Graphite" = "Graphite";
